@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LDIMS - 文档类型管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f7fa;
+            height: 100vh;
+            display: flex;
+        }
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar {
+            width: 220px;
+            background-color: #304156;
+            height: 100%;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: white;
+            font-size: 18px;
+            border-bottom: 1px solid #1f2d3d;
+        }
+        .logo img {
+            width: 28px;
+            height: 28px;
+            margin-right: 10px;
+        }
+        .menu {
+            padding: 16px 0;
+        }
+        .menu-item {
+            padding: 12px 20px;
+            color: #bfcbd9;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .menu-item:hover, .menu-item.active {
+            color: white;
+            background-color: #263445;
+            border-left: 3px solid #409eff;
+            padding-left: 17px;
+        }
+        .menu-item:not(.active):not(:hover) {
+            padding-left: 20px;
+            border-left: 3px solid transparent;
+        }
+        .menu-item i {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .main-container {
+            margin-left: 220px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .header {
+            height: 60px;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,21,41,.08);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+        .breadcrumb {
+            color: #409eff;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            gap: 20px;
+        }
+        .page-title {
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: #303133;
+        }
+        .tree-container {
+            width: 300px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+            padding: 20px;
+        }
+        .tree-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .tree-title {
+            font-weight: 500;
+            color: #303133;
+        }
+        .tree-node {
+            padding: 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .tree-node-icon {
+            margin-right: 5px;
+        }
+        .tree-node-label {
+            flex: 1;
+        }
+        .tree-node.selected {
+            color: #409eff;
+        }
+        .tree-node:hover {
+            background-color: #f5f7fa;
+        }
+        .tree-node-children {
+            padding-left: 20px;
+        }
+        .form-container {
+            flex: 1;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+            padding: 20px;
+        }
+        .form-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ebeef5;
+        }
+        .form-title {
+            font-weight: 500;
+            color: #303133;
+        }
+        .action-bar {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background-color: #409eff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #66b1ff;
+        }
+        .btn-default {
+            background-color: #f4f4f5;
+            color: #606266;
+        }
+        .btn-default:hover {
+            background-color: #e9e9eb;
+        }
+        .btn-danger {
+            background-color: #f56c6c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #f78989;
+        }
+        .form-item {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #606266;
+        }
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: white;
+        }
+        .form-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ebeef5;
+        }
+        .dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .dialog-content {
+            background-color: white;
+            border-radius: 4px;
+            width: 500px;
+            padding: 20px;
+        }
+        .dialog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .dialog-title {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z'/%3E%3C/svg%3E" alt="Logo">
+                <span>LDIMS</span>
+            </div>
+            <div class="menu">
+                <div class="menu-item">
+                    <i>📄</i>
+                    <span>文档管理</span>
+                </div>
+                <div class="menu-item active">
+                    <i>📁</i>
+                    <span>文档类型</span>
+                </div>
+                <div class="menu-item">
+                    <i>👥</i>
+                    <span>用户管理</span>
+                </div>
+                <div class="menu-item">
+                    <i>🏢</i>
+                    <span>部门管理</span>
+                </div>
+                <div class="menu-item">
+                    <i>⚙️</i>
+                    <span>系统设置</span>
+                </div>
+            </div>
+        </div>
+        <div class="main-container">
+            <div class="header">
+                <div class="header-left">
+                    <div class="breadcrumb">首页 / 文档类型管理</div>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <img class="user-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23409eff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Avatar">
+                        <span>管理员</span>
+                    </div>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="tree-container">
+                    <div class="tree-header">
+                        <div class="tree-title">文档类型</div>
+                        <button class="btn btn-primary" onclick="showDialog()">新增</button>
+                    </div>
+                    <div class="tree-content">
+                        <div class="tree-node selected">
+                            <span class="tree-node-icon">📁</span>
+                            <span class="tree-node-label">所有文档类型</span>
+                        </div>
+                        <div class="tree-node">
+                            <span class="tree-node-icon">📄</span>
+                            <span class="tree-node-label">工作报告</span>
+                        </div>
+                        <div class="tree-node-children">
+                            <div class="tree-node">
+                                <span class="tree-node-icon">📄</span>
+                                <span class="tree-node-label">季度工作报告</span>
+                            </div>
+                            <div class="tree-node">
+                                <span class="tree-node-icon">📄</span>
+                                <span class="tree-node-label">年度工作报告</span>
+                            </div>
+                        </div>
+                        <div class="tree-node">
+                            <span class="tree-node-icon">📄</span>
+                            <span class="tree-node-label">申请文件</span>
+                        </div>
+                        <div class="tree-node-children">
+                            <div class="tree-node">
+                                <span class="tree-node-icon">📄</span>
+                                <span class="tree-node-label">设备申请</span>
+                            </div>
+                            <div class="tree-node">
+                                <span class="tree-node-icon">📄</span>
+                                <span class="tree-node-label">经费申请</span>
+                            </div>
+                        </div>
+                        <div class="tree-node">
+                            <span class="tree-node-icon">📄</span>
+                            <span class="tree-node-label">计划文件</span>
+                        </div>
+                        <div class="tree-node">
+                            <span class="tree-node-icon">📄</span>
+                            <span class="tree-node-label">调研报告</span>
+                        </div>
+                        <div class="tree-node">
+                            <span class="tree-node-icon">📄</span>
+                            <span class="tree-node-label">会议记录</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-container">
+                    <div class="form-header">
+                        <div class="form-title">文档类型信息</div>
+                        <div class="action-bar">
+                            <button class="btn btn-default">重置</button>
+                            <button class="btn btn-danger">删除</button>
+                            <button class="btn btn-primary">保存</button>
+                        </div>
+                    </div>
+                    <div class="form-content">
+                        <div class="form-item">
+                            <label class="form-label">类型名称</label>
+                            <input type="text" class="form-input" value="工作报告">
+                        </div>
+                        <div class="form-item">
+                            <label class="form-label">上级类型</label>
+                            <select class="form-select">
+                                <option value="0">无（作为顶级类型）</option>
+                                <option value="1">所有文档类型</option>
+                            </select>
+                        </div>
+                        <div class="form-item">
+                            <label class="form-label">排序号</label>
+                            <input type="number" class="form-input" value="1">
+                        </div>
+                        <div class="form-item">
+                            <label class="form-label">描述</label>
+                            <textarea class="form-input" rows="4">记录工作完成情况、问题和计划等内容的报告类文档。</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增文档类型对话框 -->
+    <div class="dialog" id="doctypeDialog">
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <div class="dialog-title">新增文档类型</div>
+                <button class="close-btn" onclick="hideDialog()">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-item">
+                    <label class="form-label">类型名称</label>
+                    <input type="text" class="form-input" placeholder="请输入类型名称">
+                </div>
+                <div class="form-item">
+                    <label class="form-label">上级类型</label>
+                    <select class="form-select">
+                        <option value="0">无（作为顶级类型）</option>
+                        <option value="1">所有文档类型</option>
+                        <option value="2">工作报告</option>
+                        <option value="3">申请文件</option>
+                        <option value="4">计划文件</option>
+                        <option value="5">调研报告</option>
+                        <option value="6">会议记录</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label class="form-label">排序号</label>
+                    <input type="number" class="form-input" value="1">
+                </div>
+                <div class="form-item">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-input" rows="4" placeholder="请输入描述信息"></textarea>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-default" onclick="hideDialog()">取消</button>
+                <button class="btn btn-primary">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showDialog() {
+            document.getElementById('doctypeDialog').style.display = 'flex';
+        }
+        
+        function hideDialog() {
+            document.getElementById('doctypeDialog').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 

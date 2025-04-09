@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LDIMS - 系统设置</title>
+    <link href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f7fa;
+            height: 100vh;
+            display: flex;
+        }
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar {
+            width: 220px;
+            background-color: #304156;
+            height: 100%;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: white;
+            font-size: 18px;
+            border-bottom: 1px solid #1f2d3d;
+        }
+        .logo img {
+            width: 28px;
+            height: 28px;
+            margin-right: 10px;
+        }
+        .menu {
+            padding: 16px 0;
+        }
+        .menu-item {
+            padding: 12px 20px;
+            color: #bfcbd9;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .menu-item:hover, .menu-item.active {
+            color: white;
+            background-color: #263445;
+            border-left: 3px solid #409eff;
+            padding-left: 17px;
+        }
+        .menu-item:not(.active):not(:hover) {
+            padding-left: 20px;
+            border-left: 3px solid transparent;
+        }
+        .menu-item i {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .main-container {
+            margin-left: 220px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .header {
+            height: 60px;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,21,41,.08);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+        .breadcrumb {
+            color: #409eff;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            gap: 20px;
+        }
+        .page-title {
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: #303133;
+        }
+        .settings-menu {
+            width: 240px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+            padding: 20px 0;
+            flex-shrink: 0;
+            height: fit-content;
+        }
+        .settings-menu-title {
+            padding: 0 20px;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #606266;
+            font-size: 14px;
+        }
+        .settings-menu-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #303133;
+        }
+        .settings-menu-item:hover, .settings-menu-item.active {
+            background-color: #ecf5ff;
+            color: #409eff;
+        }
+        .settings-content-wrapper {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        .settings-content {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+            padding: 20px;
+            padding-bottom: 80px;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .settings-section {
+            display: none;
+        }
+        .settings-section.active {
+            display: block;
+        }
+        .settings-header {
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ebeef5;
+        }
+        .settings-title {
+            font-weight: 500;
+            color: #303133;
+            font-size: 18px;
+        }
+        .form-item {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #606266;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            max-width: 500px;
+            background-color: white;
+        }
+        .form-description {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #909399;
+            line-height: 1.4;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #dcdfe6;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input[type="checkbox"]:checked + .slider {
+            background-color: #409eff;
+        }
+        input[type="checkbox"]:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        .form-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: white;
+            padding: 15px 20px;
+            border-top: 1px solid #ebeef5;
+            display: flex;
+            justify-content: flex-end;
+            z-index: 10;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            background-color: white;
+            color: #606266;
+            height: 36px;
+        }
+        .btn-primary {
+            background-color: #409eff;
+            color: white;
+            border-color: #409eff;
+        }
+        .btn-primary:hover {
+            background-color: #66b1ff;
+            border-color: #66b1ff;
+        }
+        .btn-default {
+            margin-right: 10px;
+        }
+        .btn-default:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+            background-color: #ecf5ff;
+        }
+        .btn-danger {
+            background-color: #f56c6c;
+            color: white;
+            border-color: #f56c6c;
+        }
+        .btn-danger:hover {
+            background-color: #f78989;
+            border-color: #f78989;
+        }
+        .form-password {
+            position: relative;
+        }
+        .form-password .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 8px;
+            color: #909399;
+            cursor: pointer;
+        }
+        .card {
+            border: 1px solid #ebeef5;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .card-title {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #303133;
+        }
+        .card-content {
+            color: #606266;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .db-status {
+            display: inline-flex;
+            align-items: center;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .db-status.connected {
+            background-color: #f0f9eb;
+            color: #67c23a;
+        }
+        .db-status.disconnected {
+            background-color: #fef0f0;
+            color: #f56c6c;
+        }
+        .db-status i {
+            margin-right: 4px;
+            font-size: 12px;
+        }
+        .action-link {
+            color: #409eff;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 15px;
+        }
+        .action-link:hover {
+            color: #66b1ff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z'/%3E%3C/svg%3E" alt="Logo">
+                <span>LDIMS</span>
+            </div>
+            <div class="menu">
+                <div class="menu-item" data-target="dashboard">
+                    <i>📊</i>
+                    <span>仪表盘</span>
+                </div>
+                <div class="menu-item" data-target="document">
+                    <i>📄</i>
+                    <span>文档管理</span>
+                </div>
+                <div class="menu-item" data-target="doctype">
+                    <i>📁</i>
+                    <span>文档类型</span>
+                </div>
+                <div class="menu-item" data-target="user">
+                    <i>👥</i>
+                    <span>用户管理</span>
+                </div>
+                <div class="menu-item" data-target="department">
+                    <i>🏢</i>
+                    <span>部门管理</span>
+                </div>
+                <div class="menu-item active" data-target="settings">
+                    <i>⚙️</i>
+                    <span>系统设置</span>
+                </div>
+            </div>
+        </div>
+        <div class="main-container">
+            <div class="header">
+                <div class="header-left">
+                    <div class="breadcrumb">首页 / 系统设置</div>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <img class="user-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23409eff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Avatar">
+                        <span>管理员</span>
+                    </div>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="settings-menu">
+                    <div class="settings-menu-title">系统设置</div>
+                    <div class="settings-menu-item active" data-section="basic-settings">基本设置</div>
+                    <div class="settings-menu-item" data-section="db-settings">数据库设置</div>
+                    <div class="settings-menu-item" data-section="query-settings">查询设置</div>
+                    <div class="settings-menu-item" data-section="import-export-settings">导入导出</div>
+                    <div class="settings-menu-item" data-section="log-settings">操作日志</div>
+                    <div class="settings-menu-item" data-section="data-settings">数据管理</div>
+                </div>
+                <div class="settings-content-wrapper">
+                    <div class="settings-content">
+                        <div class="settings-section active" id="basic-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">基本设置</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">系统名称</label>
+                                <input type="text" class="form-input" value="LDIMS - 文档信息管理系统">
+                                <div class="form-description">显示在浏览器标题栏和系统页面顶部的系统名称</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">系统Logo</label>
+                                <input type="file" class="form-input">
+                                <div class="form-description">建议尺寸：120x120像素，支持PNG、JPG格式</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">每页显示记录数</label>
+                                <select class="form-select">
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="30">30</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                                <div class="form-description">列表页面每页默认显示的记录数量</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据默认排序</label>
+                                <select class="form-select">
+                                    <option value="created_desc" selected>创建日期（降序）</option>
+                                    <option value="created_asc">创建日期（升序）</option>
+                                    <option value="updated_desc">更新日期（降序）</option>
+                                    <option value="updated_asc">更新日期（升序）</option>
+                                    <option value="name_asc">文档名称（升序）</option>
+                                </select>
+                                <div class="form-description">文档列表默认的排序方式</div>
+                            </div>
+                        </div>
+                        <div class="settings-section" id="db-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">数据库设置</div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">数据库连接状态</div>
+                                <div class="card-content">
+                                    当前状态：<span class="db-status connected"><i>●</i> 已连接</span>
+                                    <span class="action-link">测试连接</span>
+                                    <span class="action-link">刷新状态</span>
+                                </div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库类型</label>
+                                <select class="form-select">
+                                    <option value="mysql" selected>MySQL</option>
+                                    <option value="mariadb">MariaDB</option>
+                                </select>
+                                <div class="form-description">选择数据库类型，当前系统适配MySQL 8.0</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库主机</label>
+                                <input type="text" class="form-input" value="localhost">
+                                <div class="form-description">数据库服务器地址，本地服务器可使用localhost</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库端口</label>
+                                <input type="text" class="form-input" value="3306">
+                                <div class="form-description">MySQL默认端口为3306</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库名称</label>
+                                <input type="text" class="form-input" value="ldims">
+                                <div class="form-description">确保该数据库已创建且有访问权限</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库用户名</label>
+                                <input type="text" class="form-input" value="root">
+                                <div class="form-description">连接数据库的用户名</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">数据库密码</label>
+                                <div class="form-password">
+                                    <input type="password" class="form-input" value="********">
+                                    <span class="toggle-password">👁</span>
+                                </div>
+                                <div class="form-description">连接数据库的密码</div>
+                            </div>
+                        </div>
+                        <div class="settings-section" id="query-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">查询设置</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">启用查询历史</label>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="form-description">启用后，系统将记录用户最近使用的查询条件</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">最大历史记录数</label>
+                                <input type="number" class="form-input" value="10" min="0" max="50">
+                                <div class="form-description">最多保存多少条最近查询历史记录 (0表示不限制)</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">最大保存条件数</label>
+                                <input type="number" class="form-input" value="20" min="0" max="100">
+                                <div class="form-description">每个用户最多保存多少条常用查询条件 (0表示不限制)</div>
+                            </div>
+                        </div>
+                        <div class="settings-section" id="import-export-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">导入导出设置</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">默认导出格式</label>
+                                <select class="form-select">
+                                    <option value="xlsx" selected>Excel (.xlsx)</option>
+                                    <option value="csv">CSV (.csv)</option>
+                                </select>
+                                <div class="form-description">导出文档信息时的默认文件格式</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">单次导入/导出最大记录数</label>
+                                <input type="number" class="form-input" value="5000" min="100" max="50000">
+                                <div class="form-description">限制单次导入或导出操作处理的最大记录数量，防止系统过载</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">导入/导出任务超时时间 (秒)</label>
+                                <input type="number" class="form-input" value="300" min="60" max="1800">
+                                <div class="form-description">后台导入或导出任务允许执行的最长时间</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">任务管理</label>
+                                <button class="btn btn-default">查看导入导出任务列表</button>
+                                <div class="form-description">查看和管理后台正在执行或已完成的导入导出任务</div>
+                            </div>
+                        </div>
+                        <div class="settings-section" id="log-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">操作日志设置</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">启用操作日志</label>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <div class="form-description">记录用户的登录日志和重要操作日志（如批量导入、删除等）</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">日志保留期限</label>
+                                <select class="form-select">
+                                    <option value="30">30天</option>
+                                    <option value="90" selected>90天</option>
+                                    <option value="180">180天</option>
+                                    <option value="365">1年</option>
+                                    <option value="0">永久保留</option>
+                                </select>
+                                <div class="form-description">操作日志在数据库中保留的最长时间</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">日志查看</label>
+                                <button class="btn btn-default">查看操作日志</button>
+                                <div class="form-description">跳转到操作日志查询页面</div>
+                            </div>
+                        </div>
+                        <div class="settings-section" id="data-settings">
+                            <div class="settings-header">
+                                <div class="settings-title">数据管理设置</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">逻辑删除数据保留期</label>
+                                <select class="form-select">
+                                    <option value="7">7天</option>
+                                    <option value="15">15天</option>
+                                    <option value="30" selected>30天</option>
+                                    <option value="90">90天</option>
+                                    <option value="0">永久保留</option>
+                                </select>
+                                <div class="form-description">已删除数据在回收站中保留的最长时间，到期后可手动清除</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">手动清理已删除数据</label>
+                                <button class="btn btn-danger">立即清理</button>
+                                <div class="form-description">警告：此操作将永久删除回收站中超过保留期的数据，无法恢复</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">手动数据备份</label>
+                                <button class="btn btn-default">导出全量数据 (Excel)</button>
+                                <div class="form-description">将系统内所有文档信息导出为Excel文件进行备份</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-footer">
+                        <button class="btn btn-default">重置</button>
+                        <button class="btn btn-primary">保存设置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.querySelector('.toggle-password')?.addEventListener('click', function() {
+            const passwordInput = this.previousElementSibling;
+            if (passwordInput) {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.textContent = type === 'password' ? '👁' : '👁‍🗨';
+            }
+        });
+
+        const settingsMenuItems = document.querySelectorAll('.settings-menu-item');
+        const settingsSections = document.querySelectorAll('.settings-section');
+
+        settingsMenuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const targetSectionId = item.getAttribute('data-section');
+
+                settingsMenuItems.forEach(menu => menu.classList.remove('active'));
+                item.classList.add('active');
+
+                settingsSections.forEach(section => {
+                    if (section.id === targetSectionId) {
+                        section.classList.add('active');
+                    } else {
+                        section.classList.remove('active');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
