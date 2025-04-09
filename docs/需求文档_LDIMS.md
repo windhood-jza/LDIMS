@@ -204,6 +204,9 @@ LDIMS是一个用于管理文档信息的系统，支持文档信息的录入、
 | 当前 | API: DepartmentNode 响应增加 parentName 字段 | AI助手 |
 | 当前 | 修改 documents 表和API，允许多个字段为空 | AI助手 |
 | 当前 | 新增数据库创建脚本 | AI助手 |
+| 当前 | 修改 departments 表，使用 deletedAt 进行逻辑删除 | AI助手 |
+| 当前 | 修改 doc_types 表，使用 deletedAt 进行逻辑删除 | AI助手 |
+| 当前 | 修改 documents 表，使用 deletedAt 进行逻辑删除 | AI助手 |
 
 ## 7. 数据库设计
 
@@ -247,7 +250,7 @@ CREATE TABLE departments (
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-启用, 0-禁用',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    deletedAt DATETIME NULL DEFAULT NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
     INDEX idx_parent (parent_id),
     INDEX idx_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表';
@@ -265,7 +268,7 @@ CREATE TABLE doc_types (
     created_by INT NOT NULL COMMENT '创建人ID',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    deletedAt DATETIME NULL DEFAULT NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
     INDEX idx_parent (parent_id),
     INDEX idx_level (level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档类型表';
@@ -289,9 +292,9 @@ CREATE TABLE documents (
     updated_by VARCHAR(50) COMMENT '最后修改人姓名, 允许为空',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除',
+    deletedAt DATETIME NULL DEFAULT NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
     INDEX idx_doc_type (doc_type_id),
-    INDEX idx_department (source_department_id),
+    INDEX idx_source_department (source_department_id),
     INDEX idx_handover_date (handover_date),
     INDEX idx_doc_name (doc_name),
     FULLTEXT INDEX idx_content (doc_name, submitter, receiver, signer, remarks)
@@ -364,8 +367,8 @@ CREATE TABLE export_tasks (
 4. 文档信息表（documents）
    - 主键索引：id
    - 普通索引：doc_type_id（按类型查询）
-   - 普通索引：source_department_id（按部门查询）
-   - 普通索引：year（按年度查询）
+   - 普通索引：source_department_id（按部门查询，索引名：idx_source_department）
+   - 普通索引：handover_date（按交接日期查询）
    - 普通索引：doc_name（按文档名称查询）
    - 全文索引：(doc_name, submitter, receiver, signer, remarks)（全文检索）
 

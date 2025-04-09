@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection, isConnected } from './config/database';
 import { success } from './utils/response';
+import routes from './routes'; // 引入主路由
 
 // 加载环境变量
 dotenv.config();
@@ -15,6 +16,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// --- API 路由 ---
+app.use('/api/v1', routes);
 
 // 基础路由
 app.get('/api/v1/health', (req, res) => {
