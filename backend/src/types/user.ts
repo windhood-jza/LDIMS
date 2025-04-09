@@ -33,6 +33,8 @@ export interface CreateUserRequest {
  * 更新用户请求体
  */
 export interface UpdateUserRequest {
+  username?: string;
+  password?: string;
   realName?: string;
   role?: 'admin' | 'editor' | 'viewer';
   departmentId?: number;

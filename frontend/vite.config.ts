@@ -12,9 +12,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
+      '/api/v1': { // 修改代理监听路径为 /api/v1
         target: 'http://localhost:3000', // 后端 API 服务器地址
         changeOrigin: true,
+        // 移除 rewrite 规则，因为源和目标基础路径现在一致了
+        // rewrite: (path) => path.replace(/^\/api/, '/api/v1') 
       },
     }
   }

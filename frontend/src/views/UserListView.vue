@@ -100,7 +100,7 @@
     </el-card>
 
     <!-- 新增/编辑用户弹窗 -->
-    <!-- <UserFormDialog ref="userDialogRef" @success="fetchUsers" /> -->
+    <UserFormDialog ref="userDialogRef" @success="fetchUsers" />
 
   </div>
 </template>
@@ -109,11 +109,10 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElTable, ElTableColumn, ElCard, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElPagination, ElTag, ElSwitch, ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Refresh, Plus, Edit, Delete, Key } from '@element-plus/icons-vue';
-import { getUsers } from '@/services/api/user'; // 引入 API 服务
-import type { UserInfo } from '../../../backend/src/types/user'; // 复用类型
-import { format, parseISO } from 'date-fns'; // 日期格式化库
-
-// import UserFormDialog from './components/UserFormDialog.vue'; // 引入弹窗组件
+import { getUsers, updateUserStatus, deleteUser, getDepartments, resetUserPassword } from '@/services/api/user';
+import type { UserInfo } from '../../../backend/src/types/user';
+import { format, parseISO } from 'date-fns';
+import UserFormDialog from './components/UserFormDialog.vue';
 
 const loading = ref(false);
 const tableData = ref<UserInfo[]>([]);
@@ -131,7 +130,19 @@ const paginationParams = reactive({
   pageSize: 20,
 });
 
-// const userDialogRef = ref(); // 弹窗引用
+// 部门数据
+const departments = ref([]);
+
+// 获取部门列表
+const fetchDepartments = async () => {
+  try {
+    const data = await getDepartments();
+    departments.value = data;
+  } catch (error: any) {
+    console.error('获取部门列表失败:', error);
+    ElMessage.error(error.message || '获取部门列表失败');
+  }
+};
 
 // 获取用户列表
 const fetchUsers = async () => {
@@ -220,14 +231,11 @@ const formatDateTime = (dateTimeString: string) => {
   }
 };
 
-// 处理状态改变 (需要调用API更新)
+// 处理状态改变
 const handleStatusChange = async (row: UserInfo) => {
   loading.value = true;
-  console.log('状态改变:', row.id, row.status);
-  // 模拟 API 调用
-  await new Promise(resolve => setTimeout(resolve, 500)); 
   try {
-    // await updateUserStatus(row.id, row.status); // 假设有这个API
+    await updateUserStatus(row.id, row.status);
     ElMessage.success('状态更新成功');
   } catch (error: any) {
     ElMessage.error('状态更新失败: ' + error.message);
@@ -238,23 +246,8 @@ const handleStatusChange = async (row: UserInfo) => {
   }
 };
 
-// 新增用户
-const handleAddUser = () => {
-  console.log('新增用户');
-  // userDialogRef.value?.open('add');
-  ElMessage.info('新增用户功能待实现');
-};
-
-// 编辑用户
-const handleEditUser = (row: UserInfo) => {
-  console.log('编辑用户:', row);
-  // userDialogRef.value?.open('edit', row);
-  ElMessage.info('编辑用户功能待实现');
-};
-
 // 删除用户
 const handleDeleteUser = (row: UserInfo) => {
-  console.log('删除用户:', row);
   ElMessageBox.confirm(
     `确定要删除用户 "${row.realName}" 吗？`, 
     '警告', 
@@ -265,10 +258,8 @@ const handleDeleteUser = (row: UserInfo) => {
     }
   ).then(async () => {
     loading.value = true;
-    // 模拟 API 调用
-    await new Promise(resolve => setTimeout(resolve, 500));
     try {
-      // await deleteUser(row.id); // 假设有这个API
+      await deleteUser(row.id);
       ElMessage.success('删除成功');
       fetchUsers(); // 重新加载列表
     } catch (error: any) {
@@ -277,21 +268,52 @@ const handleDeleteUser = (row: UserInfo) => {
       loading.value = false;
     }
   }).catch(() => {
-    // 取消删除
     ElMessage.info('已取消删除');          
   });
 };
 
+// 用户表单弹窗引用
+const userDialogRef = ref();
+
+// 新增用户
+const handleAddUser = () => {
+  userDialogRef.value?.open('add');
+};
+
+// 编辑用户
+const handleEditUser = (row: UserInfo) => {
+  userDialogRef.value?.open('edit', row);
+};
+
 // 重置密码
 const handleResetPassword = (row: UserInfo) => {
-  console.log('重置密码:', row);
-  ElMessage.info('重置密码功能待实现');
+  ElMessageBox.confirm(
+    `确定要重置用户 "${row.realName}" 的密码吗？`, 
+    '警告', 
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    loading.value = true;
+    try {
+      await resetUserPassword(row.id);
+      ElMessage.success('密码重置成功');
+    } catch (error: any) {
+      ElMessage.error('密码重置失败: ' + error.message);
+    } finally {
+      loading.value = false;
+    }
+  }).catch(() => {
+    ElMessage.info('已取消重置密码');          
+  });
 };
 
 // 组件挂载后加载数据
 onMounted(() => {
   fetchUsers();
-  // 获取部门列表用于搜索下拉框
+  fetchDepartments();
 });
 
 </script>

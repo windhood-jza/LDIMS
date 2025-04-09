@@ -23,7 +23,8 @@
     /* Path Aliases */
     "baseUrl": ".", // 基准目录
     "paths": {
-      "@/*": ["src/*"] // 配置 @/ 指向 src/
+      "@/*": ["src/*"], // 配置 @/ 指向 src/
+      "@backend-types/*": ["../backend/src/types/*"] // 新增：指向后端类型目录
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
