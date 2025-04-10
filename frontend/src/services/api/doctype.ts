@@ -1,13 +1,33 @@
 import request from '../request';
 import type { DocTypeInfo, CreateDocTypeRequest, UpdateDocTypeRequest } from '@backend-types/doctype';
+// import type { ApiResponse } from '../request';
+
+// 假设树节点的接口定义
+interface TreeNode {
+    id: number;
+    name: string;
+    children?: TreeNode[];
+    // 可能包含其他属性
+}
 
 /**
- * 获取文档类型树结构
- * GET /api/v1/doctypes/tree
+ * 获取文档类型树
+ * @returns Promise 包含文档类型树数组
  */
-export const getDocTypeTree = (): Promise<DocTypeInfo[]> => {
-  // 注意路径与后端 Controller 中定义的一致
-  return request.get('/doctypes/tree');
+export const getDocTypeTree = async (): Promise<TreeNode[]> => {
+    try {
+        // 假设 request 直接返回需要的数据结构 (数组)
+        const response: TreeNode[] = await request({
+            url: '/doctypes/tree',
+            method: 'get',
+        });
+        return response || [];
+    } catch (error) {
+        console.error("API Error fetching doctype tree:", error);
+        // 返回空数组，让界面能正常渲染，并通过 ElMessage 提示用户
+        ElMessage.error('获取文档类型树失败');
+        return [];
+    }
 };
 
 /**

@@ -5,8 +5,8 @@ import sequelize from '../config/database';
 interface DocumentAttributes {
   id: number;
   docName: string;
-  docTypeId: number | null;
-  sourceDepartmentId: number;
+  docTypeName: string | null;
+  sourceDepartmentName: string | null;
   submitter: string;
   receiver: string;
   signer: string | null;
@@ -17,18 +17,18 @@ interface DocumentAttributes {
   updatedBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
-  deletedAt?: Date | null; // 修改: 允许 null
+  deletedAt?: Date | null;
 }
 
 // 定义创建 Document 时可选的属性
-interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'docTypeId' | 'signer' | 'storageLocation' | 'remarks' | 'handoverDate' | 'createdBy' | 'updatedBy' | 'createdAt' | 'updatedAt' | 'deletedAt'> {}
+interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'signer' | 'storageLocation' | 'remarks' | 'handoverDate' | 'createdBy' | 'updatedBy' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'docTypeName' | 'sourceDepartmentName'> {}
 
 // 定义 Document 模型类
 class Document extends Model<DocumentAttributes, DocumentCreationAttributes> implements DocumentAttributes {
   public id!: number;
   public docName!: string;
-  public docTypeId!: number | null;
-  public sourceDepartmentId!: number;
+  public docTypeName!: string | null;
+  public sourceDepartmentName!: string | null;
   public submitter!: string;
   public receiver!: string;
   public signer!: string | null;
@@ -41,7 +41,7 @@ class Document extends Model<DocumentAttributes, DocumentCreationAttributes> imp
   // 时间戳
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
-  public readonly deletedAt!: Date | null; // 由 paranoid 模式管理
+  public readonly deletedAt!: Date | null;
 }
 
 // 初始化 Document 模型
@@ -58,17 +58,17 @@ Document.init(
       field: 'doc_name',
       comment: '文档名称',
     },
-    docTypeId: {
-      type: DataTypes.INTEGER,
+    docTypeName: {
+      type: DataTypes.STRING(255),
       allowNull: true,
-      field: 'doc_type_id',
-      comment: '文档类型ID, 允许为空',
+      field: 'doc_type_name',
+      comment: '文档类型名称',
     },
-    sourceDepartmentId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      field: 'source_department_id',
-      comment: '来源部门ID',
+    sourceDepartmentName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'source_department_name',
+      comment: '来源部门名称',
     },
     submitter: {
       type: DataTypes.STRING(50),
@@ -139,10 +139,10 @@ Document.init(
     underscored: false,
     comment: '文档信息表',
     indexes: [
-      { fields: ['doc_type_id'], name: 'idx_doc_type' },
-      { fields: ['source_department_id'], name: 'idx_source_department' },
       { fields: ['handover_date'], name: 'idx_handover_date' },
       { fields: ['doc_name'], name: 'idx_doc_name' },
+      { fields: ['doc_type_name'], name: 'idx_doc_type_name' },
+      { fields: ['source_department_name'], name: 'idx_source_department_name' },
     ],
     paranoid: true,
     deletedAt: 'deletedAt'

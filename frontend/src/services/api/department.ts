@@ -1,11 +1,33 @@
 import request from '../request'; // 引入封装好的 axios 实例
 import type { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '@backend-types/department'; // 引入后端类型
+// import type { ApiResponse } from '../request';
+
+// 假设树节点的接口定义
+interface TreeNode {
+    id: number;
+    name: string;
+    parentName?: string; // 部门树可能包含 parentName
+    children?: TreeNode[];
+    // 可能包含其他属性
+}
 
 /**
- * 获取部门树结构
+ * 获取部门树
+ * @returns Promise 包含部门树数组
  */
-export const getDepartmentTree = (): Promise<DepartmentInfo[]> => {
-  return request.get('/departments/tree');
+export const getDepartmentTree = async (): Promise<TreeNode[]> => {
+    try {
+        const response: TreeNode[] = await request({
+            url: '/departments/tree', // 假设获取树的接口路径是 /departments/tree
+            method: 'get',
+        });
+        return response || [];
+    } catch (error) {
+        console.error("API Error fetching department tree:", error);
+        // 返回空数组并提示用户
+        ElMessage.error('获取部门树失败');
+        return [];
+    }
 };
 
 /**
