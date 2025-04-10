@@ -5,12 +5,13 @@
       <el-aside width="200px" class="sidebar">
         <div class="logo">LDIMS</div>
         <el-menu
-          default-active="/dashboard" 
+          :default-active="activeMenu"
           class="el-menu-vertical-demo"
           background-color="#304156"
           text-color="#bfcbd9"
           active-text-color="#409EFF"
           router
+          :collapse-transition="false"
         >
           <el-menu-item index="/dashboard">
             <el-icon><House /></el-icon>
@@ -36,30 +37,28 @@
              <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </el-menu-item>
-          <!-- 更多菜单项 -->
         </el-menu>
       </el-aside>
 
-      <el-container>
+      <el-container class="main-container">
         <!-- Header -->
         <el-header class="header">
-          <div class="breadcrumb">
-            <!-- 面包屑导航 -->
+          <div class="header-left">
             <el-breadcrumb separator="/">
               <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-              <el-breadcrumb-item>{{ $route.meta.title || '页面' }}</el-breadcrumb-item>
+              <el-breadcrumb-item v-if="route.meta.title">{{ route.meta.title }}</el-breadcrumb-item>
             </el-breadcrumb>
           </div>
-          <div class="user-info">
-            <el-dropdown>
-              <span class="el-dropdown-link">
-                Admin <el-icon class="el-icon--right"><arrow-down /></el-icon>
+          <div class="header-right">
+            <el-dropdown @command="handleCommand">
+              <span class="el-dropdown-link user-info">
+                <el-avatar :size="30" :src="avatarUrl"/>
+                <span class="username">{{ username }}</span>
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item>个人中心</el-dropdown-item>
-                  <el-dropdown-item>修改密码</el-dropdown-item>
-                  <el-dropdown-item divided>退出登录</el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -68,7 +67,7 @@
 
         <!-- Main Content -->
         <el-main class="main-content">
-          <router-view></router-view> <!-- 路由视图，用于显示子页面 -->
+          <router-view></router-view>
         </el-main>
       </el-container>
     </el-container>
@@ -76,49 +75,111 @@
 </template>
 
 <script setup lang="ts">
-import { 
-  House, 
-  Files, 
-  Collection, 
-  User, 
-  OfficeBuilding, 
-  Setting, 
-  ArrowDown 
+import { computed } from 'vue';
+import {
+  ElContainer, ElAside, ElHeader, ElMain, ElMenu, ElMenuItem, ElIcon,
+  ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar,
+  ElBreadcrumb, ElBreadcrumbItem
+} from 'element-plus';
+import {
+  House,
+  Files,
+  Collection,
+  User,
+  OfficeBuilding, // 确保已引入
+  Setting,
+  ArrowDown
 } from '@element-plus/icons-vue';
+import { useRoute, useRouter } from 'vue-router';
 
-// 这里可以添加布局相关的逻辑，例如获取用户信息等
+const route = useRoute();
+const router = useRouter();
+
+// 根据当前路由计算激活的菜单项
+const activeMenu = computed(() => route.path);
+
+// 模拟用户信息和头像
+const username = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')!).username : '未登录';
+const avatarUrl = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23409eff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E`;
+
+// 处理下拉菜单命令
+const handleCommand = (command: string) => {
+  if (command === 'logout') {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userInfo');
+    router.push('/login');
+  }
+};
 
 </script>
 
 <style scoped>
+/* 基本布局和容器 */
 .common-layout, .layout-container {
   height: 100vh;
   display: flex;
 }
 
+/* 侧边栏 */
 .sidebar {
   background-color: #304156;
   color: #fff;
-  overflow-y: auto; /* 如果菜单过长，允许滚动 */
+  overflow-y: auto;
+  height: 100%;
 }
 
+/* Logo */
 .logo {
   height: 60px;
   line-height: 60px;
   text-align: center;
   font-size: 20px;
   font-weight: bold;
-  background-color: #263445; /* Logo 背景色稍深 */
+  background-color: #263445;
+  color: white;
+}
+.logo img {
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+  vertical-align: middle;
 }
 
+/* 菜单 */
 .el-menu {
-  border-right: none; /* 移除菜单右边框 */
+  border-right: none;
 }
 
+/* 修复菜单项激活时的边框和样式 */
 .el-menu-item.is-active {
-  /* 可以添加选中项的特殊样式 */
+    border-left: 3px solid #409eff;
+}
+/* 统一菜单项 padding */
+.el-menu-item {
+    padding-left: 20px !important;
+}
+.el-menu-item.is-active {
+    padding-left: 17px !important;
+}
+/* 鼠标悬停时效果 */
+.el-menu-item:hover {
+    background-color: #263445 !important;
+}
+/* 图标和文字间距 */
+.el-menu-item .el-icon {
+    margin-right: 5px;
 }
 
+/* 主容器 */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  flex: 1;
+}
+
+/* 顶部 Header */
 .header {
   background-color: #fff;
   color: #333;
@@ -128,37 +189,56 @@ import {
   border-bottom: 1px solid #e6e6e6;
   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
   padding: 0 20px;
+  height: 60px;
+  flex-shrink: 0;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+/* 面包屑 */
 .breadcrumb {
-  /* 面包屑样式 */
+  /* 样式 */
 }
 
+/* 用户信息 */
 .user-info {
   display: flex;
   align-items: center;
+  cursor: pointer;
+}
+
+.username {
+  margin-left: 8px;
+  margin-right: 4px;
 }
 
 .el-dropdown-link {
-  cursor: pointer;
-  color: #409eff;
   display: flex;
   align-items: center;
 }
 
+/* 主内容区域 */
 .main-content {
   background-color: #f5f7fa;
   padding: 20px;
-  height: calc(100vh - 60px); /* 计算主内容区域高度，减去Header高度 */
-  overflow-y: auto; /* 如果内容过长，允许滚动 */
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* 隐藏滚动条但保留滚动功能 (适用于 Webkit 内核浏览器) */
 .sidebar::-webkit-scrollbar, .main-content::-webkit-scrollbar {
-  display: none; 
+  display: none;
 }
 .sidebar, .main-content {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-</style> 
+</style>

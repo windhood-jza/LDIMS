@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
+import DepartmentManagement from '../views/DepartmentManagement.vue'; // 引入部门管理视图
 
 // 定义路由规则
 const routes: Array<RouteRecordRaw> = [
@@ -34,8 +35,8 @@ const routes: Array<RouteRecordRaw> = [
       },
        {
         path: 'departments',
-        name: 'DepartmentList',
-        component: () => import('../views/DepartmentListView.vue'),
+        name: 'DepartmentManagement',
+        component: DepartmentManagement,
         meta: { title: '部门管理', requiresAuth: true }
       },
        {
