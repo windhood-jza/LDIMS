@@ -117,11 +117,17 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
     // Ensure parentId is not null before creating
     const parentIdToSave = data.parentId ?? 0;
 
+    // 添加日志记录，检查传入的 data
+    console.log('DocTypeService.create - Received data:', data);
+    console.log('DocTypeService.create - sortOrder value:', data.sortOrder, 'Type:', typeof data.sortOrder);
+
+    // 修复：明确传递 sortOrder 并提供默认值
     const newDocType = await DocType.create({
-      ...data,
+      name: data.name,
       parentId: parentIdToSave, // Use the determined parentId
       level: level,
       createdBy: userId,
+      sortOrder: data.sortOrder ?? 0, // 显式包含 sortOrder，如果未提供则默认为 0
     });
     return newDocType;
   }
@@ -133,7 +139,7 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
    * @returns Promise<DocType | null>
    */
   async update(id: number, data: UpdateDocTypeRequest): Promise<DocType | null> { // Return DocType
-    const docType = await DocType.findByPk(id);
+    const docType = await this.docTypeModel.findByPk(id);
     if (!docType) {
       return null; // Or throw an error ('文档类型未找到')
     }
@@ -147,7 +153,7 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
             throw new Error('不能将类型的上级设置为自身');
         }
         if (data.parentId) {
-            parent = await DocType.findByPk(data.parentId);
+            parent = await this.docTypeModel.findByPk(data.parentId);
             if (!parent) {
                 throw new Error('指定的上级类型不存在');
             }
