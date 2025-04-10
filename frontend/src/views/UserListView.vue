@@ -9,14 +9,18 @@
             <el-input v-model="searchParams.keyword" placeholder="用户名/姓名" clearable></el-input>
           </el-form-item>
           <el-form-item label="部门">
-            <el-select v-model="searchParams.departmentId" placeholder="请选择部门" clearable filterable>
-              <el-option
-                v-for="dept in departments"
-                :key="dept.id"
-                :label="dept.name"
-                :value="dept.id"
-              />
-            </el-select>
+            <el-tree-select
+              v-model="searchParams.departmentId"
+              :data="departments"
+              :props="{ label: 'name', children: 'children', value: 'id' }"
+              placeholder="请选择部门"
+              clearable
+              filterable
+              check-strictly
+              node-key="id"
+              default-expand-all
+              style="width: 180px;"
+            />
           </el-form-item>
           <el-form-item label="角色">
             <el-select v-model="searchParams.role" placeholder="请选择角色" clearable>
@@ -109,13 +113,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { ElTable, ElTableColumn, ElCard, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElPagination, ElTag, ElSwitch, ElMessage, ElMessageBox } from 'element-plus';
+import { ElTable, ElTableColumn, ElCard, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElPagination, ElTag, ElSwitch, ElMessage, ElMessageBox, ElTreeSelect } from 'element-plus';
 import { Search, Refresh, Plus, Edit, Delete, Key } from '@element-plus/icons-vue';
 import { getUsers, updateUserStatus, deleteUser, resetUserPassword } from '@/services/api/user';
 import type { UserInfo } from '../../../backend/src/types/user';
 import { format, parseISO } from 'date-fns';
 import UserFormDialog from './components/UserFormDialog.vue';
-import { getDepartmentList } from '@/services/api/department';
+import { getDepartmentTree } from '@/services/api/department';
 import type { DepartmentInfo } from '@backend-types/department';
 
 const loading = ref(false);
@@ -140,11 +144,11 @@ const departments = ref<DepartmentInfo[]>([]);
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const data = await getDepartmentList();
+    const data = await getDepartmentTree();
     departments.value = data;
   } catch (error: any) {
-    console.error('获取部门列表失败:', error);
-    ElMessage.error(error.message || '获取部门列表失败');
+    console.error('获取部门树失败:', error);
+    ElMessage.error(error.message || '获取部门树失败');
   }
 };
 
@@ -401,5 +405,15 @@ onMounted(() => {
 /* .control-container .el-button {
   height: 36px;
 } */
+
+/* 为下拉选择框设置固定宽度 - 对 TreeSelect 可能也需要调整 */
+.search-form .el-tree-select {
+  width: 180px; /* 或根据需要调整宽度 */
+  height: 36px; /* 保持高度一致 */
+   :deep(.el-select__wrapper) {
+      height: 100%;
+      box-sizing: border-box;
+  }
+}
 
 </style>
