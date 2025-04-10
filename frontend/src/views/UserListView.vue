@@ -9,11 +9,13 @@
             <el-input v-model="searchParams.keyword" placeholder="用户名/姓名" clearable></el-input>
           </el-form-item>
           <el-form-item label="部门">
-            <el-select v-model="searchParams.departmentId" placeholder="请选择部门" clearable>
-              <!-- 部门选项需要从 API 获取 -->
-              <el-option label="总部" :value="1"></el-option>
-              <el-option label="技术部" :value="2"></el-option>
-              <el-option label="市场部" :value="3"></el-option>
+            <el-select v-model="searchParams.departmentId" placeholder="请选择部门" clearable filterable>
+              <el-option
+                v-for="dept in departments"
+                :key="dept.id"
+                :label="dept.name"
+                :value="dept.id"
+              />
             </el-select>
           </el-form-item>
           <el-form-item label="角色">
@@ -109,10 +111,12 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElTable, ElTableColumn, ElCard, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElPagination, ElTag, ElSwitch, ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Refresh, Plus, Edit, Delete, Key } from '@element-plus/icons-vue';
-import { getUsers, updateUserStatus, deleteUser, getDepartments, resetUserPassword } from '@/services/api/user';
+import { getUsers, updateUserStatus, deleteUser, resetUserPassword } from '@/services/api/user';
 import type { UserInfo } from '../../../backend/src/types/user';
 import { format, parseISO } from 'date-fns';
 import UserFormDialog from './components/UserFormDialog.vue';
+import { getDepartmentList } from '@/services/api/department';
+import type { DepartmentInfo } from '@backend-types/department';
 
 const loading = ref(false);
 const tableData = ref<UserInfo[]>([]);
@@ -131,12 +135,12 @@ const paginationParams = reactive({
 });
 
 // 部门数据
-const departments = ref([]);
+const departments = ref<DepartmentInfo[]>([]);
 
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const data = await getDepartments();
+    const data = await getDepartmentList();
     departments.value = data;
   } catch (error: any) {
     console.error('获取部门列表失败:', error);

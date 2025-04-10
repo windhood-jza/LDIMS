@@ -47,7 +47,34 @@
           <template #header>
             <div class="card-header">
               <span>部门信息</span>
-               <el-button type="primary" @click="handleSave" :loading="formLoading" :disabled="!selectedDepartment">保存</el-button>
+              <div>
+                <el-button
+                  :icon="RefreshLeft" 
+                  @click="resetForm"
+                  :disabled="!selectedDepartment"
+                >
+                  重置
+                </el-button>
+                <el-button
+                  type="danger"
+                  :icon="Delete"
+                  @click="handleDelete(selectedDepartment!)" 
+                  :disabled="!selectedDepartment || !selectedDepartment.id"
+                  style="margin-left: 10px;"
+                >
+                  删除
+                </el-button>
+                <el-button 
+                  type="primary" 
+                  :icon="Check" 
+                  @click="handleSave" 
+                  :loading="formLoading" 
+                  :disabled="!selectedDepartment || !selectedDepartment.id"
+                  style="margin-left: 10px;"
+                >
+                  保存
+                </el-button>
+              </div>
             </div>
           </template>
           <div v-if="selectedDepartment" class="form-content">
@@ -113,7 +140,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { ElTree, ElCard, ElRow, ElCol, ElButton, ElInput, ElForm, ElFormItem, ElEmpty, ElTreeSelect, ElInputNumber, ElDialog, ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Delete } from '@element-plus/icons-vue';
+import { Plus, Delete, RefreshLeft, Check } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import type Node from 'element-plus/es/components/tree/src/model/node'; // 类型
 import { getDepartmentTree, createDepartment, updateDepartment, deleteDepartment } from '@/services/api/department';
@@ -396,6 +423,16 @@ const handleDelete = (data: DepartmentInfo) => {
     });
 };
 
+// 重置右侧表单为其原始选中状态
+const resetForm = () => {
+  if (selectedDepartment.value) {
+    updateForm(selectedDepartment.value);
+    formRef.value?.clearValidate(); // 清除可能的验证错误提示
+    ElMessage.info('表单已重置');
+  } else {
+     ElMessage.warning('请先选择一个部门');
+  }
+};
 
 // --- Lifecycle ---
 onMounted(() => {
@@ -406,13 +443,22 @@ onMounted(() => {
 
 <style scoped>
 .department-management-page {
-  padding: 20px;
+  /* padding: 20px; */ /* Padding is on main-content now */
+  height: 100%; /* 让页面容器占满父容器高度 */
 }
+
+/* 让 Row 和 Col 也占满高度 */
+.el-row,
+.el-col {
+  height: 100%;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .custom-tree-node {
   flex: 1;
   display: flex;
@@ -421,30 +467,45 @@ onMounted(() => {
   font-size: 14px;
   padding-right: 8px;
 }
-/* 控制按钮只在 hover 时显示，或者始终显示，根据需要调整 */
+/* 控制按钮只在 hover 时显示 */
 .custom-tree-node span:last-child {
-    display: none; /* 默认隐藏 */
+    /* display: none; */ /* 改为一直显示可能更好操作 */
+    /* opacity: 0; */
+    /* transition: opacity 0.2s ease-in-out; */
 }
 .el-tree-node__content:hover .custom-tree-node span:last-child {
-    display: inline-block; /* Hover时显示 */
+    /* display: inline-block; */
+    /* opacity: 1; */
 }
 
 .form-content {
-    margin-top: 20px; /* Add some space above the form */
+    /* margin-top: 20px; */ /* Card header 有 padding */
 }
+
 .el-form {
-    max-width: 600px; /* Limit form width */
+    max-width: 95%; /* 稍微留点边距 */
+    /* max-width: 600px; */ /* Maybe too restrictive */
 }
 
 .el-card {
-    height: calc(100vh - 100px); /* Adjust based on header/padding */
+    height: 100%; /* 让卡片占满 Col 高度 */
     display: flex;
     flex-direction: column;
 }
+
 :deep(.el-card__body) {
-    flex: 1;
-    overflow-y: auto; /* Enable scrolling for card body */
+    flex: 1; /* 让 body 填充剩余空间 */
+    overflow-y: auto; /* 内容超出时内部滚动 */
+    padding: 20px; /* 确保 body 有内边距 */
 }
 
+/* 隐藏滚动条但保留滚动功能 (适用于 Webkit 内核浏览器) */
+:deep(.el-card__body)::-webkit-scrollbar {
+  display: none;
+}
+:deep(.el-card__body) {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
 
 </style> 

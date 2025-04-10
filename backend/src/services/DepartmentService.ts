@@ -98,28 +98,59 @@ class DepartmentService {
    * 创建新部门
    * @param deptData 部门数据
    * @returns 创建后的部门信息
-   * @throws 如果同级下名称已存在或其他数据库错误
+   * @throws 如果同级下名称已存在(未删除的)或父部门不存在
    */
   public async createDepartment(deptData: CreateDepartmentRequest): Promise<DepartmentInfo> {
+    // 1. 检查同级下名称是否重复 (只检查未删除的)
     const whereClauseForCheck = {
       name: deptData.name,
-      parentId: deptData.parentId === null ? { [Op.is]: null } : deptData.parentId // 处理 null
+      parentId: deptData.parentId === null ? { [Op.is]: null } : deptData.parentId
     };
-    const existingDept = await Department.findOne({ where: whereClauseForCheck });
+    const existingDept = await Department.findOne({ 
+        where: whereClauseForCheck 
+        // paranoid: false // 移除此选项，恢复默认行为(只查未删除的)
+    });
     if (existingDept) {
-      throw new Error(`在 ${deptData.parentId ? '此父部门下' : '顶级部门中'} 已存在名为 "${deptData.name}" 的部门`);
+      // 恢复原始错误消息
+      const message = `在 ${deptData.parentId ? '此父部门下' : '顶级部门中'} 已存在名为 "${deptData.name}" 的部门`;
+      throw new Error(message);
     }
 
-    // 只传递模型需要的字段给 create
-    const createData = {
+    // ... (计算 level, 创建部门, 更新 code, 返回信息 - 保持不变) ...
+     // 2. 计算 level
+    let level = 1; // Default for top-level
+    if (deptData.parentId) {
+      const parentDept = await Department.findByPk(deptData.parentId);
+      if (!parentDept) {
+        throw new Error(`指定的上级部门 (ID: ${deptData.parentId}) 不存在`);
+      }
+      // @ts-ignore - Assume parentDept.level exists and is number
+      level = parentDept.level + 1;
+    }
+
+    // 3. 创建部门 (包含临时 code 和计算好的 level)
+    const tempCode = `TEMP_${Date.now()}`; // 生成临时 code
+    const createData: { name: string; parentId?: number; sortOrder: number; level: number; code: string } = {
       name: deptData.name,
-      parentId: deptData.parentId,
-      sortOrder: deptData.sortOrder
-      // code 和 level 依赖数据库默认值或后续处理
+      sortOrder: deptData.sortOrder ?? 0,
+      level: level,
+      code: tempCode, // 先使用临时 code 满足 NOT NULL 约束
     };
-    // @ts-ignore // 暂时忽略 code, level 的缺失，假设数据库有默认值
+    if (deptData.parentId !== null) {
+      createData.parentId = deptData.parentId;
+    }
     const newDept = await Department.create(createData);
-    return await this.getDepartmentById(newDept.id) as DepartmentInfo;
+
+    // 4. 更新为最终的 code (使用 D + ID)
+    const finalCode = 'D' + newDept.id;
+    await newDept.update({ code: finalCode });
+
+    // 5. 返回包含最终 code 和 parentName 的信息
+    const createdDeptInfo = await this.getDepartmentById(newDept.id);
+    if (!createdDeptInfo) { 
+        throw new Error('创建部门后无法查询到信息');
+    }
+    return createdDeptInfo;
   }
 
   /**
