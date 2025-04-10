@@ -41,19 +41,49 @@ instance.interceptors.response.use(
       // 可以根据不同的错误码处理不同的逻辑，例如 401 未授权跳转登录页
       return Promise.reject(new Error(res.message || 'Error'));
     } else {
-      // 成功时只返回 data 部分 (如果后端直接返回数据而非 {code, data, message} 结构，则返回 res)
-      // return res; // 如果后端直接返回数据
-       return res.data; // 如果后端返回 {code, data, message}
+       // 成功时只返回 data 部分 (如果后端返回 {code, data, message})
+       // 检查 res.data 是否存在，如果后端有时直接返回 null 或空，则返回 null
+       return res ? (res.data !== undefined ? res.data : res) : null; 
+       // 如果后端有时直接返回数据而非 {code, data, message} 结构，则可能需要更复杂的判断
+       // return res;
     }
   },
   (error) => {
     console.error('Response error:', error); // for debug
-    ElMessage({
-      message: error.message || '请求失败，请检查网络或联系管理员', // 提供更友好的默认错误消息
-      type: 'error',
-      duration: 5 * 1000,
-    });
-    return Promise.reject(error);
+
+    // 检查是否存在 error.response (网络错误或 CORS 等问题可能没有 response)
+    if (error.response) {
+        const status = error.response.status;
+        const errMsg = error.response.data?.message || error.message || '请求失败';
+
+        if (status === 401) {
+            // 401 未授权 (Token 无效、过期等)
+            ElMessage.error('登录已过期或无效，请重新登录');
+            // 清除本地 token
+            localStorage.removeItem('authToken');
+            // 跳转到登录页 (需要引入 Vue Router 实例或使用 window.location)
+            // import router from '../router'; // 假设 router 实例在此处可用
+            // router.push('/login');
+            window.location.href = '/login'; // 简单跳转
+            return Promise.reject(new Error('Unauthorized')); // 阻止后续处理
+        } else if (status === 403) {
+            // 403 禁止访问 (权限不足)
+            ElMessage.error(errMsg || '权限不足，无法访问该资源');
+            // 这里可以根据需要决定是否跳转，或者仅仅提示
+            return Promise.reject(new Error('Forbidden')); // 阻止后续处理
+        } else {
+            // 其他 HTTP 错误 (404, 500 etc.)
+            ElMessage.error(`${status}: ${errMsg}`);
+        }
+    } else if (error.request) {
+      // 请求已发出，但没有收到响应 (例如网络断开)
+      ElMessage.error('网络请求超时或无响应，请检查网络连接');
+    } else {
+      // 发送请求时触发了一些错误 (例如请求配置错误)
+      ElMessage.error(`请求发送失败: ${error.message}`);
+    }
+
+    return Promise.reject(error); // 继续传递错误，以便调用处可以捕获
   }
 );
 

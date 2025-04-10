@@ -26,7 +26,7 @@
       <el-form-item label="所属部门" prop="departmentId">
         <el-select v-model="formData.departmentId" placeholder="请选择部门" class="full-width">
           <el-option
-            v-for="dept in departments"
+            v-for="dept in props.departments"
             :key="dept.id"
             :label="dept.name"
             :value="dept.id"
@@ -79,11 +79,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, defineProps } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import type { UserInfo } from '../../../../backend/src/types/user';
 import { createUser, updateUser } from '@/services/api/user';
+import type { DepartmentInfo } from '@backend-types/department';
+
+// 定义 Props 来接收部门数据
+const props = defineProps<{
+  departments: DepartmentInfo[]; // 声明接收一个名为 departments 的 prop，类型为 DepartmentInfo 数组
+}>();
 
 const emit = defineEmits(['success']);
 
@@ -91,13 +97,6 @@ const dialogVisible = ref(false);
 const dialogType = ref<'add' | 'edit'>('add');
 const loading = ref(false);
 const formRef = ref<FormInstance>();
-
-// 模拟部门数据，实际应该从 API 获取
-const departments = ref([
-  { id: 1, name: '总部' },
-  { id: 2, name: '技术部' },
-  { id: 3, name: '市场部' },
-]);
 
 const formData = reactive({
   username: '',

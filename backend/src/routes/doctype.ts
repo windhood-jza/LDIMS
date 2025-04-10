@@ -2,6 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { DocTypeService } from '../services/DocTypeService'; // 注意路径
 import { success, fail } from '../utils/response';
 // import { authenticateToken, isAdmin } from '../middleware/auth'; // 假设有认证和权限中间件
+// 导入中间件
+import authenticateToken from '../middleware/authenticateToken';
+import checkAdminRole from '../middleware/checkAdminRole';
 
 const router = Router();
 
@@ -10,30 +13,6 @@ const router = Router();
 const docTypeService = new DocTypeService();
 // 方案二：依赖注入容器 (如果项目使用)
 // const docTypeService = container.get(DocTypeService);
-
-// Middleware for checking admin role (placeholder)
-const isAdmin = (req: Request, res: Response, next: NextFunction) => {
-  // @ts-ignore - Assume user info is attached to req after authentication
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    res.status(403).json(fail('权限不足，需要管理员权限'));
-  }
-};
-// Authentication middleware (placeholder)
-const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-   // Implement your JWT verification logic here
-   // If valid, attach user info to req: req.user = decodedPayload;
-   // For now, just pass through or add a basic check
-   // @ts-ignore
-   if (true) { // Replace with actual token check logic
-       // @ts-ignore - Placeholder user
-       req.user = { id: 1, username: 'admin', role: 'admin' }; // Example user, replace with actual decoded user
-       next();
-   } else {
-       res.status(401).json(fail('未授权或Token无效'));
-   }
-};
 
 // GET /api/v1/doctypes/tree - 获取文档类型树 (已登录即可访问)
 router.get('/tree', authenticateToken, async (req, res, next) => {
@@ -51,7 +30,7 @@ router.get('/tree', authenticateToken, async (req, res, next) => {
 // --- 取消注释并实现 CRUD 路由 ---
 
 // POST /api/v1/doctypes - 创建文档类型 (需要管理员权限)
-router.post('/', authenticateToken, isAdmin, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // --- Input Validation ---
     const { name, parentId, sortOrder, description } = req.body;
@@ -84,7 +63,7 @@ router.post('/', authenticateToken, isAdmin, async (req: Request, res: Response,
 });
 
 // PUT /api/v1/doctypes/:id - 更新文档类型 (需要管理员权限)
-router.put('/:id', authenticateToken, isAdmin, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -119,7 +98,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req: Request, res: Respons
 });
 
 // DELETE /api/v1/doctypes/:id - 删除文档类型 (需要管理员权限)
-router.delete('/:id', authenticateToken, isAdmin, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10);
      if (isNaN(id)) {

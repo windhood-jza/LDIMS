@@ -106,7 +106,7 @@
     </el-card>
 
     <!-- 新增/编辑用户弹窗 -->
-    <UserFormDialog ref="userDialogRef" @success="fetchUsers" />
+    <UserFormDialog ref="userDialogRef" :departments="departments" @success="fetchUsers" />
 
   </div>
 </template>
