@@ -90,6 +90,9 @@ export interface UpdateDocumentRequest {
  * @property {string} [sortField] - 排序字段
  * @property {'ASC' | 'DESC'} [sortOrder] - 排序顺序
  * @property {number} [sourceDepartmentId] - 来源部门 ID (用于查询)
+ * @property {number} [docTypeId] - 文档类型 ID (用于查询)
+ * @property {string} [docTypeNameFilter] - 文档类型名称 (模糊查询)
+ * @property {string} [sourceDepartmentNameFilter] - 来源部门名称 (模糊查询)
  */
 export interface DocumentListQuery {
   docName?: string;
@@ -105,4 +108,7 @@ export interface DocumentListQuery {
   sortField?: string;
   sortOrder?: 'ASC' | 'DESC';
   sourceDepartmentId?: number;
+  docTypeId?: number;
+  docTypeNameFilter?: string;
+  sourceDepartmentNameFilter?: string;
 } 

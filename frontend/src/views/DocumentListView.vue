@@ -27,30 +27,48 @@
             style="width: 150px"
           />
         </el-form-item>
-        <el-form-item label="文档类型" prop="docTypeId">
+        <el-form-item label="文档类型">
           <el-tree-select
             v-model="searchForm.docTypeId"
-            placeholder="选择文档类型"
+            placeholder="选择或输入类型"
             :data="docTypeTree"
             :props="treeProps"
             check-strictly
             :render-after-expand="false"
             clearable
             :loading="treeLoading"
-            style="width: 180px"
+            style="width: 180px; margin-right: 5px;"
+            @change="handleDocTypeSelect"
+          />
+          <el-input
+            v-model="searchForm.docTypeNameFilter"
+            placeholder="或手动输入"
+            clearable
+            style="width: 120px;"
+            @input="handleDocTypeNameInput"
+            @clear="() => { searchForm.docTypeNameFilter = '' }"
           />
         </el-form-item>
-        <el-form-item label="来源部门" prop="sourceDepartmentId">
+        <el-form-item label="来源部门">
           <el-tree-select
             v-model="searchForm.sourceDepartmentId"
-            placeholder="选择来源部门"
+            placeholder="选择或输入部门"
             :data="departmentTree"
             :props="treeProps"
             check-strictly
             :render-after-expand="false"
             clearable
             :loading="treeLoading"
-            style="width: 180px"
+            style="width: 180px; margin-right: 5px;"
+            @change="handleDepartmentSelect"
+          />
+          <el-input
+            v-model="searchForm.sourceDepartmentNameFilter"
+            placeholder="或手动输入"
+            clearable
+            style="width: 120px;"
+            @input="handleDepartmentNameInput"
+            @clear="() => { searchForm.sourceDepartmentNameFilter = '' }"
           />
         </el-form-item>
         <el-form-item label="签章人" prop="signer">
@@ -482,6 +500,10 @@ onMounted(() => {
 
 :deep(.el-tree-select__popper) {
     min-width: fit-content;
+}
+
+.el-form-item__content {
+    gap: 5px;
 }
 
 </style> 

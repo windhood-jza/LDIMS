@@ -226,8 +226,10 @@ export class DocumentService {
         const submitter = query.submitter;
         const receiver = query.receiver;
         const signer = query.signer;
-        const docTypeName = query.docTypeName; // 获取类型名称
-        const sourceDepartmentId = query.sourceDepartmentId; // **新增**: 获取部门 ID
+        const docTypeId = query.docTypeId; // 获取类型 ID
+        const sourceDepartmentId = query.sourceDepartmentId; // 获取部门 ID
+        const docTypeNameFilter = query.docTypeNameFilter; // **新增**: 获取类型名称模糊查询
+        const sourceDepartmentNameFilter = query.sourceDepartmentNameFilter; // **新增**: 获取部门名称模糊查询
         const handoverStartDate = query.handoverStartDate; // 获取日期开始
         const handoverEndDate = query.handoverEndDate;   // 获取日期结束
         const sortField = query.sortField;
@@ -249,18 +251,31 @@ export class DocumentService {
         if (submitter) where.submitter = { [Op.like]: `%${submitter}%` };
         if (receiver) where.receiver = { [Op.like]: `%${receiver}%` };
         if (signer) where.signer = { [Op.like]: `%${signer}%` };
-        if (docTypeName) where.docTypeName = { [Op.like]: `%${docTypeName}%` }; // 使用类型名称过滤
 
-        // **新增**: 如果提供了 sourceDepartmentId，则查询名称并用名称过滤
+        // **修改**: 处理文档类型过滤 (ID 优先，否则用模糊文本)
+        if (docTypeId) {
+            const docType = await DocType.findByPk(docTypeId);
+            if (docType) {
+                where.docTypeName = docType.name; // 精确匹配
+            } else {
+                console.warn(`[DocumentService] DocType with ID ${docTypeId} not found for filtering. Returning empty list.`);
+                where.id = -1;
+            }
+        } else if (docTypeNameFilter) { // 如果没有传 ID，但传了模糊文本
+            where.docTypeName = { [Op.like]: `%${docTypeNameFilter}%` }; // 模糊匹配
+        }
+
+        // **修改**: 处理来源部门过滤 (ID 优先，否则用模糊文本)
         if (sourceDepartmentId) {
             const department = await Department.findByPk(sourceDepartmentId);
             if (department) {
-                where.sourceDepartmentName = department.name; // 使用查找到的部门名称进行过滤
+                where.sourceDepartmentName = department.name; // 精确匹配
             } else {
-                // 如果找不到对应ID的部门，则让查询结果为空
                 console.warn(`[DocumentService] Department with ID ${sourceDepartmentId} not found for filtering. Returning empty list.`);
-                where.id = -1; // 设置一个不可能匹配的条件
+                where.id = -1;
             }
+        } else if (sourceDepartmentNameFilter) { // 如果没有传 ID，但传了模糊文本
+            where.sourceDepartmentName = { [Op.like]: `%${sourceDepartmentNameFilter}%` }; // 模糊匹配
         }
 
         // 处理交接日期范围
