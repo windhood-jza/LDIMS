@@ -295,34 +295,40 @@ export class DocumentService {
 
         // 构建 Order 条件
         let order: Order = [['createdAt', 'DESC']]; // 默认按创建时间降序
-        if (sortField && ['id', 'docName', 'handoverDate', 'createdAt'].includes(sortField)) { // 限制允许排序的字段
-             // 确保 sortField 是模型属性名 (camelCase)
+        if (sortField && ['id', 'docName', 'handoverDate', 'createdAt'].includes(sortField)) {
              order = [[sortField, sortOrder]];
         }
 
-        console.debug('[DocumentService] Constructed WHERE clause:', JSON.stringify(where, null, 2)); // Log constructed where clause
-        console.debug('[DocumentService] Constructed ORDER clause:', JSON.stringify(order)); // Log constructed order clause
+        console.debug('[DocumentService] Constructed WHERE clause:', JSON.stringify(where, null, 2));
+        console.debug('[DocumentService] Constructed ORDER clause:', JSON.stringify(order));
+
+        // **修改**: 分页/获取所有数据的选项
+        const findOptions: any = {
+            where: where,
+            attributes: [
+               'id', 'docName', 'docTypeName', 'sourceDepartmentName',
+               'submitter', 'receiver', 'signer', 'storageLocation', 'remarks',
+               'handoverDate', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt',
+            ],
+            order: order,
+        };
+
+        if (pageSizeNum > 0) { // 只有 pageSize 大于 0 时才应用分页
+            findOptions.limit = limit;
+            findOptions.offset = offset;
+        } else {
+            console.debug('[DocumentService] pageSize <= 0, fetching all records.');
+            // 不需要设置 limit 和 offset，获取所有匹配项
+        }
 
         try {
-             console.debug('[DocumentService] Executing findAndCountAll...'); // Log before execution
-            const result = await Document.findAndCountAll({
-                where: where, // 应用 where 条件
-                 attributes: [
-                    'id', 'docName', 'docTypeName', 'sourceDepartmentName',
-                    'submitter', 'receiver', 'signer', 'storageLocation', 'remarks',
-                    'handoverDate', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt',
-                 ],
-                order: order, // 应用排序条件
-                limit: limit,
-                offset: offset,
-            });
-            console.debug(`[DocumentService] findAndCountAll finished. Found ${result.count} documents.`); // Log after execution
+             console.debug('[DocumentService] Executing findAndCountAll...', findOptions);
+            const result = await Document.findAndCountAll(findOptions);
+            console.debug(`[DocumentService] findAndCountAll finished. Found ${result.count} documents.`);
 
-
-            // 格式化结果
             const list = result.rows.map(doc => this.formatDocumentInfo(doc));
 
-            console.debug('--- [DocumentService] list method exit ---'); // Log exit
+            console.debug('--- [DocumentService] list method exit ---');
             return { list, total: result.count };
 
         } catch (error: any) {

@@ -7,6 +7,11 @@ interface ExportTaskAttributes {
   userId: number;
   taskType: string;
   status: number;
+  fileName: string | null;
+  fileType: string | null;
+  queryCriteria: string | null;
+  progress: number | null;
+  selectedFields: string | null;
   filePath: string | null;
   errorMessage: string | null;
   createdAt?: Date;
@@ -14,7 +19,7 @@ interface ExportTaskAttributes {
 }
 
 // 定义创建 ExportTask 时可选的属性
-interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'filePath' | 'errorMessage' | 'createdAt' | 'updatedAt'> {}
+interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'createdAt' | 'updatedAt'> {}
 
 // 定义 ExportTask 模型类
 class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttributes> implements ExportTaskAttributes {
@@ -22,6 +27,11 @@ class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttribute
   public userId!: number;
   public taskType!: string;
   public status!: number;
+  public fileName!: string | null;
+  public fileType!: string | null;
+  public queryCriteria!: string | null;
+  public progress!: number | null;
+  public selectedFields!: string | null;
   public filePath!: string | null;
   public errorMessage!: string | null;
 
@@ -56,6 +66,41 @@ ExportTask.init(
       allowNull: false,
       defaultValue: 0,
       comment: '状态：0-待处理，1-处理中，2-完成，3-失败',
+    },
+    fileName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'file_name',
+      comment: '导出文件名',
+    },
+    fileType: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: 'file_type',
+      comment: '文件类型 (e.g., excel, csv)',
+    },
+    queryCriteria: {
+      type: DataTypes.TEXT('long'),
+      allowNull: true,
+      field: 'query_criteria',
+      comment: '导出时使用的查询条件 (JSON)',
+    },
+    progress: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      field: 'progress',
+      comment: '导出进度 (0-100)',
+      validate: {
+        min: 0,
+        max: 100,
+      }
+    },
+    selectedFields: {
+      type: DataTypes.TEXT('medium'),
+      allowNull: true,
+      field: 'selected_fields',
+      comment: '用户选择的导出字段 (JSON 数组)',
     },
     filePath: {
       type: DataTypes.STRING(255),

@@ -339,12 +339,17 @@ CREATE TABLE export_tasks (
     user_id INT NOT NULL COMMENT '用户ID',
     task_type VARCHAR(50) NOT NULL COMMENT '任务类型：文档导出/报表导出',
     status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-待处理，1-处理中，2-完成，3-失败',
-    file_path VARCHAR(255) COMMENT '文件路径',
-    error_message TEXT COMMENT '错误信息',
+    file_name VARCHAR(255) NULL COMMENT '导出文件名',
+    file_type VARCHAR(20) NULL COMMENT '文件类型 (e.g., excel, csv)',
+    query_criteria LONGTEXT NULL COMMENT '导出时使用的查询条件 (JSON)',
+    progress INT NULL DEFAULT 0 COMMENT '导出进度 (0-100)',
+    file_path VARCHAR(255) NULL COMMENT '文件路径',
+    error_message TEXT NULL COMMENT '错误信息',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_user (user_id),
     INDEX idx_status (status)
+    -- Optional: ADD CONSTRAINT check_progress_range CHECK (progress >= 0 AND progress <= 100)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='导出任务表';
 ```
 

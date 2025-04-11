@@ -27,56 +27,60 @@
             style="width: 150px"
           />
         </el-form-item>
-        <el-form-item label="文档类型">
-          <el-tree-select
-            v-model="searchForm.docTypeId"
-            placeholder="选择或输入类型"
-            :data="docTypeTree"
-            :props="treeProps"
-            check-strictly
-            :render-after-expand="false"
-            clearable
-            :loading="treeLoading"
-            style="width: 180px; margin-right: 5px;"
-            @change="handleDocTypeSelect"
-          />
-          <el-input
-            v-model="searchForm.docTypeNameFilter"
-            placeholder="或手动输入"
-            clearable
-            style="width: 120px;"
-            @input="handleDocTypeNameInput"
-            @clear="() => { searchForm.docTypeNameFilter = '' }"
-          />
+        <el-form-item label="文档类型" prop="docTypeId">
+          <div class="filter-group">
+            <el-tree-select
+              v-model="searchForm.docTypeId"
+              placeholder="选择精确类型"
+              :data="docTypeTree"
+              :props="treeProps"
+              check-strictly
+              :render-after-expand="false"
+              clearable
+              :loading="treeLoading"
+              style="width: 180px;"
+              @change="handleDocTypeSelect"
+            />
+            <el-input
+              v-model="searchForm.docTypeNameFilter"
+              placeholder="或输入模糊类型"
+              clearable
+              style="width: 150px;"
+              @input="handleDocTypeNameInput"
+              @clear="() => { searchForm.docTypeNameFilter = '' }"
+            />
+          </div>
         </el-form-item>
-        <el-form-item label="来源部门">
-          <el-tree-select
-            v-model="searchForm.sourceDepartmentId"
-            placeholder="选择或输入部门"
-            :data="departmentTree"
-            :props="treeProps"
-            check-strictly
-            :render-after-expand="false"
-            clearable
-            :loading="treeLoading"
-            style="width: 180px; margin-right: 5px;"
-            @change="handleDepartmentSelect"
-          />
-          <el-input
-            v-model="searchForm.sourceDepartmentNameFilter"
-            placeholder="或手动输入"
-            clearable
-            style="width: 120px;"
-            @input="handleDepartmentNameInput"
-            @clear="() => { searchForm.sourceDepartmentNameFilter = '' }"
-          />
+        <el-form-item label="来源部门" prop="sourceDepartmentId">
+          <div class="filter-group">
+            <el-tree-select
+              v-model="searchForm.sourceDepartmentId"
+              placeholder="选择精确部门"
+              :data="departmentTree"
+              :props="treeProps"
+              check-strictly
+              :render-after-expand="false"
+              clearable
+              :loading="treeLoading"
+              style="width: 180px;"
+              @change="handleDepartmentSelect"
+            />
+            <el-input
+              v-model="searchForm.sourceDepartmentNameFilter"
+              placeholder="或输入模糊部门"
+              clearable
+              style="width: 150px;"
+              @input="handleDepartmentNameInput"
+              @clear="() => { searchForm.sourceDepartmentNameFilter = '' }"
+            />
+          </div>
         </el-form-item>
         <el-form-item label="签章人" prop="signer">
            <el-input
              v-model="searchForm.signer"
              placeholder="签章人"
              clearable
-             style="width: 150px"
+             style="width: 120px"
            />
         </el-form-item>
         <el-form-item label="交接日期" prop="handoverDateRange">
@@ -163,7 +167,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick } from 'vue';
-import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort } from 'element-plus';
+import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect } from 'element-plus';
 import {
     Search,
     Refresh,
@@ -190,12 +194,14 @@ interface TreeNode {
 
 // --- 状态定义 ---
 const searchFormRef = ref<FormInstance>();
-const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null }>({
+const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null, docTypeNameFilter?: string, sourceDepartmentNameFilter?: string }>({
   docName: '',
   submitter: '',
   receiver: '',
   docTypeId: null,
   sourceDepartmentId: null,
+  docTypeNameFilter: '',
+  sourceDepartmentNameFilter: '',
   signer: '',
   handoverDateRange: null,
   page: 1,
@@ -230,7 +236,9 @@ const fetchData = async (sortParams?: { prop: string; order: string }) => {
       submitter: searchForm.submitter || undefined,
       receiver: searchForm.receiver || undefined,
       docTypeId: searchForm.docTypeId ?? undefined,
+      docTypeNameFilter: searchForm.docTypeId ? undefined : (searchForm.docTypeNameFilter || undefined),
       sourceDepartmentId: searchForm.sourceDepartmentId ?? undefined,
+      sourceDepartmentNameFilter: searchForm.sourceDepartmentId ? undefined : (searchForm.sourceDepartmentNameFilter || undefined),
       signer: searchForm.signer || undefined,
       handoverDateStart: searchForm.handoverDateRange?.[0] || undefined,
       handoverDateEnd: searchForm.handoverDateRange?.[1] || undefined,
@@ -333,7 +341,15 @@ const handleSearch = () => {
 // 重置搜索表单
 const resetSearch = () => {
   searchFormRef.value?.resetFields();
+  searchForm.docTypeId = null;
+  searchForm.sourceDepartmentId = null;
+  searchForm.docTypeNameFilter = '';
+  searchForm.sourceDepartmentNameFilter = '';
   searchForm.handoverDateRange = null;
+  searchForm.docName = '';
+  searchForm.submitter = '';
+  searchForm.receiver = '';
+  searchForm.signer = '';
   handleSearch();
 };
 
@@ -435,6 +451,27 @@ onMounted(() => {
   fetchData(); // 初始加载，无排序
 });
 
+const handleDocTypeSelect = (value: number | null) => {
+  if (value !== null) {
+    searchForm.docTypeNameFilter = '';
+  }
+};
+const handleDocTypeNameInput = (value: string) => {
+  if (value) {
+    searchForm.docTypeId = null;
+  }
+};
+const handleDepartmentSelect = (value: number | null) => {
+  if (value !== null) {
+    searchForm.sourceDepartmentNameFilter = '';
+  }
+};
+const handleDepartmentNameInput = (value: string) => {
+  if (value) {
+    searchForm.sourceDepartmentId = null;
+  }
+};
+
 </script>
 
 <style scoped>
@@ -502,8 +539,15 @@ onMounted(() => {
     min-width: fit-content;
 }
 
-.el-form-item__content {
-    gap: 5px;
+.filter-group {
+  display: flex;
+  align-items: center; 
+  gap: 5px; 
+}
+
+/* 移除之前可能干扰布局的 el-form-item__content 样式 */
+:deep(.el-form-item__content) {
+  /* 确保这里没有 display: block 或类似的样式 */
 }
 
 </style> 
