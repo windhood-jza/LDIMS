@@ -18,12 +18,12 @@ User.hasMany(DocType, { foreignKey: 'createdBy', as: 'createdDocTypes' });
 DocType.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
 // Document <-> DocType (一对多: 一个文档类型对应多个文档)
-DocType.hasMany(Document, { foreignKey: 'docTypeId', as: 'documents' });
-Document.belongsTo(DocType, { foreignKey: 'docTypeId', as: 'docType' });
+// DocType.hasMany(Document, { foreignKey: 'docTypeId', as: 'documents' }); // 注释掉，不再使用 docTypeId
+// Document.belongsTo(DocType, { foreignKey: 'docTypeId', as: 'docType' }); // 注释掉，不再使用 docTypeId
 
 // Document <-> Department (一对多: 一个部门来源多个文档)
-Department.hasMany(Document, { foreignKey: 'sourceDepartmentId', as: 'sourceDocuments' });
-Document.belongsTo(Department, { foreignKey: 'sourceDepartmentId', as: 'sourceDepartment' });
+// Department.hasMany(Document, { foreignKey: 'sourceDepartmentId', as: 'sourceDocuments' }); // 注释掉，不再使用 sourceDepartmentId
+// Document.belongsTo(Department, { foreignKey: 'sourceDepartmentId', as: 'sourceDepartment' }); // 注释掉，不再使用 sourceDepartmentId
 
 // OperationLog <-> User (一对多: 一个用户产生多个操作日志)
 User.hasMany(OperationLog, { foreignKey: 'userId', as: 'operationLogs' });

@@ -31,8 +31,12 @@ router.post(
         // 验证请求体
         body('fileType').isIn(['xlsx', 'csv']).withMessage('无效的文件类型，应为 xlsx 或 csv'),
         body('fields').isArray({ min: 1 }).withMessage('必须指定至少一个导出字段'),
-        // query 条件可以允许为空或部分提供，ExportService 会处理
         body('query').optional().isObject().withMessage('查询条件必须是对象格式'),
+        body('exportScope').isIn(['all', 'selected']).withMessage('无效的导出范围'),
+        body('selectedIds').if(body('exportScope').equals('selected'))
+                           .isArray({ min: 1 }).withMessage('导出选中项时必须提供 selectedIds 数组')
+                           .custom((ids: any[]) => ids.every(id => typeof id === 'number' && Number.isInteger(id)))
+                           .withMessage('selectedIds 必须是包含数字 ID 的数组'),
     ],
     async (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
@@ -48,13 +52,22 @@ router.post(
                 return;
             }
 
-            const { query, fields, fileType } = req.body;
+            const { query, fields, fileType, exportScope, selectedIds } = req.body;
             const exportOptions = { fields, fileType };
 
             // query 可以为空对象 {}
-            const finalQuery: DocumentListQuery = query || {}; 
+            const finalQuery: DocumentListQuery = query || {};
 
-            const newTask = await exportService.createExportTask(finalQuery, exportOptions, userId);
+            // 将 selectedIds (如果存在) 转换为 JSON 字符串
+            const selectedIdsJson = exportScope === 'selected' ? JSON.stringify(selectedIds || []) : null;
+
+            const newTask = await exportService.createExportTask(
+                finalQuery,
+                exportOptions,
+                userId,
+                exportScope,      // 传递新字段
+                selectedIdsJson  // 传递新字段 (JSON 字符串或 null)
+            );
             res.status(201).json({ code: 201, message: '导出任务已创建', data: { taskId: newTask.id } });
             return;
         } catch (error) {

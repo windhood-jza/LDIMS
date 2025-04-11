@@ -107,14 +107,25 @@
          <div class="toolbar-buttons">
             <el-button type="primary" @click="openAddDialog" :icon="Plus">新增文档</el-button>
             <el-button type="success" @click="openImportDialog" :icon="UploadFilled">批量导入</el-button>
-            <el-button type="warning" @click="openExportDialog" :icon="Download">导出</el-button>
+            <el-button type="warning" @click="handleExport" :icon="Download">导出</el-button>
          </div>
        </div>
 
       <!-- 数据表格 -->
-      <el-table :data="tableData" v-loading="loading" style="width: 100%" stripe border @sort-change="handleSortChange" :default-sort="{ prop: 'createdAt', order: 'descending' }">
-         <el-table-column type="selection" width="50" align="center" />
-        <el-table-column prop="id" label="ID" width="80" align="center" sortable="custom" />
+      <el-table
+        ref="tableRef"
+        :data="tableData"
+        v-loading="loading"
+        style="width: 100%"
+        stripe
+        border
+        @sort-change="handleSortChange"
+        :default-sort="{ prop: 'createdAt', order: 'descending' }"
+        @selection-change="handleSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="55" :reserve-selection="true" />
+        <el-table-column prop="id" label="ID" width="80" sortable />
         <el-table-column prop="docName" label="文档名称" min-width="200" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="docTypeName" label="文档类型" width="150" />
         <el-table-column prop="departmentName" label="来源部门" width="150" />
@@ -182,22 +193,22 @@ import {
     View,
     RefreshRight
 } from '@element-plus/icons-vue';
-import type { DocumentInfo, DocumentListQuery } from '@/types/document.d';
+import type { DocumentInfo, DocumentListQuery } from '@/types/document';
+import type { TreeNode } from '@/types/common';
 import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
 import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
 
-// 优化：定义更精确的树节点类型
-interface TreeNode {
-    id: number;
-    name: string;
-    children?: TreeNode[];
-}
+// --- ref 定义 ---
+const searchFormRef = ref<FormInstance>();
+const documentFormDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null>(null);
+const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
+const tableRef = ref(); // 表格实例 (如果需要调用方法)
+const selectedDocumentIds = ref<number[]>([]); // 存储选中行的 ID
 
 // --- 状态定义 ---
-const searchFormRef = ref<FormInstance>();
 const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null, docTypeNameFilter?: string, sourceDepartmentNameFilter?: string }>({
   docName: '',
   submitter: '',
@@ -224,9 +235,6 @@ const pagination = reactive({
 const docTypeTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
 const departmentTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
 const treeProps = { value: 'id', label: 'name', children: 'children' };
-
-const formDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null>(null);
-const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
 
 // --- API 调用与数据处理 ---
 
@@ -258,50 +266,29 @@ const fetchData = async (sortParams?: { prop: string; order: string }) => {
     });
 
     // 调用 API
-    const res = await getDocuments(params);
+    const result = await getDocuments(params);
     
-    // --- 新增日志：打印最原始的 res ---
-    console.log('[DocumentListView] Raw response from getDocuments service:', res);
+    // --- 新增日志：打印最原始的 result ---
+    console.log('[DocumentListView] Raw response from getDocuments service:', result);
 
-    // --- 尝试不同的数据提取路径 ---
-    let listData: DocumentInfo[] = [];
-    let totalCount: number = 0;
-
-    // 尝试路径 1: res.data.data (对应情况 1 - 后端 success 包装了 data)
-    if (res && res.data && res.data.data && Array.isArray(res.data.data.list)) {
-      console.log('[DocumentListView] Trying to extract from res.data.data');
-      listData = res.data.data.list || [];
-      totalCount = res.data.data.total || 0;
-    }
-    // 尝试路径 2: res.data (对应情况 2 - 服务层返回 response.data)
-    else if (res && res.data && Array.isArray(res.data.list)) {
-      console.log('[DocumentListView] Trying to extract from res.data');
-      listData = res.data.list || [];
-      totalCount = res.data.total || 0;
-    }
-    // 尝试路径 3: res (对应情况 3 - 服务层直接返回 {list, total})
-    else if (res && Array.isArray(res.list)) {
-      console.log('[DocumentListView] Trying to extract from res directly');
-      listData = res.list || [];
-      totalCount = res.total || 0;
-    }
-    // 如果以上路径都找不到 list 数组
-    else {
-      console.error('[DocumentListView] Could not find list array in response structure:', res);
-      // 保持列表为空， total 为 0
+    // --- 检查返回的数据结构 ---
+    if (result && Array.isArray(result.list) && typeof result.total === 'number') {
+        console.log('[DocumentListView] Trying to extract from result directly');
+        tableData.value = result.list;
+        pagination.total = result.total;
+    } else {
+        console.error('Invalid data structure received from getDocuments:', result);
+        ElMessage.error('获取文档列表失败：数据格式错误');
+        tableData.value = [];
+        pagination.total = 0;
     }
 
-    // --- 赋值 ---
-    console.log('[DocumentListView] Final list data to assign:', listData);
-    console.log('[DocumentListView] Final total count to assign:', totalCount);
-    tableData.value = listData;
-    pagination.total = totalCount;
-
-  } catch (error) {
-    console.error("获取文档列表失败:", error);
-    ElMessage.error("获取文档列表失败");
-    tableData.value = []; // 出错时清空列表
-    pagination.total = 0; // 出错时重置总数
+  } catch (error: any) {
+    console.error("Fetch documents error:", error)
+    const message = error?.response?.data?.message || error?.message || '获取文档列表时发生错误';
+    ElMessage.error(message);
+    tableData.value = [];
+    pagination.total = 0;
   } finally {
     loading.value = false;
   }
@@ -381,15 +368,15 @@ const handleCurrentChange = (val: number) => {
 
 // --- CRUD 实现 ---
 const openAddDialog = () => {
-  formDialogRef.value?.open('add', undefined);
+  documentFormDialogRef.value?.open('add', undefined);
 };
 
 const openEditDialog = (row: DocumentInfo) => {
-  formDialogRef.value?.open('edit', row);
+  documentFormDialogRef.value?.open('edit', row);
 };
 
 const openViewDialog = (row: DocumentInfo) => {
-  formDialogRef.value?.open('view', row);
+  documentFormDialogRef.value?.open('view', row);
 };
 
 const handleDelete = async (row: DocumentInfo) => {
@@ -418,13 +405,25 @@ const openImportDialog = () => {
   ElMessage.info("导入功能待实现");
 };
 
-const openExportDialog = () => {
+/**
+ * @description 表格行选择变化时触发
+ * @param {DocumentInfo[]} selection - 当前选中的行对象数组
+ */
+const handleSelectionChange = (selection: DocumentInfo[]) => {
+  selectedDocumentIds.value = selection.map(item => item.id);
+  console.log('[Debug] DocumentListView: Selection changed, selected IDs:', selectedDocumentIds.value); // 添加日志
+};
+
+/**
+ * @description 处理导出按钮点击
+ */
+const handleExport = () => {
   // 准备传递给弹窗的查询条件 (不包含分页信息)
   const exportQuery = { ...searchForm };
   delete exportQuery.page;
   delete exportQuery.pageSize;
-  // 调用导出弹窗的 open 方法
-  exportOptionsDialogRef.value?.open(exportQuery);
+  // 调用导出弹窗的 open 方法，并传递选中的 ID
+  exportOptionsDialogRef.value?.open(exportQuery, selectedDocumentIds.value);
 };
 
 // --- 工具函数 ---

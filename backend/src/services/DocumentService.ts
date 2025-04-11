@@ -326,6 +326,13 @@ export class DocumentService {
             const result = await Document.findAndCountAll(findOptions);
             console.debug(`[DocumentService] findAndCountAll finished. Found ${result.count} documents.`);
 
+            // 添加日志：检查从 findAndCountAll 返回的原始行的 sourceDepartmentName
+            console.debug('[DocumentService] Raw rows from findAndCountAll:');
+            result.rows.forEach((doc, index) => {
+                // 直接打印原始 Sequelize 实例上的值
+                console.debug(`  Row ${index}: ID=${doc.id}, sourceDepartmentName='${doc.get('sourceDepartmentName')}'`);
+            });
+
             const list = result.rows.map(doc => this.formatDocumentInfo(doc));
 
             console.debug('--- [DocumentService] list method exit ---');
@@ -364,5 +371,85 @@ export class DocumentService {
             updatedAt: document.updatedAt,
         };
         return result;
+    }
+
+    /**
+     * @description 根据 ID 列表获取文档详情
+     * @param {number[]} ids - 文档 ID 数组
+     * @returns {Promise<DocumentInfo[]>}
+     */
+    async getByIds(ids: number[]): Promise<DocumentInfo[]> {
+        console.debug(`[DocumentService] getByIds called with IDs:`, ids);
+        if (!ids || ids.length === 0) {
+            return [];
+        }
+
+        try {
+            // 构建 include 配置 (与 list 方法保持一致)
+            const include = [
+                {
+                    model: DocType,
+                    attributes: ['name'], // 只获取名称
+                    required: false, // 使用 LEFT JOIN
+                },
+                {
+                    model: Department,
+                    as: 'sourceDepartment', // 使用别名
+                    attributes: ['name'],
+                    required: false,
+                },
+                {
+                    model: User,
+                    as: 'creator', // 假设关联别名是 creator
+                    attributes: ['username'], // 获取用户名
+                    required: false,
+                },
+                {
+                    model: User,
+                    as: 'updater', // 假设关联别名是 updater
+                    attributes: ['username'], // 获取用户名
+                    required: false,
+                },
+            ];
+
+            const documents = await Document.findAll({
+                attributes: [
+                   'id',
+                   'docName',
+                   'submitter',
+                   'receiver',
+                   'signer',
+                   'storageLocation',
+                   'remarks',
+                   'handoverDate',
+                   'createdBy',
+                   'updatedBy',
+                   'createdAt',
+                   'updatedAt',
+                ],
+                where: {
+                    id: { [Op.in]: ids }
+                },
+                include: include,
+                // 导出选中项时通常不需要特定排序，按 ID 默认排序即可
+            });
+
+            console.debug(`[DocumentService] Found ${documents.length} documents by IDs.`);
+
+            // 添加日志：检查从 findAll 返回的原始文档的 sourceDepartmentName
+            console.debug('[DocumentService] Raw documents from findAll (getByIds):');
+            documents.forEach((doc, index) => {
+                 // 直接打印原始 Sequelize 实例上的值
+                console.debug(`  Doc ${index}: ID=${doc.id}, sourceDepartmentName='${doc.get('sourceDepartmentName')}'`);
+            });
+
+            // 格式化结果
+            const list = documents.map(doc => this.formatDocumentInfo(doc));
+
+            return list;
+        } catch (error: any) {
+            console.error(`[DocumentService] Error fetching documents by IDs:`, error);
+            throw new Error(`根据 ID 获取文档失败: ${error.message}`);
+        }
     }
 } 

@@ -2,20 +2,35 @@
   <el-dialog
     v-model="dialogVisible"
     title="导出选项"
-    width="600px"
+    width="650px"
     :close-on-click-modal="false"
     @close="handleClose"
   >
     <el-form label-width="100px">
+      <el-form-item label="导出范围">
+        <el-radio-group v-model="exportScope">
+          <el-radio label="all">全部 (根据筛选条件)</el-radio>
+          <el-radio label="selected" :disabled="!hasSelectedItems">
+            选中项 ({{ selectedItemCount }} 项)
+          </el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item label="选择字段">
+        <el-row :gutter="10" style="width: 100%; margin-bottom: 10px;">
+          <el-col :span="12">
+            <el-button type="primary" link @click="selectAllFields">全选</el-button>
+            <el-button type="primary" link @click="deselectAllFields" style="margin-left: 15px;">取消全选</el-button>
+          </el-col>
+        </el-row>
         <el-checkbox-group v-model="selectedFields">
-          <!-- 字段选项将动态加载或预定义 -->
-          <el-checkbox v-for="field in availableFields" :key="field.value" :label="field.value">
-            {{ field.label }}
-          </el-checkbox>
+          <el-row :gutter="5" style="width: 100%;">
+            <el-col :span="8" v-for="field in availableFields" :key="field.value">
+              <el-checkbox :label="field.value" style="margin-bottom: 8px;">
+                {{ field.label }}
+              </el-checkbox>
+            </el-col>
+          </el-row>
         </el-checkbox-group>
-        <el-button type="text" @click="selectAllFields" style="margin-left: 10px;">全选</el-button>
-        <el-button type="text" @click="deselectAllFields">取消全选</el-button>
       </el-form-item>
       <el-form-item label="文件类型">
         <el-radio-group v-model="fileType">
@@ -36,22 +51,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineExpose, defineEmits, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { requestExport } from '@/services/api/export' // 确认路径是否正确
+import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
+import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
+import { requestExport } from '@/services/api/export'
 
 interface FieldOption {
   label: string;
   value: string;
 }
 
-// 可选的字段列表，需要根据实际 DocumentInfo 结构定义
-// 可以考虑从外部传入或在此处硬编码
+// 可选的字段列表
 const availableFields = ref<FieldOption[]>([
   { label: '文档 ID', value: 'id' },
   { label: '文档名称', value: 'docName' },
   { label: '文档类型', value: 'docTypeName' },
-  { label: '来源部门', value: 'sourceDepartmentName' }, // 注意这里是 Name
+  { label: '来源部门', value: 'sourceDepartmentName' },
   { label: '提交人', value: 'submitter' },
   { label: '接收人', value: 'receiver' },
   { label: '签收（章）人', value: 'signer' },
@@ -60,26 +74,34 @@ const availableFields = ref<FieldOption[]>([
   { label: '备注', value: 'remarks' },
   { label: '创建人', value: 'createdByName' },
   { label: '创建时间', value: 'createdAt' },
-  { label: '最后修改人', value: 'updatedByName' }, // 假设有这个字段
+  { label: '最后修改人', value: 'updatedByName' },
   { label: '最后修改时间', value: 'updatedAt' },
 ]);
 
 const dialogVisible = ref(false)
 const loading = ref(false)
 const selectedFields = ref<string[]>([])
-const fileType = ref('xlsx') // 默认导出 xlsx
-const currentQueryCriteria = ref<any>(null) // 用于存储触发导出时的查询条件
+const fileType = ref('xlsx')
+const exportScope = ref<'all' | 'selected'>('all')
+const currentQueryCriteria = ref<any>(null)
+const currentSelectedIds = ref<number[]>([])
 
-const emit = defineEmits(['export-started']) // 定义导出开始事件
+const emit = defineEmits(['export-started'])
+
+const hasSelectedItems = computed(() => currentSelectedIds.value.length > 0)
+const selectedItemCount = computed(() => currentSelectedIds.value.length)
 
 /**
  * @description 打开弹窗
  * @param {any} query - 当前的查询条件
+ * @param {number[]} [selectedItemIds=[]] - 父组件传递的选中项 ID 列表
  */
-const open = (query: any) => {
+const open = (query: any, selectedItemIds: number[] = []) => {
+  console.log('[Debug] ExportOptionsDialog: Received selectedItemIds:', selectedItemIds);
   currentQueryCriteria.value = query;
-  // 默认全选所有字段
+  currentSelectedIds.value = selectedItemIds;
   selectedFields.value = availableFields.value.map(f => f.value);
+  exportScope.value = selectedItemIds.length > 0 ? 'all' : 'all';
   dialogVisible.value = true
 }
 
@@ -87,9 +109,8 @@ const open = (query: any) => {
  * @description 关闭弹窗
  */
 const handleClose = () => {
-  if (loading.value) return; // 防止提交过程中关闭
+  if (loading.value) return;
   dialogVisible.value = false
-  // 清理状态可以在这里做，但 open 时会重置
 }
 
 /**
@@ -100,25 +121,36 @@ const handleSubmit = async () => {
     ElMessage.warning('请至少选择一个要导出的字段');
     return;
   }
+  if (exportScope.value === 'selected' && !hasSelectedItems.value) {
+      ElMessage.warning('请先在表格中勾选要导出的文档');
+      return;
+  }
+
   loading.value = true;
   try {
-    // 假设 requestExport 在成功时直接返回 data: { taskId: number }
-    const resultData = await requestExport(currentQueryCriteria.value, selectedFields.value, fileType.value);
+    const params: any = {
+        query: exportScope.value === 'all' ? currentQueryCriteria.value : {},
+        fields: selectedFields.value,
+        fileType: fileType.value,
+        exportScope: exportScope.value,
+    };
+    if (exportScope.value === 'selected') {
+        params.selectedIds = currentSelectedIds.value;
+    }
 
-    // 检查返回的数据是否包含 taskId
+    const resultData = await requestExport(params);
+
     if (resultData && typeof resultData.taskId === 'number') {
-      // 成功路径
       console.log('[Debug] handleSubmit: Success path executing.');
       ElMessage.success('导出任务已创建，请稍后在"导出任务"页面查看进度和下载。');
-      emit('export-started', resultData.taskId); // 触发事件，传递任务 ID
+      emit('export-started', resultData.taskId);
       handleClose();
     } else {
-      // 如果成功但数据结构不对（理论上不太可能发生）
       console.error('Invalid data structure received after creating export task:', resultData);
       console.log('[Debug] handleSubmit: Invalid data structure path executing.');
       ElMessage.error('创建导出任务失败：响应数据异常');
     }
-  } catch (error: any) { // 捕获 API 调用本身的错误 (例如 4xx, 5xx)
+  } catch (error: any) {
     console.error('Request export error:', error);
     const message = error?.response?.data?.message || error?.message || '创建导出任务时发生错误';
     console.log('[Debug] handleSubmit: Catch block executing.');
@@ -149,14 +181,11 @@ defineExpose({
 </script>
 
 <style scoped>
-/* 可以添加一些样式 */
-.el-checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
+/* 优化复选框样式 */
+.el-checkbox-group .el-col {
+  margin-bottom: 8px;
 }
 .el-checkbox {
-  width: 150px; /* 控制每行显示数量 */
-  margin-right: 10px;
-  margin-bottom: 5px;
+  margin-right: 0;
 }
 </style> 

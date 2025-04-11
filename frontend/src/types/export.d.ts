@@ -19,6 +19,8 @@ export interface ExportTask {
   progress: number | null;        // 进度 (0-100)，处理中才有，否则为 null
   filePath: string | null;        // 修改为 filePath，完成后才有
   errorMessage: string | null;    // 错误信息，失败后才有
+  exportScope: 'all' | 'selected'; // 添加导出范围
+  selectedIds: string | null;     // 添加选中 ID 列表 (JSON 字符串)
   createdAt: string;              // 创建时间 (ISO 8601 字符串)
   updatedAt: string;              // 更新时间 (ISO 8601 字符串)
 }

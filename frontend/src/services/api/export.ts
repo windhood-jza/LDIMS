@@ -4,17 +4,22 @@ import type { ApiResponse } from '@/types/api'
 
 /**
  * @description 请求创建导出任务
- * @param {any} queryCriteria - 查询条件
- * @param {string[]} selectedFields - 选择导出的字段
- * @param {string} fileType - 导出文件类型 ('xlsx', 'csv')
+ * @param {object} params - 请求参数对象
+ * @param {any} params.query - 查询条件 (scope='all')
+ * @param {string[]} params.fields - 选择导出的字段
+ * @param {'xlsx' | 'csv'} params.fileType - 导出文件类型
+ * @param {'all' | 'selected'} params.exportScope - 导出范围
+ * @param {number[]} [params.selectedIds] - 选中项 ID 列表 (scope='selected')
  * @returns {Promise<ApiResponse<{ taskId: number }>>} 返回包含任务 ID 的响应
  */
-export function requestExport(queryCriteria: any, selectedFields: string[], fileType: string): Promise<ApiResponse<{ taskId: number }>> {
-  return request.post('/documents/export', {
-    query: queryCriteria,
-    fields: selectedFields,
-    fileType
-  })
+export function requestExport(params: {
+  query: any;
+  fields: string[];
+  fileType: 'xlsx' | 'csv';
+  exportScope: 'all' | 'selected';
+  selectedIds?: number[];
+}): Promise<ApiResponse<{ taskId: number }>> {
+  return request.post('/documents/export', params) // 直接传递整个 params 对象
 }
 
 /**
