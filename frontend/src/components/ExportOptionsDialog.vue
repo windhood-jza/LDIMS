@@ -107,17 +107,21 @@ const handleSubmit = async () => {
 
     // 检查返回的数据是否包含 taskId
     if (resultData && typeof resultData.taskId === 'number') {
+      // 成功路径
+      console.log('[Debug] handleSubmit: Success path executing.');
       ElMessage.success('导出任务已创建，请稍后在"导出任务"页面查看进度和下载。');
       emit('export-started', resultData.taskId); // 触发事件，传递任务 ID
       handleClose();
     } else {
       // 如果成功但数据结构不对（理论上不太可能发生）
       console.error('Invalid data structure received after creating export task:', resultData);
+      console.log('[Debug] handleSubmit: Invalid data structure path executing.');
       ElMessage.error('创建导出任务失败：响应数据异常');
     }
   } catch (error: any) { // 捕获 API 调用本身的错误 (例如 4xx, 5xx)
     console.error('Request export error:', error);
     const message = error?.response?.data?.message || error?.message || '创建导出任务时发生错误';
+    console.log('[Debug] handleSubmit: Catch block executing.');
     ElMessage.error(message);
   } finally {
     loading.value = false;

@@ -162,10 +162,10 @@ const handleDownload = async (task: ExportTask & { downloading?: boolean }) => {
  */
 const formatStatus = (status: ExportTaskStatus): string => {
   switch (status) {
-    case 'pending': return '排队中';
-    case 'processing': return '处理中';
-    case 'completed': return '已完成';
-    case 'failed': return '失败';
+    case 0: return '排队中';
+    case 1: return '处理中';
+    case 2: return '已完成';
+    case 3: return '失败';
     default: return '未知';
   }
 }
@@ -177,10 +177,10 @@ const formatStatus = (status: ExportTaskStatus): string => {
  */
 const getStatusTagType = (status: ExportTaskStatus): ('primary' | 'warning' | 'success' | 'danger' | 'info') => {
   switch (status) {
-    case 'pending': return 'primary';
-    case 'processing': return 'warning';
-    case 'completed': return 'success';
-    case 'failed': return 'danger';
+    case 0: return 'primary';
+    case 1: return 'warning';
+    case 2: return 'success';
+    case 3: return 'danger';
     default: return 'info';
   }
 }

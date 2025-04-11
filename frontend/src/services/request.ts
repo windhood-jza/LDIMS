@@ -37,23 +37,34 @@ instance.interceptors.response.use(
   (response) => {
     // API 响应的 data 部分
     const res = response.data;
-    // 这里可以根据后端接口定义的成功/失败状态码进行判断
-    // 假设后端返回 { code: 0, data: ..., message: '...' } 结构
-    // 注意: 这里的 code 判断可能需要根据你的后端实际返回值调整
-    if (res && res.code !== undefined && res.code !== 0 && res.code !== 200) { // 假设 0 或 200 为成功, 确保 res 和 res.code 存在
-      ElMessage({
-        message: res.message || 'Error',
-        type: 'error',
-        duration: 5 * 1000,
-      });
-      // 可以根据不同的错误码处理不同的逻辑，例如 401 未授权跳转登录页
-      return Promise.reject(new Error(res.message || 'Error'));
+
+    // 检查后端是否返回了 code
+    if (res && res.code !== undefined) {
+      // 判断是否成功 (code 200 或 201)
+      if (res.code === 200 || res.code === 201) {
+        // 成功: 返回 data 部分 (如果存在)，否则返回整个 res (例如只有 message)
+        return res.data !== undefined ? res.data : res;
+      } else {
+        // 业务错误 (code 非 200/201)
+        ElMessage({
+          message: res.message || '业务处理失败',
+          type: 'error',
+          duration: 5 * 1000,
+        });
+        // 返回一个包含错误信息的 rejected Promise
+        return Promise.reject(new Error(res.message || 'Business Error'));
+      }
     } else {
-       // 成功时只返回 data 部分 (如果后端返回 {code, data, message})
-       // 检查 res.data 是否存在，如果后端有时直接返回 null 或空，则返回 null
-       return res ? (res.data !== undefined ? res.data : res) : null; 
-       // 如果后端有时直接返回数据而非 {code, data, message} 结构，则可能需要更复杂的判断
-       // return res;
+      // 如果后端没有返回 code (或者 res 为空), 但 HTTP 状态码是 2xx，则直接返回整个响应体
+      // 这种情况可能发生在直接下载文件等非标准 JSON API 响应
+      if (response.status >= 200 && response.status < 300) {
+          return res;
+      } else {
+          // 理论上不应进入这里，因为 HTTP 错误会在下面的 error 处理函数捕获
+          // 但作为保险，还是 reject
+           ElMessage.error('收到意外的响应格式');
+           return Promise.reject(new Error('Unexpected response format'));
+      }
     }
   },
   (error) => {

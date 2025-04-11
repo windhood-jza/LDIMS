@@ -1,7 +1,8 @@
 /**
- * 导出任务状态
+ * 导出任务状态 (数字类型，与后端一致)
+ * 0: pending, 1: processing, 2: completed, 3: failed
  */
-export type ExportTaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ExportTaskStatus = 0 | 1 | 2 | 3;
 
 /**
  * 导出任务信息接口
@@ -10,7 +11,7 @@ export type ExportTaskStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export interface ExportTask {
   id: number;
   userId: number;
-  status: ExportTaskStatus;
+  status: ExportTaskStatus; // 使用数字类型
   fileName: string | null;       // 文件名可能在任务完成前为 null
   fileType: 'xlsx' | 'csv';      // 文件类型
   queryCriteria: string;        // 查询条件（JSON 字符串）
