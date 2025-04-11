@@ -10,13 +10,21 @@ const instance = axios.create({
 // 请求拦截器 (可选, 用于添加 token 等)
 instance.interceptors.request.use(
   (config) => {
-    // 可以在这里添加认证 Token 等
-    const token = localStorage.getItem('authToken'); // 从 localStorage 读取 authToken
+    console.log('[request.ts:interceptor] Request interceptor START.');
+    console.log('[request.ts:interceptor] Original config.params:', JSON.stringify(config.params, null, 2)); // Log initial params
+
+    const token = localStorage.getItem('authToken');
     if (token) {
-      // Bearer 是常用的认证方案，请根据后端实际要求调整
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[request.ts:interceptor] Token added to headers.');
+    } else {
+       console.log('[request.ts:interceptor] No token found.');
     }
-    return config;
+
+    // --- Log params just before returning ---
+    console.log('[request.ts:interceptor] config.params BEFORE returning config:', JSON.stringify(config.params, null, 2));
+    console.log('[request.ts:interceptor] Request interceptor END.');
+    return config; // Return config unchanged regarding params
   },
   (error) => {
     console.error('Request error:', error); // for debug

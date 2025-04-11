@@ -1,7 +1,7 @@
 // @/services/api/document.ts
 import request from '../request'; // 假设你有一个封装好的请求工具
 import type { ApiResponse } from '../request'; // 假设 ApiResponse 类型定义在 request.ts 或其关联文件中
-import type { DocumentListQuery, DocumentInfo, CreateDocumentRequest, UpdateDocumentRequest } from '@/types/document.d';
+import type { DocumentListQuery, DocumentInfo, CreateDocumentRequest, UpdateDocumentRequest } from '@backend-types/document';
 
 // 后端分页响应的数据结构
 interface DocumentListResponse {
@@ -15,7 +15,9 @@ interface DocumentListResponse {
  * @returns Promise 包含列表和总数
  */
 export const getDocuments = async (params: DocumentListQuery): Promise<DocumentListResponse> => {
-    try { 
+    console.log('[api/document.ts:getDocuments] Entry. Received params:', JSON.stringify(params, null, 2)); // Log received params
+    try {
+        console.log('[api/document.ts:getDocuments] Params BEFORE passing to request util:', JSON.stringify(params, null, 2)); // Log before passing
         const response = await request({ 
             url: '/documents',
             method: 'get',

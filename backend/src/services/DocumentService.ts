@@ -215,127 +215,133 @@ export class DocumentService {
      * @returns {Promise<{ list: DocumentInfo[], total: number }>} 返回文档列表 (DTO 格式) 和总数
      */
     async list(query: DocumentListQuery): Promise<{ list: DocumentInfo[], total: number }> {
-        console.debug('[DocumentService] list called with query:', JSON.stringify(query));
+        console.debug('--- [DocumentService] list method entry ---'); // Log entry
+        console.debug('[DocumentService] Received raw query:', JSON.stringify(query, null, 2)); // Log raw query
 
         const page = query.page ?? 1;
         const pageSize = query.pageSize ?? 10;
-        const docName = (query as any).docName;
-        const submitter = (query as any).submitter;
-        const receiver = (query as any).receiver;
-        const docTypeId = query.docTypeId;
-        const sourceDepartmentId = query.sourceDepartmentId;
-        const signer = query.signer;
-        const handoverDateStart = query.handoverDateStart;
-        const handoverDateEnd = query.handoverDateEnd;
-        const sortField = query.sortField;
-        const sortOrder = query.sortOrder;
 
+        // 从 query 中获取所有可能的参数
+        const docName = query.docName;
+        const submitter = query.submitter;
+        const receiver = query.receiver;
+        const signer = query.signer;
+        const docTypeName = query.docTypeName; // 获取类型名称
+        const sourceDepartmentId = query.sourceDepartmentId; // **新增**: 获取部门 ID
+        const handoverStartDate = query.handoverStartDate; // 获取日期开始
+        const handoverEndDate = query.handoverEndDate;   // 获取日期结束
+        const sortField = query.sortField;
+        const sortOrder = query.sortOrder === 'DESC' ? 'DESC' : 'ASC'; // 修正：使用大写的 'DESC' 进行比较
+
+        // 分页计算
         let pageNum = parseInt(String(page), 10);
         let pageSizeNum = parseInt(String(pageSize), 10);
         if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
         if (isNaN(pageSizeNum) || pageSizeNum < 1) pageSizeNum = 10;
-        else if (pageSizeNum > 1000) pageSizeNum = 1000;
+        else if (pageSizeNum > 1000) pageSizeNum = 1000; // 防止过大的 pageSize
 
         const offset = (pageNum - 1) * pageSizeNum;
         const limit = pageSizeNum;
 
-        const where: WhereOptions<Document> = {}; 
-        if (docName) where.docName = { [Op.like]: `%${docName}%` }; 
+        // 构建 Where 条件
+        const where: WhereOptions<Document> = {};
+        if (docName) where.docName = { [Op.like]: `%${docName}%` };
         if (submitter) where.submitter = { [Op.like]: `%${submitter}%` };
         if (receiver) where.receiver = { [Op.like]: `%${receiver}%` };
         if (signer) where.signer = { [Op.like]: `%${signer}%` };
+        if (docTypeName) where.docTypeName = { [Op.like]: `%${docTypeName}%` }; // 使用类型名称过滤
 
-        // Temporarily disable ID filters
-        if (docTypeId !== undefined && docTypeId !== null) {
-            console.warn(`[DocumentService] TODO: Filtering by docTypeId (${docTypeId}) disabled.`);
-        }
-        if (sourceDepartmentId !== undefined && sourceDepartmentId !== null) {
-            console.warn(`[DocumentService] TODO: Filtering by sourceDepartmentId (${sourceDepartmentId}) disabled.`);
-        }
-
-        if (handoverDateStart || handoverDateEnd) {
-            const handoverDateWhere: any = {}; 
-            if (handoverDateStart) handoverDateWhere[Op.gte] = new Date(handoverDateStart);
-            if (handoverDateEnd) {
-                const endDate = new Date(handoverDateEnd);
-                endDate.setHours(23, 59, 59, 999);
-                handoverDateWhere[Op.lte] = endDate;
+        // **新增**: 如果提供了 sourceDepartmentId，则查询名称并用名称过滤
+        if (sourceDepartmentId) {
+            const department = await Department.findByPk(sourceDepartmentId);
+            if (department) {
+                where.sourceDepartmentName = department.name; // 使用查找到的部门名称进行过滤
+            } else {
+                // 如果找不到对应ID的部门，则让查询结果为空
+                console.warn(`[DocumentService] Department with ID ${sourceDepartmentId} not found for filtering. Returning empty list.`);
+                where.id = -1; // 设置一个不可能匹配的条件
             }
-            where.handoverDate = handoverDateWhere; 
         }
 
-        const order: Order = sortField && sortOrder
-            ? [[sortField, sortOrder === 'DESC' ? 'DESC' : 'ASC']] 
-            : [['createdAt', 'DESC']]; 
+        // 处理交接日期范围
+        if (handoverStartDate && handoverEndDate) {
+            where.handoverDate = {
+                [Op.between]: [handoverStartDate, handoverEndDate],
+            };
+        } else if (handoverStartDate) {
+            where.handoverDate = {
+                [Op.gte]: handoverStartDate, // 大于等于开始日期
+            };
+        } else if (handoverEndDate) {
+            where.handoverDate = {
+                [Op.lte]: handoverEndDate, // 小于等于结束日期
+            };
+        }
 
-        console.debug('[DocumentService] Document Raw Attributes:', Document.rawAttributes);
-        console.debug('[DocumentService] Sequelize findAndCountAll args:', JSON.stringify({ where, order, offset, limit }));
+        // 构建 Order 条件
+        let order: Order = [['createdAt', 'DESC']]; // 默认按创建时间降序
+        if (sortField && ['id', 'docName', 'handoverDate', 'createdAt'].includes(sortField)) { // 限制允许排序的字段
+             // 确保 sortField 是模型属性名 (camelCase)
+             order = [[sortField, sortOrder]];
+        }
+
+        console.debug('[DocumentService] Constructed WHERE clause:', JSON.stringify(where, null, 2)); // Log constructed where clause
+        console.debug('[DocumentService] Constructed ORDER clause:', JSON.stringify(order)); // Log constructed order clause
 
         try {
-            const { count, rows } = await Document.findAndCountAll({
-                where,
-                order,
-                offset,
-                limit,
-                // 修正：attributes 使用模型属性名 (camelCase)
-                attributes: [
-                    'id',
-                    'docName',
-                    'docTypeName',
-                    'sourceDepartmentName',
-                    'submitter',
-                    'receiver',
-                    'signer',
-                    'storageLocation',
-                    'remarks',
-                    'handoverDate',
-                    'createdBy',
-                    'updatedBy',
-                    'createdAt',
-                    'updatedAt',
-                ],
+             console.debug('[DocumentService] Executing findAndCountAll...'); // Log before execution
+            const result = await Document.findAndCountAll({
+                where: where, // 应用 where 条件
+                 attributes: [
+                    'id', 'docName', 'docTypeName', 'sourceDepartmentName',
+                    'submitter', 'receiver', 'signer', 'storageLocation', 'remarks',
+                    'handoverDate', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt',
+                 ],
+                order: order, // 应用排序条件
+                limit: limit,
+                offset: offset,
             });
+            console.debug(`[DocumentService] findAndCountAll finished. Found ${result.count} documents.`); // Log after execution
 
-            console.debug(`[DocumentService] Sequelize findAndCountAll returned ${rows.length} records.`);
-            console.debug(`[DocumentService] Sequelize findAndCountAll returned total count: ${count}.`);
 
-            const formattedList = rows.map((doc: Document) => this.formatDocumentInfo(doc));
-            return { list: formattedList, total: count };
-        } catch (error) {
-            console.error('[DocumentService] Error fetching documents:', error);
-            const message = (error instanceof Error) ? error.message : 'Unknown error';
-            throw new Error(`列表查询失败: ${message}`); 
+            // 格式化结果
+            const list = result.rows.map(doc => this.formatDocumentInfo(doc));
+
+            console.debug('--- [DocumentService] list method exit ---'); // Log exit
+            return { list, total: result.count };
+
+        } catch (error: any) {
+            console.error('[DocumentService] Error during findAndCountAll:', error); // Log error during execution
+            console.debug('--- [DocumentService] list method exit (with error) ---'); // Log exit on error
+            throw new Error(`获取文档列表失败: ${error.message}`);
         }
     }
 
     /**
-     * @description 格式化 Sequelize 文档实例为 DocumentInfo 接口格式
-     * @private
-     * @param {Document} document - Sequelize 文档实例
-     * @returns {DocumentInfo}
-     */
+    * @description 格式化 Sequelize 文档实例为 DTO
+    * @param {Document} document - Sequelize 文档实例
+    * @returns {DocumentInfo} 返回 DTO 对象
+    */
     private formatDocumentInfo(document: Document): DocumentInfo {
-        const docTypeName = document.docTypeName; 
-        const sourceDepartmentName = document.sourceDepartmentName;
+         // --- Temporarily revert createdByName logic ---
+         const creatorUsername = document.createdBy ?? null; // Use createdBy directly for now
 
-        const result: Omit<DocumentInfo, 'docTypeId' | 'sourceDepartmentId'> & { docTypeName: string; departmentName: string } = { 
+        const result = {
             id: document.id,
-            docName: document.docName, 
-            docTypeName: docTypeName ?? 'N/A',        
-            departmentName: sourceDepartmentName ?? 'N/A', 
-            submitter: document.submitter,
-            receiver: document.receiver,
-            signer: document.signer,
-            storageLocation: document.storageLocation,
-            handoverDate: document.handoverDate,
-            remarks: document.remarks,
-            createdBy: document.createdBy,
-            createdByName: document.createdBy ?? 'N/A', 
-            updatedBy: document.updatedBy,
+            docName: document.docName,
+            docTypeName: document.docTypeName ?? null,
+            departmentName: document.sourceDepartmentName ?? null,
+            submitter: document.submitter ?? null,
+            receiver: document.receiver ?? null,
+            signer: document.signer ?? null,
+            storageLocation: document.storageLocation ?? null,
+            remarks: document.remarks ?? null,
+            handoverDate: document.handoverDate ?? null,
+             createdByName: creatorUsername, // Assign the temporary value
+            updatedBy: document.updatedBy ?? null,
             createdAt: document.createdAt,
             updatedAt: document.updatedAt,
         };
-        // 临时恢复 as any
-        return result as any; 
+        return result;
     }
 } 
