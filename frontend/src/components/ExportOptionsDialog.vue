@@ -10,6 +10,9 @@
       <el-form-item label="导出范围">
         <el-radio-group v-model="exportScope">
           <el-radio label="all">全部 (根据筛选条件)</el-radio>
+          <el-radio label="currentPage" :disabled="!hasCurrentPageItems">
+            当前页 ({{ currentPageItemCount }} 项)
+          </el-radio>
           <el-radio label="selected" :disabled="!hasSelectedItems">
             选中项 ({{ selectedItemCount }} 项)
           </el-radio>
@@ -54,6 +57,7 @@
 import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
 import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
 import { requestExport } from '@/services/api/export'
+import type { ExportRequestParams, ExportScope } from '@/types/export';
 
 interface FieldOption {
   label: string;
@@ -82,26 +86,40 @@ const dialogVisible = ref(false)
 const loading = ref(false)
 const selectedFields = ref<string[]>([])
 const fileType = ref('xlsx')
-const exportScope = ref<'all' | 'selected'>('all')
+const exportScope = ref<ExportScope>('all')
 const currentQueryCriteria = ref<any>(null)
 const currentSelectedIds = ref<number[]>([])
+const currentCurrentPageIds = ref<number[]>([])
 
 const emit = defineEmits(['export-started'])
 
 const hasSelectedItems = computed(() => currentSelectedIds.value.length > 0)
 const selectedItemCount = computed(() => currentSelectedIds.value.length)
+const hasCurrentPageItems = computed(() => currentCurrentPageIds.value.length > 0)
+const currentPageItemCount = computed(() => currentCurrentPageIds.value.length)
 
 /**
  * @description 打开弹窗
  * @param {any} query - 当前的查询条件
- * @param {number[]} [selectedItemIds=[]] - 父组件传递的选中项 ID 列表
+ * @param {number[]} [selectedItemIds=[]] - 选中项 ID
+ * @param {number[]} [currentPageIds=[]] - 当前页 ID
  */
-const open = (query: any, selectedItemIds: number[] = []) => {
+const open = (query: any, selectedItemIds: number[] = [], currentPageIds: number[] = []) => {
   console.log('[Debug] ExportOptionsDialog: Received selectedItemIds:', selectedItemIds);
+  console.log('[Debug] ExportOptionsDialog: Received currentPageIds:', currentPageIds);
   currentQueryCriteria.value = query;
   currentSelectedIds.value = selectedItemIds;
+  currentCurrentPageIds.value = currentPageIds;
   selectedFields.value = availableFields.value.map(f => f.value);
-  exportScope.value = selectedItemIds.length > 0 ? 'all' : 'all';
+
+  if (selectedItemIds.length > 0) {
+      exportScope.value = 'selected';
+  } else if (currentPageIds.length > 0) {
+      exportScope.value = 'currentPage';
+  } else {
+      exportScope.value = 'all';
+  }
+
   dialogVisible.value = true
 }
 
@@ -125,17 +143,24 @@ const handleSubmit = async () => {
       ElMessage.warning('请先在表格中勾选要导出的文档');
       return;
   }
+  if (exportScope.value === 'currentPage' && !hasCurrentPageItems.value) {
+      ElMessage.warning('当前页没有可导出的数据');
+      return;
+  }
 
   loading.value = true;
   try {
-    const params: any = {
-        query: exportScope.value === 'all' ? currentQueryCriteria.value : {},
+    const params: ExportRequestParams = {
         fields: selectedFields.value,
         fileType: fileType.value,
         exportScope: exportScope.value,
     };
-    if (exportScope.value === 'selected') {
+    if (exportScope.value === 'all') {
+        params.query = currentQueryCriteria.value;
+    } else if (exportScope.value === 'selected') {
         params.selectedIds = currentSelectedIds.value;
+    } else if (exportScope.value === 'currentPage') {
+        params.currentPageIds = currentCurrentPageIds.value;
     }
 
     const resultData = await requestExport(params);

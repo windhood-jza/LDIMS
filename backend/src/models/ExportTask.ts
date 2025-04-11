@@ -14,14 +14,15 @@ interface ExportTaskAttributes {
   selectedFields: string | null;
   filePath: string | null;
   errorMessage: string | null;
-  exportScope?: 'all' | 'selected';
-  selectedIds?: string | null;
+  exportScope: 'all' | 'selected' | 'currentPage';
+  selectedIds: string | null;
+  currentPageIds: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 // 定义创建 ExportTask 时可选的属性
-interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'exportScope' | 'selectedIds' | 'createdAt' | 'updatedAt'> {}
+interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'exportScope' | 'selectedIds' | 'currentPageIds' | 'createdAt' | 'updatedAt'> {}
 
 // 定义 ExportTask 模型类
 class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttributes> implements ExportTaskAttributes {
@@ -36,8 +37,9 @@ class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttribute
   public selectedFields!: string | null;
   public filePath!: string | null;
   public errorMessage!: string | null;
-  public exportScope!: 'all' | 'selected';
+  public exportScope!: 'all' | 'selected' | 'currentPage';
   public selectedIds!: string | null;
+  public currentPageIds!: string | null;
 
   // 时间戳
   public readonly createdAt!: Date;
@@ -119,17 +121,23 @@ ExportTask.init(
       comment: '错误信息',
     },
     exportScope: {
-      type: DataTypes.ENUM('all', 'selected'),
+      type: DataTypes.ENUM('all', 'selected', 'currentPage'),
       allowNull: false,
       defaultValue: 'all',
       field: 'export_scope',
-      comment: '导出范围: all(根据查询条件), selected(根据选中ID)',
+      comment: '导出范围: all(根据查询条件), selected(根据选中ID), currentPage(根据当前页)',
     },
     selectedIds: {
-      type: DataTypes.TEXT('medium'),
+      type: DataTypes.JSON,
       allowNull: true,
       field: 'selected_ids',
       comment: '选中项的 ID 列表 (JSON 数组)',
+    },
+    currentPageIds: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'currentPageIds',
+      comment: '当前页的 ID 列表 (JSON 数组)',
     },
     createdAt: {
       type: DataTypes.DATE,

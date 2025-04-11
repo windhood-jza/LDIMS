@@ -28,15 +28,34 @@ router.post(
     '/documents/export',
     authenticateToken,
     [
-        // 验证请求体
-        body('fileType').isIn(['xlsx', 'csv']).withMessage('无效的文件类型，应为 xlsx 或 csv'),
-        body('fields').isArray({ min: 1 }).withMessage('必须指定至少一个导出字段'),
-        body('query').optional().isObject().withMessage('查询条件必须是对象格式'),
-        body('exportScope').isIn(['all', 'selected']).withMessage('无效的导出范围'),
+        body('fields').isArray({ min: 1 }).withMessage('必须选择至少一个导出字段'),
+        body('fields.*').isString().isIn([
+            'id', 'docName', 'docTypeName', 'sourceDepartmentName', 'submitter', 'receiver',
+            'signer', 'handoverDate', 'storageLocation', 'remarks', 'createdByName',
+            'createdAt', 'updatedByName', 'updatedAt'
+            // 根据需要添加其他允许的字段
+        ]).withMessage('包含无效的字段名'),
+        body('fileType').isIn(['xlsx', 'csv']).withMessage('无效的文件类型'),
+        body('exportScope').isIn(['all', 'selected', 'currentPage']).withMessage('无效的导出范围'),
         body('selectedIds').if(body('exportScope').equals('selected'))
-                           .isArray({ min: 1 }).withMessage('导出选中项时必须提供 selectedIds 数组')
-                           .custom((ids: any[]) => ids.every(id => typeof id === 'number' && Number.isInteger(id)))
-                           .withMessage('selectedIds 必须是包含数字 ID 的数组'),
+            .isArray({ min: 1 }).withMessage('导出选中项时必须提供 selectedIds'),
+        body('selectedIds.*').if(body('exportScope').equals('selected'))
+            .isInt({ min: 1 }).withMessage('selectedIds 必须是有效的数字 ID'),
+        body('currentPageIds').if(body('exportScope').equals('currentPage'))
+            .isArray({ min: 1 }).withMessage('导出当前页时必须提供 currentPageIds'),
+        body('currentPageIds.*').if(body('exportScope').equals('currentPage'))
+            .isInt({ min: 1 }).withMessage('currentPageIds 必须是有效的数字 ID'),
+        body('query').optional().isObject(),
+        body('query.docName').optional().isString(),
+        body('query.submitter').optional().isString(),
+        body('query.receiver').optional().isString(),
+        body('query.docTypeId').optional().isInt({ min: 1 }),
+        body('query.sourceDepartmentId').optional().isInt({ min: 1 }),
+        body('query.docTypeNameFilter').optional().isString(),
+        body('query.sourceDepartmentNameFilter').optional().isString(),
+        body('query.signer').optional().isString(),
+        body('query.handoverDateRange').optional().isArray({ min: 2, max: 2 }),
+        body('query.handoverDateRange.*').optional().isISO8601().toDate(),
     ],
     async (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
@@ -52,7 +71,7 @@ router.post(
                 return;
             }
 
-            const { query, fields, fileType, exportScope, selectedIds } = req.body;
+            const { fields, fileType, query, exportScope, selectedIds, currentPageIds } = req.body;
             const exportOptions = { fields, fileType };
 
             // query 可以为空对象 {}
@@ -60,13 +79,15 @@ router.post(
 
             // 将 selectedIds (如果存在) 转换为 JSON 字符串
             const selectedIdsJson = exportScope === 'selected' ? JSON.stringify(selectedIds || []) : null;
+            const currentPageIdsJson = exportScope === 'currentPage' ? JSON.stringify(currentPageIds || []) : null;
 
             const newTask = await exportService.createExportTask(
                 finalQuery,
                 exportOptions,
                 userId,
                 exportScope,      // 传递新字段
-                selectedIdsJson  // 传递新字段 (JSON 字符串或 null)
+                selectedIdsJson,  // 传递新字段 (JSON 字符串或 null)
+                currentPageIdsJson  // 传递新字段 (JSON 字符串或 null)
             );
             res.status(201).json({ code: 201, message: '导出任务已创建', data: { taskId: newTask.id } });
             return;

@@ -44,18 +44,20 @@ export class ExportService {
    * @param query 查询条件 (如果 scope='all')
    * @param options 包含 fields 和 fileType
    * @param userId 用户 ID
-   * @param exportScope 导出范围 ('all' 或 'selected')
+   * @param exportScope 导出范围 ('all' 或 'selected' 或 'currentPage')
    * @param selectedIdsJson 选中项 ID 列表 (JSON 字符串, 如果 scope='selected')
+   * @param currentPageIdsJson 当前页 ID 列表 (JSON 字符串, 如果 scope='currentPage')
    * @returns {Promise<ExportTask>} 创建的任务对象
    */
   async createExportTask(
     query: DocumentListQuery,
     options: { fields: string[]; fileType: 'xlsx' | 'csv' },
     userId: number,
-    exportScope: 'all' | 'selected' = 'all', // 添加默认值
-    selectedIdsJson: string | null = null
+    exportScope: 'all' | 'selected' | 'currentPage' = 'all', // 更新范围类型
+    selectedIdsJson: string | null = null,
+    currentPageIdsJson: string | null = null // <-- 新增参数
   ): Promise<ExportTask> {
-    console.log('[ExportService] Creating export task for user:', userId, 'Query:', query, 'Options:', options);
+    console.log('[ExportService] Creating export task for user:', userId, 'Scope:', exportScope, 'Query:', query, 'Options:', options);
 
     const fileType = options.fileType || 'xlsx';
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -69,13 +71,15 @@ export class ExportService {
 
       const newTask = await ExportTask.create({
         userId,
-        taskType: 'document_export', // 可以根据需要调整任务类型
+        taskType: 'document_export',
         status: 0, // Pending
-        queryCriteria: exportScope === 'all' ? JSON.stringify(query || {}) : null, // 仅在导出全部时保存 query
+        // 仅在特定范围时保存对应条件
+        queryCriteria: exportScope === 'all' ? JSON.stringify(query || {}) : null,
         selectedFields: JSON.stringify(options.fields || []),
         fileType: options.fileType,
         exportScope: exportScope,
-        selectedIds: selectedIdsJson,
+        selectedIds: exportScope === 'selected' ? selectedIdsJson : null,
+        currentPageIds: exportScope === 'currentPage' ? currentPageIdsJson : null, // <-- 保存 currentPageIds
         // 其他字段默认为 null 或由数据库设置
       });
 
@@ -88,6 +92,10 @@ export class ExportService {
       return newTask;
     } catch (error) {
       console.error('[ExportService] Failed to create export task:', error);
+      // 考虑更具体的错误类型和消息
+      if (error instanceof Error && error.message === '未指定要导出的字段') {
+          throw error;
+      }
       throw new Error('创建导出任务数据库记录失败');
     }
   }
@@ -117,6 +125,7 @@ export class ExportService {
       const fileType = task.fileType as 'xlsx' | 'csv';
       const exportScope = task.exportScope;
       const selectedIds: number[] | null = JSON.parse(task.selectedIds || 'null');
+      const currentPageIds: number[] | null = JSON.parse(task.currentPageIds || 'null'); // <-- 解析 currentPageIds
 
       if (selectedFields.length === 0) {
         throw new Error('未指定要导出的字段');
@@ -131,31 +140,17 @@ export class ExportService {
               throw new Error('导出选中项时未提供有效的 ID 列表');
           }
           console.log(`[ExportService] Task ${taskId}: Fetching selected documents with IDs:`, selectedIds);
-          console.log(`[Debug] selectedIds value before query:`, selectedIds);
-          console.log(`[Debug] typeof selectedIds:`, typeof selectedIds);
-          console.log(`[Debug] Array.isArray(selectedIds):`, Array.isArray(selectedIds));
-          if (Array.isArray(selectedIds)) {
-              console.log(`[Debug] selectedIds elements types:`, selectedIds.map(id => typeof id));
+          // --- 复用获取和格式化逻辑 --- 
+          allDocuments = await this.fetchDocumentsByIds(selectedIds, MAX_EXPORT_ROWS);
+          // ----------------------------
+      } else if (exportScope === 'currentPage') { // <-- 新增处理 currentPage
+          if (!currentPageIds || currentPageIds.length === 0) {
+              throw new Error('导出当前页时未提供有效的 ID 列表');
           }
-
-          // 使用 Sequelize 的 Op.in (临时方案)
-          const result = await Document.findAll({
-              where: {
-                  id: { [Op.in]: selectedIds! } // 使用 ! 断言 selectedIds 不为 null
-              },
-              // 警告: 这里需要手动添加与 DocumentService.list 相同的关联和格式化逻辑！
-              // include: [...] 
-              limit: MAX_EXPORT_ROWS
-          });
-          // 警告: 需要手动格式化，这里仅为示例，格式化逻辑在下面准备数据时处理
-          // allDocuments = await Promise.all(result.map(doc => this.documentService.formatDocumentInfo(doc)));
-          // 简化处理：直接使用 Sequelize 返回的对象，依赖后续步骤处理
-          // 注意：这可能缺少关联数据，如 docTypeName, sourceDepartmentName, createdByName 等!
-          // 你需要在上面 findAll 中添加 include 来获取关联数据。
-          // 为了让代码能跑通，我们暂时假设后续步骤能处理原始 doc 对象
-          // TODO: 强烈建议在 DocumentService 中实现 getByIds 方法
-          allDocuments = result.map(doc => doc.toJSON() as unknown as DocumentInfo); // 转换为普通对象, 类型断言需要谨慎
-
+          console.log(`[ExportService] Task ${taskId}: Fetching current page documents with IDs:`, currentPageIds);
+          // --- 复用获取和格式化逻辑 --- 
+          allDocuments = await this.fetchDocumentsByIds(currentPageIds, MAX_EXPORT_ROWS);
+          // ----------------------------
       } else { // exportScope === 'all'
           console.log(`[ExportService] Task ${taskId}: Fetching documents with query:`, queryCriteria);
           const result = await this.documentService.list({ ...(queryCriteria || {}), page: 1, pageSize: MAX_EXPORT_ROWS });
@@ -272,6 +267,30 @@ export class ExportService {
       }
     }
   }
+
+  // --- 新增辅助方法：根据 ID 获取文档并格式化 --- 
+  /**
+   * @description 根据 ID 列表获取文档数据并格式化
+   * @param ids 文档 ID 列表
+   * @param limit 最大行数限制
+   * @returns {Promise<DocumentInfo[]>}
+   * @private
+   */
+  private async fetchDocumentsByIds(ids: number[], limit: number): Promise<DocumentInfo[]> {
+      const result = await Document.findAll({
+          where: {
+              id: { [Op.in]: ids }
+          },
+          // 警告: 如果 formatDocumentInfo 需要关联数据，这里仍需添加 include
+          // 但根据当前 formatDocumentInfo 的实现，它似乎依赖预置的 name 字段
+          limit: limit
+      });
+
+      // --- 重点修改：调用 formatDocumentInfo 进行格式化 --- 
+      return result.map(doc => this.documentService.formatDocumentInfo(doc));
+      // -------------------------------------------------
+  }
+  // --- 辅助方法结束 ---
 
   /**
    * @description 获取指定用户的导出任务列表 (分页)

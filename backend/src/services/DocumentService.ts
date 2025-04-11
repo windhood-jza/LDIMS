@@ -346,13 +346,14 @@ export class DocumentService {
     }
 
     /**
-    * @description 格式化 Sequelize 文档实例为 DTO
-    * @param {Document} document - Sequelize 文档实例
-    * @returns {DocumentInfo} 返回 DTO 对象
-    */
-    private formatDocumentInfo(document: Document): DocumentInfo {
-         // --- Temporarily revert createdByName logic ---
-         const creatorUsername = document.createdBy ?? null; // Use createdBy directly for now
+     * @description 格式化从数据库获取的文档信息为前端所需的格式
+     * @param document Sequelize 文档模型实例
+     * @returns {DocumentInfo} 格式化后的文档信息对象
+     * @public
+     */
+    public formatDocumentInfo(document: Document): DocumentInfo {
+        // --- Temporarily revert createdByName logic ---
+        const creatorUsername = document.createdBy ?? null; // Use createdBy directly for now
 
         const result = {
             id: document.id,
@@ -365,7 +366,7 @@ export class DocumentService {
             storageLocation: document.storageLocation ?? null,
             remarks: document.remarks ?? null,
             handoverDate: document.handoverDate ?? null,
-             createdByName: creatorUsername, // Assign the temporary value
+            createdByName: creatorUsername, // Assign the temporary value
             updatedBy: document.updatedBy ?? null,
             createdAt: document.createdAt,
             updatedAt: document.updatedAt,

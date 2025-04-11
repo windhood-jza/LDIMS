@@ -106,8 +106,8 @@
        <div class="toolbar">
          <div class="toolbar-buttons">
             <el-button type="primary" @click="openAddDialog" :icon="Plus">新增文档</el-button>
-            <el-button type="success" @click="openImportDialog" :icon="UploadFilled">批量导入</el-button>
-            <el-button type="warning" @click="handleExport" :icon="Download">导出</el-button>
+            <el-button type="success" @click="openImportDialog" :icon="UploadFilled" style="margin-left: 10px;">批量导入</el-button>
+            <el-button type="warning" @click="handleExport" :icon="Download" style="margin-left: 10px;">批量导出</el-button>
          </div>
        </div>
 
@@ -415,15 +415,19 @@ const handleSelectionChange = (selection: DocumentInfo[]) => {
 };
 
 /**
- * @description 处理导出按钮点击
+ * @description 处理批量导出按钮点击
  */
 const handleExport = () => {
-  // 准备传递给弹窗的查询条件 (不包含分页信息)
-  const exportQuery = { ...searchForm };
-  delete exportQuery.page;
-  delete exportQuery.pageSize;
-  // 调用导出弹窗的 open 方法，并传递选中的 ID
-  exportOptionsDialogRef.value?.open(exportQuery, selectedDocumentIds.value);
+  if (exportOptionsDialogRef.value) {
+    // 获取当前页数据的 ID 列表
+    const currentPageIds = tableData.value.map(item => item.id);
+
+    exportOptionsDialogRef.value.open(
+      searchForm, // 传递当前的搜索条件 (用于 'all' 范围)
+      selectedDocumentIds.value, // 传递选中的 ID 列表 (用于 'selected' 范围)
+      currentPageIds // <-- 新增: 传递当前页的 ID 列表
+    );
+  }
 };
 
 // --- 工具函数 ---

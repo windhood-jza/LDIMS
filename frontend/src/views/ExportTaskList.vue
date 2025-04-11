@@ -260,7 +260,7 @@ onUnmounted(() => {
 
 <style scoped>
 .export-task-list-view {
-  padding: 20px;
+  /* padding: 20px; */ /* <-- 注释或移除这里的 padding */
 }
 .card-header {
   display: flex;

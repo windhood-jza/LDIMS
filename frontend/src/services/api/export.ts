@@ -1,5 +1,10 @@
 import request from '../request'
-import type { ExportTask, ExportTaskQuery } from '@/types/export' // 假设类型文件路径
+import type {
+  ExportTask,
+  ExportTaskListResponse,
+  ExportTaskQuery,
+  ExportRequestParams
+} from '@/types/export' // 假设类型文件路径
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -12,13 +17,7 @@ import type { ApiResponse } from '@/types/api'
  * @param {number[]} [params.selectedIds] - 选中项 ID 列表 (scope='selected')
  * @returns {Promise<ApiResponse<{ taskId: number }>>} 返回包含任务 ID 的响应
  */
-export function requestExport(params: {
-  query: any;
-  fields: string[];
-  fileType: 'xlsx' | 'csv';
-  exportScope: 'all' | 'selected';
-  selectedIds?: number[];
-}): Promise<ApiResponse<{ taskId: number }>> {
+export function requestExport(params: ExportRequestParams): Promise<ApiResponse<{ taskId: number }>> {
   return request.post('/documents/export', params) // 直接传递整个 params 对象
 }
 
@@ -48,5 +47,34 @@ export function getExportTaskStatus(taskId: number): Promise<ApiResponse<ExportT
 export function downloadExportFile(taskId: number): Promise<Blob> {
   return request.get(`/export-tasks/${taskId}/download`, {
     responseType: 'blob' // 重要：设置响应类型为 blob 以下载文件
+  })
+}
+
+/**
+ * @description 获取当前用户的导出任务列表（分页）
+ * @param params 查询参数 (page, pageSize)
+ * @returns Promise<ExportTaskListResponse>
+ */
+export function getExportTasksList(params: ExportTaskQuery): Promise<ExportTaskListResponse> {
+  return request.get('/export/tasks', { params })
+}
+
+/**
+ * @description 获取指定导出任务的状态和进度
+ * @param taskId 任务 ID
+ * @returns Promise<{ status: number; progress: number; filePath: string | null; errorMessage: string | null }>
+ */
+export function getExportTaskStatusDetails(taskId: number): Promise<{ status: number; progress: number; filePath: string | null; errorMessage: string | null }> {
+  return request.get(`/export/tasks/${taskId}/status`)
+}
+
+/**
+ * @description 下载已完成的导出文件
+ * @param taskId 任务 ID
+ * @returns Promise<Blob>
+ */
+export function downloadExportFileDetails(taskId: number): Promise<Blob> {
+  return request.get(`/export/tasks/${taskId}/download`, {
+    responseType: 'blob' // 重要：指定响应类型为 blob
   })
 } 
