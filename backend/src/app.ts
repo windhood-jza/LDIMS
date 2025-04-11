@@ -1,10 +1,13 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection, isConnected } from './config/database';
 import { success } from './utils/response';
 import routes from './routes'; // 引入主路由
+import uploadRouter from './routes/upload';
+import multer from 'multer';
+import morgan from 'morgan';
 
 // 加载环境变量
 dotenv.config();
@@ -19,6 +22,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- API 路由 ---
 app.use('/api/v1', routes);
+app.use('/api/v1', uploadRouter);
 
 // 基础路由
 app.get('/api/v1/health', (req, res) => {
@@ -31,14 +35,32 @@ app.get('/api/v1/health', (req, res) => {
   }, '服务正常运行'));
 });
 
-// 错误处理中间件
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('全局错误处理:', err);
-  res.status(500).json({
-    code: 500,
-    message: '服务器内部错误',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+// --- 全局错误处理中间件 (暂时简化) ---
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error("Simplified Global Error Handler:", err);
+
+    // 暂时只返回 500 错误
+    res.status(500).json({ message: '服务器内部错误 (简化测试)' });
+
+    // 注意：原始的 Multer 和其他错误处理逻辑暂时被注释掉了
+    /*
+    // 处理 Multer 错误
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: '文件大小超过限制 (最大 10MB)' });
+        }
+        return res.status(400).json({ message: `文件上传字段错误: ${err.message}` });
+    }
+    // 处理文件过滤器抛出的错误或其他特定错误
+    if (err.message && err.message.includes('仅支持上传')) {
+         return res.status(400).json({ message: err.message });
+    }
+    const statusCode = err.status || 500;
+    const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+                    ? '服务器内部错误'
+                    : err.message || '未知服务器错误';
+    res.status(statusCode).json({ message });
+    */
 });
 
 // 启动服务器

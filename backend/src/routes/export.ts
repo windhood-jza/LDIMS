@@ -7,6 +7,7 @@ import { validationResult, body, query as queryValidator, param as paramValidato
 import * as fs from 'fs'; // 引入 Node.js fs 模块用于检查文件是否存在
 import * as path from 'path'; // 引入 path 模块
 import ExportTask from '../models/ExportTask'; // 修改为默认导入
+import { importService } from '../services/ImportService'; // <-- 导入 importService
 
 // --- 实例化服务 --- 
 // !! 注意：这里假设 DocumentService 已经被实例化并且可用
@@ -315,6 +316,50 @@ router.get(
                 const message = error instanceof Error ? error.message : '处理下载请求时出错';
                 res.status(500).json({ code: 500, message: message });
             }
+        }
+    }
+);
+
+// --- 导入相关路由 --- 
+
+// POST /documents/import - 创建导入任务
+router.post(
+    '/documents/import',
+    authenticateToken,
+    [
+        // 验证请求体中必须包含上传接口返回的文件名和原始文件名
+        body('fileName').notEmpty().withMessage('缺少上传后的文件名 (fileName)').isString(),
+        body('originalName').notEmpty().withMessage('缺少原始文件名 (originalName)').isString(),
+    ],
+    async (req: any, res: any) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        try {
+            const userId = req.user.userId; // 从认证中间件获取用户 ID
+            const { fileName, originalName } = req.body;
+
+            // 调用 importService 创建导入任务
+            const task = await importService.createImportTask(
+                userId,
+                originalName,
+                fileName // 传递服务器上存储的文件名
+            );
+
+            res.status(201).json({ message: '导入任务已创建', taskId: task.id });
+        } catch (error) {
+            console.error("Error creating import task:", error);
+            // 根据 importService 中抛出的错误类型返回不同消息
+            if (error instanceof Error) {
+                if (error.message.includes('上传的文件未找到')) {
+                     return res.status(400).json({ message: error.message });
+                } else if (error.message.includes('创建导入任务数据库记录失败')) {
+                     return res.status(500).json({ message: error.message });
+                }
+            }
+            res.status(500).json({ message: '创建导入任务失败' });
         }
     }
 );

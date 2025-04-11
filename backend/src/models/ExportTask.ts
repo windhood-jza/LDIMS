@@ -5,7 +5,7 @@ import sequelize from '../config/database';
 interface ExportTaskAttributes {
   id: number;
   userId: number;
-  taskType: string;
+  taskType: 'document_export' | 'document_import';
   status: number;
   fileName: string | null;
   fileType: string | null;
@@ -17,18 +17,23 @@ interface ExportTaskAttributes {
   exportScope: 'all' | 'selected' | 'currentPage';
   selectedIds: string | null;
   currentPageIds: string | null;
+  totalRows: number | null;
+  processedRows: number | null;
+  successCount: number | null;
+  failureCount: number | null;
+  errorDetails: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 // 定义创建 ExportTask 时可选的属性
-interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'exportScope' | 'selectedIds' | 'currentPageIds' | 'createdAt' | 'updatedAt'> {}
+interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'exportScope' | 'selectedIds' | 'currentPageIds' | 'totalRows' | 'processedRows' | 'successCount' | 'failureCount' | 'errorDetails' | 'createdAt' | 'updatedAt'> {}
 
 // 定义 ExportTask 模型类
 class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttributes> implements ExportTaskAttributes {
   public id!: number;
   public userId!: number;
-  public taskType!: string;
+  public taskType!: 'document_export' | 'document_import';
   public status!: number;
   public fileName!: string | null;
   public fileType!: string | null;
@@ -40,6 +45,11 @@ class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttribute
   public exportScope!: 'all' | 'selected' | 'currentPage';
   public selectedIds!: string | null;
   public currentPageIds!: string | null;
+  public totalRows!: number | null;
+  public processedRows!: number | null;
+  public successCount!: number | null;
+  public failureCount!: number | null;
+  public errorDetails!: string | null;
 
   // 时间戳
   public readonly createdAt!: Date;
@@ -62,10 +72,11 @@ ExportTask.init(
       // 外键关联将在模型关联部分定义
     },
     taskType: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.ENUM('document_export', 'document_import'),
       allowNull: false,
+      defaultValue: 'document_export',
       field: 'task_type',
-      comment: '任务类型：文档导出/报表导出',
+      comment: '任务类型: document_export, document_import',
     },
     status: {
       type: DataTypes.TINYINT,
@@ -77,13 +88,13 @@ ExportTask.init(
       type: DataTypes.STRING(255),
       allowNull: true,
       field: 'file_name',
-      comment: '导出文件名',
+      comment: '文件名 (导入时原始文件名/导出时生成文件名)',
     },
     fileType: {
       type: DataTypes.STRING(20),
       allowNull: true,
       field: 'file_type',
-      comment: '文件类型 (e.g., excel, csv)',
+      comment: '文件类型 (e.g., xlsx, csv)',
     },
     queryCriteria: {
       type: DataTypes.TEXT('long'),
@@ -96,7 +107,7 @@ ExportTask.init(
       allowNull: true,
       defaultValue: 0,
       field: 'progress',
-      comment: '导出进度 (0-100)',
+      comment: '任务进度 (0-100)',
       validate: {
         min: 0,
         max: 100,
@@ -112,13 +123,13 @@ ExportTask.init(
       type: DataTypes.STRING(255),
       allowNull: true,
       field: 'file_path',
-      comment: '文件路径',
+      comment: '文件路径 (导入/导出)',
     },
     errorMessage: {
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'error_message',
-      comment: '错误信息',
+      comment: '总体错误信息',
     },
     exportScope: {
       type: DataTypes.ENUM('all', 'selected', 'currentPage'),
@@ -139,6 +150,36 @@ ExportTask.init(
       field: 'currentPageIds',
       comment: '当前页的 ID 列表 (JSON 数组)',
     },
+    totalRows: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'total_rows',
+      comment: '导入文件总行数'
+    },
+    processedRows: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'processed_rows',
+      comment: '已处理行数'
+    },
+    successCount: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'success_count',
+      comment: '成功导入行数'
+    },
+    failureCount: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'failure_count',
+      comment: '导入失败行数'
+    },
+    errorDetails: {
+      type: DataTypes.TEXT('long'),
+      allowNull: true,
+      field: 'error_details',
+      comment: '详细错误信息 (例如 JSON 数组 [{row: number, error: string}])'
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -157,10 +198,11 @@ ExportTask.init(
     tableName: 'export_tasks',
     timestamps: true,
     underscored: true,
-    comment: '导出任务表',
+    comment: '导出与导入任务表',
     indexes: [
       { fields: ['user_id'], name: 'idx_user' },
       { fields: ['status'], name: 'idx_status' },
+      { fields: ['task_type'], name: 'idx_task_type' },
     ],
   }
 );
