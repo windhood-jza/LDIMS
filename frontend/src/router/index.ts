@@ -44,6 +44,12 @@ const routes: Array<RouteRecordRaw> = [
         name: 'Settings',
         component: () => import('../views/SettingsView.vue'),
         meta: { title: '系统设置', requiresAuth: true }
+      },
+      {
+        path: 'export-tasks',
+        name: 'ExportTaskList',
+        component: () => import('../views/ExportTaskList.vue'),
+        meta: { title: '导出任务', requiresAuth: true }
       }
       // ... 其他使用 DefaultLayout 的页面路由
     ]

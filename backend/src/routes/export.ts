@@ -6,6 +6,7 @@ import { DocumentListQuery } from '../types/document.d';
 import { validationResult, body, query as queryValidator, param as paramValidator } from 'express-validator';
 import * as fs from 'fs'; // 引入 Node.js fs 模块用于检查文件是否存在
 import * as path from 'path'; // 引入 path 模块
+import ExportTask from '../models/ExportTask'; // 修改为默认导入
 
 // --- 实例化服务 --- 
 // !! 注意：这里假设 DocumentService 已经被实例化并且可用
@@ -28,7 +29,7 @@ router.post(
     authenticateToken,
     [
         // 验证请求体
-        body('fileType').isIn(['excel', 'csv']).withMessage('无效的文件类型'),
+        body('fileType').isIn(['xlsx', 'csv']).withMessage('无效的文件类型，应为 xlsx 或 csv'),
         body('fields').isArray({ min: 1 }).withMessage('必须指定至少一个导出字段'),
         // query 条件可以允许为空或部分提供，ExportService 会处理
         body('query').optional().isObject().withMessage('查询条件必须是对象格式'),
@@ -91,29 +92,32 @@ router.get(
                 return;
             }
 
-            const page = (req.query.page as number | undefined) ?? 1;
-            const pageSize = (req.query.pageSize as number | undefined) ?? 10;
+            // 直接使用验证器处理后的值，如果不存在，服务层会处理默认值
+            const page = req.query.page as number | undefined; // 验证器已确保是 number 或 undefined
+            const pageSize = req.query.pageSize as number | undefined; // 验证器已确保是 number 或 undefined
 
+            // 传递给服务层，让服务层处理默认值 (getTasksByUserId 有默认值 page=1, pageSize=10)
             const result = await exportService.getTasksByUserId(userId, page, pageSize);
             
             // 格式化返回的分页数据
              const responseData = {
-                list: result.list.map(task => ({
+                list: result.list.map((task: ExportTask) => ({
                     id: task.id,
                     userId: task.userId,
-                    taskType: task.taskType,
                     status: task.status,
                     fileName: task.fileName,
                     fileType: task.fileType,
+                    queryCriteria: task.queryCriteria,
+                    selectedFields: task.selectedFields,
                     progress: task.progress,
-                    filePath: task.filePath, // 可能会暴露服务器路径，考虑是否只在下载时使用
+                    filePath: task.filePath,
                     errorMessage: task.errorMessage,
                     createdAt: task.createdAt,
                     updatedAt: task.updatedAt,
                 })),
                 total: result.total,
-                page: page,
-                pageSize: pageSize,
+                page: Number(page ?? 1),
+                pageSize: Number(pageSize ?? 10),
             };
 
             res.status(200).json({ code: 200, message: '获取成功', data: responseData });

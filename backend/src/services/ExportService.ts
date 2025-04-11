@@ -4,9 +4,27 @@ import Document from '../models/Document';
 import { DocumentService } from './DocumentService'; // 引入 DocumentService
 import { DocumentInfo, DocumentListQuery } from '../types/document.d'; // 引入查询类型和信息类型
 import { taskQueueService } from './TaskQueueService'; // 引入任务队列服务
-import * as fs from 'fs/promises';
+import * as fs from 'fs'; // 修改为导入标准 fs 模块
 import * as path from 'path';
 import * as xlsx from 'xlsx'; // 用于生成 Excel
+
+// 中英文列名映射
+const fieldToHeaderMap: Record<string, string> = {
+  id: '文档 ID',
+  docName: '文档名称',
+  docTypeName: '文档类型',
+  sourceDepartmentName: '来源部门',
+  submitter: '提交人',
+  receiver: '接收人',
+  signer: '签收（章）人',
+  handoverDate: '交接日期',
+  storageLocation: '保管位置',
+  remarks: '备注',
+  createdByName: '创建人',
+  createdAt: '创建时间',
+  updatedByName: '最后修改人',
+  updatedAt: '最后修改时间',
+};
 
 // 定义导出选项接口
 interface ExportOptions {
@@ -72,118 +90,130 @@ export class ExportService {
   }
 
   /**
-   * @description 处理单个导出任务 (由 TaskQueueService 调用)
+   * @description 实际处理导出任务的逻辑
    * @param taskId 任务 ID
    */
   async processExportTask(taskId: number): Promise<void> {
-    console.log(`[ExportService] Starting to process export task ${taskId}`);
+    console.log(`[ExportService] Processing task ${taskId}...`);
     let task: ExportTask | null = null;
-
     try {
       task = await ExportTask.findByPk(taskId);
-      if (!task) {
-        console.error(`[ExportService] Task ${taskId} not found for processing.`);
+      if (!task || task.status !== 0) { // 仅处理待处理任务
+        console.log(`[ExportService] Task ${taskId} not found or not in pending state.`);
         return;
       }
 
-      // 1. 更新状态为处理中
-      task.status = 1; // Processing
-      task.progress = 10; // 设置初始进度
+      // 1. 更新任务状态为处理中
+      task.status = 1; // 1: processing
+      task.progress = 10; // 初始进度
       await task.save();
-      console.log(`[ExportService] Task ${taskId} status updated to Processing.`);
 
-      // **修改**: 解析查询条件和导出的字段
-      if (!task.queryCriteria) {
-        throw new Error('Query criteria not found in task.');
-      }
-      if (!task.selectedFields) { // **新增**: 检查 selectedFields
-          throw new Error('Selected fields not found in task.');
-      }
-      const query: DocumentListQuery = JSON.parse(task.queryCriteria);
-      const selectedFields: string[] = JSON.parse(task.selectedFields); // **修改**: 从 task 读取
+      // 2. 解析查询条件和选择字段
+      const queryCriteria: DocumentListQuery = JSON.parse(task.queryCriteria || '{}');
+      const selectedFields: string[] = JSON.parse(task.selectedFields || '[]');
+      const fileType = task.fileType as 'xlsx' | 'csv';
 
       if (selectedFields.length === 0) {
-          throw new Error('No fields specified for export in task.');
+        throw new Error('未指定要导出的字段');
       }
 
-      const exportOptions: ExportOptions = {
-        fields: selectedFields, // **修改**: 使用解析出的字段
-        fileType: task.fileType as ('excel' | 'csv') || 'excel',
-      };
-      console.log(`[ExportService] Task ${taskId} - Parsed query:`, query, 'Options:', exportOptions);
+      console.log(`[ExportService] Task ${taskId}: Fetching documents with query:`, queryCriteria);
+      console.log(`[ExportService] Task ${taskId}: Selected fields:`, selectedFields);
 
-      // 3. 获取所有数据 (需要修改 DocumentService.list 或添加新方法)
-      console.log(`[ExportService] Task ${taskId} - Fetching all documents...`);
-      // **假设** DocumentService 有一个 getAll 方法或 list 支持 pageSize=-1
-      // 注意：一次性加载大量数据可能导致内存问题，实际应用中可能需要分页获取或流式处理
-      const allDocumentsResult = await this.documentService.list({ ...query, page: 1, pageSize: -1 }); // 使用 pageSize: -1 表示获取所有
-      const allDocuments: DocumentInfo[] = allDocumentsResult.list;
-      const totalDocs = allDocuments.length;
-      console.log(`[ExportService] Task ${taskId} - Fetched ${totalDocs} documents.`);
-      task.progress = 30;
+      // 3. 获取所有匹配的文档数据 (不分页)
+      // 注意：这里直接调用 list 方法，并传递一个很大的 pageSize 来获取所有数据
+      // 对于非常大的数据集，这可能会导致内存问题，需要考虑流式处理或分批处理
+      const MAX_EXPORT_ROWS = 100000; // 设置一个最大导出条数限制，防止内存溢出
+      const result = await this.documentService.list({ ...queryCriteria, page: 1, pageSize: MAX_EXPORT_ROWS });
+      const allDocuments: DocumentInfo[] = result.list;
+
+      console.log(`[ExportService] Task ${taskId}: Found ${allDocuments.length} documents to export.`);
+      task.progress = 50; // 更新进度
       await task.save();
 
-      if (totalDocs === 0) {
-          console.log(`[ExportService] Task ${taskId} - No documents found for export. Marking as completed.`);
-          task.status = 2; // Completed
-          task.progress = 100;
-          task.filePath = null; // 没有文件生成
-          await task.save();
-          return;
-      }
+      // 4. 准备导出数据 (包括中文表头)
+      const exportData: any[][] = [];
 
-      // **确认**: 准备数据的逻辑现在使用 exportOptions.fields (来自 task.selectedFields)
-      const dataToExport = allDocuments.map((doc: DocumentInfo) => {
-        const row: any = {};
-        exportOptions.fields.forEach(field => {
-          // **确认**: key 断言和 doc 类型应已修复 TS7053
-          const key = field as keyof DocumentInfo;
-          if (key === 'handoverDate' || key === 'createdAt' || key === 'updatedAt') {
-              row[field] = doc[key] ? new Date(doc[key] as string | Date).toLocaleDateString('zh-CN') : ''; // 稍作调整以处理可能的类型
-          } else {
-              row[field] = doc[key] ?? '';
+      // 创建中文表头行
+      const headerRow = selectedFields.map(field => fieldToHeaderMap[field] || field); // 如果映射不存在，使用原始字段名
+      exportData.push(headerRow);
+
+      // 创建数据行
+      allDocuments.forEach(doc => {
+        const dataRow = selectedFields.map(field => {
+          const value = (doc as any)[field]; // 获取字段值
+          // 可以根据需要格式化特定字段 (例如日期)
+          if ((field === 'createdAt' || field === 'updatedAt' || field === 'handoverDate') && value) {
+              try {
+                  // 尝试格式化日期 YYYY-MM-DD HH:MM 或 YYYY-MM-DD
+                  const dt = new Date(value);
+                  const year = dt.getFullYear();
+                  const month = (dt.getMonth() + 1).toString().padStart(2, '0');
+                  const day = dt.getDate().toString().padStart(2, '0');
+                  if (field === 'handoverDate') {
+                      return `${year}-${month}-${day}`;
+                  } else {
+                      const hours = dt.getHours().toString().padStart(2, '0');
+                      const minutes = dt.getMinutes().toString().padStart(2, '0');
+                      return `${year}-${month}-${day} ${hours}:${minutes}`;
+                  }
+              } catch (e) { return value; } // 格式化失败则返回原始值
           }
+          return value !== null && value !== undefined ? value : ''; // 处理 null/undefined
         });
-        return row;
+        exportData.push(dataRow);
       });
-      task.progress = 60;
-      await task.save();
 
-      // 5. 生成文件 (Excel 或 CSV)
-      console.log(`[ExportService] Task ${taskId} - Generating ${exportOptions.fileType} file...`);
-      const exportDir = path.resolve(__dirname, '../../uploads/exports'); // 定义导出目录
-      await fs.mkdir(exportDir, { recursive: true }); // 确保目录存在
-      const filePath = path.join(exportDir, task.fileName || `export_${taskId}.xlsx`); // 使用 task 中的 fileName
+      // 5. 生成文件
+      const exportsDir = path.join(__dirname, '../../exports'); // 导出目录
+      if (!fs.existsSync(exportsDir)) {
+        fs.mkdirSync(exportsDir, { recursive: true });
+      }
 
-      if (exportOptions.fileType === 'excel') {
-        const worksheet = xlsx.utils.json_to_sheet(dataToExport);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `documents_export_${taskId}_${timestamp}.${fileType}`;
+      const filePath = path.join(exportsDir, fileName);
+
+      console.log(`[ExportService] Task ${taskId}: Generating ${fileType} file at ${filePath}...`);
+
+      if (fileType === 'xlsx') {
+        const worksheet = xlsx.utils.aoa_to_sheet(exportData);
         const workbook = xlsx.utils.book_new();
         xlsx.utils.book_append_sheet(workbook, worksheet, 'Documents');
-        await xlsx.writeFile(workbook, filePath);
-      } else {
-        // **确认**: CSV header 和 rows 使用 exportOptions.fields
-        const header = exportOptions.fields.join(',') + '\n';
-        const rows = dataToExport.map(row => exportOptions.fields.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(',')).join('\n');
-        await fs.writeFile(filePath, header + rows, 'utf8');
+        xlsx.writeFile(workbook, filePath);
+      } else if (fileType === 'csv') {
+        // 对于 CSV，需要确保特殊字符被正确处理
+        const csvContent = exportData.map(row =>
+          row.map(cell => {
+            const cellStr = String(cell);
+            // 如果包含逗号、引号或换行符，则用引号括起来，并将内部引号转义
+            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+              return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+          }).join(',')
+        ).join('\n');
+        fs.writeFileSync(filePath, '\ufeff' + csvContent, { encoding: 'utf8' }); // 添加 BOM 头以兼容 Excel 打开中文
       }
-      console.log(`[ExportService] Task ${taskId} - File saved to ${filePath}`);
-      task.progress = 90;
-      await task.save();
+
+      console.log(`[ExportService] Task ${taskId}: File generated successfully.`);
 
       // 6. 更新任务状态为完成
-      task.status = 2; // Completed
+      task.status = 2; // 2: completed
       task.progress = 100;
-      task.filePath = filePath; // 记录文件路径
+      task.fileName = fileName;
+      task.filePath = filePath; // 保存相对或绝对路径，取决于部署需求
       await task.save();
-      console.log(`[ExportService] Task ${taskId} successfully completed.`);
 
-    } catch (error) {
-      console.error(`[ExportService] Failed to process task ${taskId}:`, error);
+      console.log(`[ExportService] Task ${taskId} completed successfully.`);
+
+    } catch (error: any) {
+      console.error(`[ExportService] Error processing task ${taskId}:`, error);
       if (task) {
         try {
-          task.status = 3; // Failed
-          task.progress = task.progress || 0; // 保留失败前的进度
-          task.errorMessage = error instanceof Error ? error.message : String(error);
+          task.status = 3; // 3: failed
+          task.progress = null;
+          task.errorMessage = error.message || '导出过程中发生未知错误';
           await task.save();
           console.log(`[ExportService] Task ${taskId} status updated to Failed.`);
         } catch (saveError) {
@@ -200,9 +230,17 @@ export class ExportService {
    * @param pageSize 每页数量
    * @returns {Promise<{ list: ExportTask[], total: number }>} 任务列表和总数
    */
-  async getTasksByUserId(userId: number, page: number = 1, pageSize: number = 10): Promise<{ list: ExportTask[], total: number }> {
-    const offset = (page - 1) * pageSize;
-    const limit = pageSize;
+  async getTasksByUserId(userId: number, page: number | string = 1, pageSize: number | string = 10): Promise<{ list: ExportTask[], total: number }> {
+    // 确保分页参数是数字
+    const numPage = typeof page === 'string' ? parseInt(page, 10) : page;
+    const numPageSize = typeof pageSize === 'string' ? parseInt(pageSize, 10) : pageSize;
+
+    // 进行 NaN 检查，并提供默认值
+    const currentPage = isNaN(numPage) || numPage < 1 ? 1 : numPage;
+    const currentLimit = isNaN(numPageSize) || numPageSize < 1 ? 10 : numPageSize;
+
+    const offset = (currentPage - 1) * currentLimit;
+    const limit = currentLimit;
     try {
       const result = await ExportTask.findAndCountAll({
         where: { userId },

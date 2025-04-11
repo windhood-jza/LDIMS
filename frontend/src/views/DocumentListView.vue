@@ -162,6 +162,9 @@
       @success="fetchData"
      />
 
+    <!-- 导出选项弹窗 -->
+    <ExportOptionsDialog ref="exportOptionsDialogRef" />
+
   </div>
 </template>
 
@@ -184,6 +187,7 @@ import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
+import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
 
 // 优化：定义更精确的树节点类型
 interface TreeNode {
@@ -222,6 +226,7 @@ const departmentTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
 const treeProps = { value: 'id', label: 'name', children: 'children' };
 
 const formDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null>(null);
+const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
 
 // --- API 调用与数据处理 ---
 
@@ -414,7 +419,12 @@ const openImportDialog = () => {
 };
 
 const openExportDialog = () => {
-  ElMessage.info("导出功能待实现");
+  // 准备传递给弹窗的查询条件 (不包含分页信息)
+  const exportQuery = { ...searchForm };
+  delete exportQuery.page;
+  delete exportQuery.pageSize;
+  // 调用导出弹窗的 open 方法
+  exportOptionsDialogRef.value?.open(exportQuery);
 };
 
 // --- 工具函数 ---

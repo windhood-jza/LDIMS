@@ -37,6 +37,10 @@
              <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </el-menu-item>
+          <el-menu-item index="/export-tasks">
+            <el-icon><Download /></el-icon>
+            <span>导出任务</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -88,7 +92,8 @@ import {
   User,
   OfficeBuilding, // 确保已引入
   Setting,
-  ArrowDown
+  ArrowDown,
+  Download
 } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 
