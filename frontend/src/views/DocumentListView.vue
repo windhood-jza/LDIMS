@@ -106,7 +106,18 @@
        <div class="toolbar">
          <div class="toolbar-buttons">
             <el-button type="primary" @click="openAddDialog" :icon="Plus">新增文档</el-button>
-            <el-button type="success" @click="openImportDialog" :icon="UploadFilled" style="margin-left: 10px;">批量导入</el-button>
+            <el-upload
+              :action="uploadUrl" 
+              :headers="uploadHeaders"
+              :show-file-list="false" 
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              :before-upload="beforeUpload"
+              accept=".xlsx, .xls" 
+              style="margin-left: 10px; display: inline-block;" 
+            >
+              <el-button type="success" :icon="UploadFilled" :loading="isUploading">批量导入</el-button>
+            </el-upload>
             <el-button type="warning" @click="handleExport" :icon="Download" style="margin-left: 10px;">批量导出</el-button>
          </div>
        </div>
@@ -180,8 +191,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue';
-import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect } from 'element-plus';
+import { ref, reactive, onMounted, nextTick, computed } from 'vue';
+import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect, ElUpload } from 'element-plus';
 import {
     Search,
     Refresh,
@@ -195,11 +206,14 @@ import {
 } from '@element-plus/icons-vue';
 import type { DocumentInfo, DocumentListQuery } from '@/types/document';
 import type { TreeNode } from '@/types/common';
+import type { UploadResponse, ImportRequestParams } from '@/types/export';
 import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
+import { requestImport } from '@/services/api/export';
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
 import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
+import type { UploadProps, UploadRawFile } from 'element-plus';
 
 // --- ref 定义 ---
 const searchFormRef = ref<FormInstance>();
@@ -207,6 +221,7 @@ const documentFormDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null
 const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
 const tableRef = ref(); // 表格实例 (如果需要调用方法)
 const selectedDocumentIds = ref<number[]>([]); // 存储选中行的 ID
+const isUploading = ref(false); // 控制导入按钮的加载状态
 
 // --- 状态定义 ---
 const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null, docTypeNameFilter?: string, sourceDepartmentNameFilter?: string }>({
@@ -235,6 +250,22 @@ const pagination = reactive({
 const docTypeTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
 const departmentTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
 const treeProps = { value: 'id', label: 'name', children: 'children' };
+
+// --- 计算属性 (获取上传 URL 和 Headers) ---
+const uploadUrl = computed(() => {
+    // 确保使用完整的 API 地址
+    // 假设后端 API 基础路径已通过环境变量或其他方式配置
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+    return `${baseUrl}/upload/excel`;
+});
+
+const uploadHeaders = computed(() => {
+    // 从 localStorage 或其他地方获取 token
+    const token = localStorage.getItem('accessToken'); // 或你的 token 存储键
+    return {
+        Authorization: `Bearer ${token}`
+    };
+});
 
 // --- API 调用与数据处理 ---
 
@@ -401,10 +432,6 @@ const handleDelete = async (row: DocumentInfo) => {
   }
 };
 
-const openImportDialog = () => {
-  ElMessage.info("导入功能待实现");
-};
-
 /**
  * @description 表格行选择变化时触发
  * @param {DocumentInfo[]} selection - 当前选中的行对象数组
@@ -429,6 +456,81 @@ const handleExport = () => {
     );
   }
 };
+
+// --- 上传处理函数 ---
+
+/**
+ * @description 上传文件之前的钩子：检查文件类型和大小
+ */
+const beforeUpload: UploadProps['beforeUpload'] = (rawFile: UploadRawFile) => {
+  const allowedTypes = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+  const maxSize = 10 * 1024 * 1024; // 10MB
+
+  if (!allowedTypes.includes(rawFile.type)) {
+    ElMessage.error('只能上传 Excel 文件 (.xlsx 或 .xls)!');
+    return false;
+  }
+  if (rawFile.size > maxSize) {
+    ElMessage.error('文件大小不能超过 10MB!');
+    return false;
+  }
+  isUploading.value = true; // 开始上传，显示加载状态
+  return true; // 允许上传
+}
+
+/**
+ * @description 文件上传成功后的回调
+ */
+const handleUploadSuccess: UploadProps['onSuccess'] = (response: UploadResponse, uploadFile) => {
+  console.log('Upload success:', response);
+  isUploading.value = false; // 上传结束
+  // 触发导入任务创建
+  if (response && response.fileName && response.originalName) {
+      triggerImportTask(response.fileName, response.originalName);
+  } else {
+      ElMessage.error(response?.message || '文件上传成功，但服务器返回数据异常');
+  }
+}
+
+/**
+ * @description 文件上传失败后的回调
+ */
+const handleUploadError: UploadProps['onError'] = (error: any, uploadFile) => {
+  console.error('Upload error:', error);
+  isUploading.value = false; // 上传结束
+  // 尝试解析错误信息
+  let message = '文件上传失败';
+  try {
+      const errorData = JSON.parse(error.message || '{}');
+      message = errorData.message || message;
+  } catch (e) {
+      // 如果 error.message 不是 JSON 字符串，直接使用
+      if (error.message) {
+          message = error.message;
+      }
+  }
+  ElMessage.error(message);
+}
+
+/**
+ * @description 触发后台导入任务
+ */
+const triggerImportTask = async (fileName: string, originalName: string) => {
+    try {
+        const params: ImportRequestParams = { fileName, originalName };
+        const result = await requestImport(params);
+        if (result && result.taskId) {
+            ElMessage.success(`导入任务已创建 (ID: ${result.taskId})，请稍后在任务列表查看进度。`);
+            // 可以考虑跳转到任务列表页面或提供链接
+        } else {
+             ElMessage.error('启动导入任务失败：服务器响应异常');
+        }
+    } catch (error: any) {
+        console.error('Request import task error:', error);
+        const message = error?.response?.data?.message || error?.message || '启动导入任务时发生错误';
+        ElMessage.error(message);
+    }
+}
 
 // --- 工具函数 ---
 const formatDate = (date: Date | string | null): string => {
@@ -561,6 +663,18 @@ const handleDepartmentNameInput = (value: string) => {
 /* 移除之前可能干扰布局的 el-form-item__content 样式 */
 :deep(.el-form-item__content) {
   /* 确保这里没有 display: block 或类似的样式 */
+}
+
+/* 确保 el-upload 内的按钮样式正常 */
+.el-upload {
+    display: inline-block; /* 使其与旁边的按钮对齐 */
+    margin-right: 10px; /* 可以调整与其他按钮的间距 */
+}
+
+/* 可能需要调整 toolbar 内按钮的垂直对齐方式 */
+.toolbar-buttons {
+    display: flex;
+    align-items: center; /* 尝试垂直居中对齐 */
 }
 
 </style> 

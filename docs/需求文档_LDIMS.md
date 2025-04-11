@@ -280,8 +280,8 @@ CREATE TABLE doc_types (
 CREATE TABLE documents (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     doc_name VARCHAR(255) NOT NULL COMMENT '文档名称',
-    doc_type_id INT COMMENT '文档类型ID, 允许为空',
-    source_department_id INT NOT NULL COMMENT '来源部门ID',
+    doc_type_name VARCHAR(255) COMMENT '文档类型名称, 允许为空',
+    source_department_name VARCHAR(255) NOT NULL COMMENT '来源部门名称',
     submitter VARCHAR(50) NOT NULL COMMENT '提交人',
     receiver VARCHAR(50) NOT NULL COMMENT '接收人',
     signer VARCHAR(50) COMMENT '落款人, 允许为空',
@@ -293,8 +293,6 @@ CREATE TABLE documents (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deletedAt DATETIME NULL DEFAULT NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
-    INDEX idx_doc_type (doc_type_id),
-    INDEX idx_source_department (source_department_id),
     INDEX idx_handover_date (handover_date),
     INDEX idx_doc_name (doc_name),
     FULLTEXT INDEX idx_content (doc_name, submitter, receiver, signer, remarks)
@@ -371,8 +369,6 @@ CREATE TABLE export_tasks (
 
 4. 文档信息表（documents）
    - 主键索引：id
-   - 普通索引：doc_type_id（按类型查询）
-   - 普通索引：source_department_id（按部门查询，索引名：idx_source_department）
    - 普通索引：handover_date（按交接日期查询）
    - 普通索引：doc_name（按文档名称查询）
    - 全文索引：(doc_name, submitter, receiver, signer, remarks)（全文检索）
@@ -705,9 +701,8 @@ INSERT INTO users (
     page?: number;     // 页码，默认1
     pageSize?: number; // 每页大小，默认20
     keyword?: string;  // 搜索关键词
-    docTypeId?: number;// 文档类型ID
-    departmentId?: number; // 来源部门ID
-    year?: number;     // 年度
+    docTypeName?: string;// 文档类型名称
+    sourceDepartmentName?: string; // 来源部门名称
     submitter?: string;// 提交人
     receiver?: string; // 接收人
     signer?: string;   // 落款人
@@ -724,18 +719,16 @@ INSERT INTO users (
   interface DocumentInfo {
     id: number;
     docName: string;
-    docTypeId: number | null; // 允许 null
-    docTypeName: string | null; // 允许 null
-    sourceDepartmentId: number;
+    docTypeName: string | null;
     sourceDepartmentName: string;
     submitter: string;
     receiver: string;
-    signer: string | null; // 允许 null
+    signer: string | null;
     storageLocation: string | null;
     remarks: string | null;
-    handoverDate: string | null; // 允许 null
-    createdBy: string | null; // 允许 null
-    updatedBy: string | null; // 允许 null
+    handoverDate: string | null;
+    createdBy: string | null;
+    updatedBy: string | null;
     createdAt: string;
     updatedAt: string;
   }
@@ -748,8 +741,8 @@ INSERT INTO users (
   ```typescript
   interface CreateDocumentRequest {
     docName: string;
-    docTypeId?: number | null; // 改为可选或允许 null
-    sourceDepartmentId: number;
+    docTypeName?: string | null; // 改为可选或允许 null
+    sourceDepartmentName: string;
     submitter: string;
     receiver: string;
     signer?: string | null; // 改为可选或允许 null
@@ -772,16 +765,14 @@ INSERT INTO users (
   ```typescript
   interface UpdateDocumentRequest {
     docName?: string;
-    docTypeId?: number | null; // 改为可选或允许 null
-    sourceDepartmentId?: number;
+    docTypeName?: string | null; // 改为可选或允许 null
+    sourceDepartmentName?: string;
     submitter?: string;
     receiver?: string;
     signer?: string | null; // 改为可选或允许 null
     storageLocation?: string;
     remarks?: string;
     handoverDate?: string | null; // 改为可选或允许 null
-    year?: number;
-    handoverDate?: string; // 交接日期
   }
   ```
 - 响应数据：无

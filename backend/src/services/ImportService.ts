@@ -7,28 +7,29 @@ import * as path from 'path';
 import sequelize from '../config/database'; // 引入 sequelize 实例用于事务
 import Document from '../models/Document'; // 引入 Document 模型
 
-// --- 定义 Excel 列名到数据库字段名的映射 ---
-// !!! 非常重要：您需要根据实际 Excel 模板来定义这个映射 !!!
-// 示例：假设 Excel 表头是中文，数据库字段是驼峰或下划线
-const EXCEL_COLUMN_MAP: Record<string, keyof Document | string> = { // 使用 keyof Document 提高类型安全，或 string 处理自定义逻辑
+// --- 定义 Excel 列名到数据库字段名/处理键的映射 ---
+// 使用更明确的处理键，不一定完全对应数据库字段
+const EXCEL_COLUMN_MAP: Record<string, string> = {
     '文档名称': 'docName',
-    '文档类型': 'docTypeName', // 假设 Excel 提供名称，需要后续查找 ID
-    '来源部门': 'sourceDepartmentName', // 假设 Excel 提供名称
+    '文档类型': 'docTypeName', // 直接用名称
+    '来源部门': 'sourceDepartmentName', // 直接用名称
     '提交人': 'submitter',
     '接收人': 'receiver',
     '签收（章）人': 'signer',
-    '交接日期': 'handoverDate', // 需要处理日期格式
+    '交接日期': 'handoverDate',
     '保管位置': 'storageLocation',
     '备注': 'remarks',
-    // '创建人': 'createdByName', // 通常由系统自动记录或根据上传用户设置
-    // '创建时间': 'createdAt', // 通常由系统自动记录
-    // ... 其他需要的字段映射 ...
+    // --- 忽略的列 (不从 Excel 读取或由系统处理) ---
+    // '文档 ID': 'ignore_id',
+    // '创建人': 'ignore_createdBy',
+    // '创建时间': 'ignore_createdAt',
+    // '最后修改人': 'ignore_updatedBy',
+    // '最后修改时间': 'ignore_updatedAt',
 };
 // ------------------------------------------
 
-// --- 定义必填的 Excel 列 ---
-// !!! 您需要根据业务需求定义哪些列是必须存在的 !!!
-const REQUIRED_EXCEL_COLUMNS = ['文档名称'];
+// --- 定义必填的 Excel 列 (使用 Excel 中的表头名称) ---
+const REQUIRED_EXCEL_COLUMNS = ['文档名称', '来源部门', '提交人', '接收人'];
 // ------------------------------------------
 
 
@@ -140,30 +141,28 @@ export class ImportService {
             const workbook = xlsx.readFile(filePath);
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData: any[][] = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: null }); // defval: null 保留空单元格
+            const jsonData: any[][] = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: null });
 
-            if (!jsonData || jsonData.length < 1) { // 至少需要表头
-                 throw new Error('Excel 文件为空');
-            }
+            if (!jsonData || jsonData.length < 1) { throw new Error('Excel 文件为空'); }
 
-            // 3. 获取表头和数据行
             const headerRowRaw: any[] = jsonData[0];
-            const headerRow = headerRowRaw.map(cell => String(cell || '').trim()).filter(Boolean); // 清理并移除空表头
-            const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== '')); // 过滤掉完全是空单元格的行
+            const headerRow = headerRowRaw.map(cell => String(cell || '').trim()).filter(Boolean);
+            const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== ''));
 
-            // --- 验证表头 ---
-            const missingHeaders = REQUIRED_EXCEL_COLUMNS.filter(reqCol => !headerRow.includes(reqCol));
+            // --- 验证表头是否包含所有必需列 ---
+            const headerSet = new Set(headerRow);
+            const missingHeaders = REQUIRED_EXCEL_COLUMNS.filter(reqCol => !headerSet.has(reqCol));
             if (missingHeaders.length > 0) {
                 throw new Error(`Excel 文件缺少必需的列: ${missingHeaders.join(', ')}`);
             }
-            // -----------------
+            // -------------------------------------
 
             task.totalRows = dataRows.length;
             task.processedRows = 0;
             task.successCount = 0;
             task.failureCount = 0;
             const errors: { row: number; error: string }[] = [];
-            await task.save(); // 保存 totalRows
+            await task.save();
 
             if (task.totalRows === 0) {
                  console.log(`[ImportService] Task ${taskId}: No data rows found after filtering.`);
@@ -180,115 +179,129 @@ export class ImportService {
             // --- 4. 逐行处理 (使用事务) ---
             const transaction = await sequelize.transaction();
             try {
+                // 构建 header 到 index 的映射，提高效率
+                const headerIndexMap: Record<string, number> = {};
+                headerRow.forEach((header, index) => {
+                    headerIndexMap[header] = index;
+                });
+
+                // --- 用于批量插入的数组 ---
+                const documentsToBulkCreate: Partial<Document>[] = [];
+                // -------------------------
+
                 for (let i = 0; i < dataRows.length; i++) {
                     const rowData = dataRows[i];
-                    const excelRowIndex = i + 2; // Excel 中的实际行号
+                    const excelRowIndex = i + 2;
                     task.processedRows = i + 1;
                     let rowSuccess = false;
 
                     try {
-                        // a. 将行数据映射到对象
-                        const docDataRaw: Record<string, any> = {};
-                        headerRow.forEach((header, index) => {
-                            const mappedKey = EXCEL_COLUMN_MAP[header] || header; // 使用映射或原始表头
-                            docDataRaw[mappedKey] = rowData[index] !== null ? String(rowData[index]).trim() : null;
-                        });
-
-                        // b. 数据验证 (基础)
-                        const requiredDbFields = REQUIRED_EXCEL_COLUMNS.map(h => EXCEL_COLUMN_MAP[h] || h);
-                        for (const field of requiredDbFields) {
-                            if (docDataRaw[field] === null || docDataRaw[field] === '') {
-                                throw new Error(`列 '${Object.keys(EXCEL_COLUMN_MAP).find(key => EXCEL_COLUMN_MAP[key] === field) || field}' 的值不能为空`);
+                        // a. 提取并验证必填字段值
+                        const documentToCreate: Partial<Document> = {};
+                        let validationError: string | null = null;
+                        for (const requiredHeader of REQUIRED_EXCEL_COLUMNS) {
+                            const mappedKey = EXCEL_COLUMN_MAP[requiredHeader];
+                            const cellIndex = headerIndexMap[requiredHeader];
+                            const cellValue = rowData[cellIndex] !== null ? String(rowData[cellIndex]).trim() : null;
+                            if (cellValue === null || cellValue === '') {
+                                validationError = `列 '${requiredHeader}' 的值不能为空`;
+                                break; // 找到一个空值就停止检查该行
                             }
+                            (documentToCreate as any)[mappedKey] = cellValue;
+                        }
+                        if (validationError) {
+                            throw new Error(validationError);
                         }
 
-                        // c. 数据转换和准备 (示例)
-                        const documentToCreate: Partial<Document> = {
-                            docName: docDataRaw.docName,
-                            submitter: docDataRaw.submitter || null,
-                            receiver: docDataRaw.receiver || null,
-                            signer: docDataRaw.signer || null,
-                            storageLocation: docDataRaw.storageLocation || null,
-                            remarks: docDataRaw.remarks || null,
-                            // 假设由 service/controller 填充 createdBy
-                            // 假设数据库自动处理 createdAt/updatedAt
-                        };
+                        // b. 处理可选字段 (映射、转换、空值)
+                        for (const header of headerRow) {
+                            if (REQUIRED_EXCEL_COLUMNS.includes(header)) continue; // 跳过已处理的必填项
 
-                        // 处理日期 (更健壮的方式)
-                        if (docDataRaw.handoverDate) {
-                            const dateValue = docDataRaw.handoverDate;
-                            let parsedDate: Date | null = null;
-                            if (typeof dateValue === 'number') { // Excel 数字日期
-                                parsedDate = xlsx.SSF.parse_date_code(dateValue);
-                            } else if (typeof dateValue === 'string') {
-                                // 尝试解析常见日期格式
-                                parsedDate = new Date(dateValue);
-                                if (isNaN(parsedDate.getTime())) { // 无效日期
-                                     parsedDate = null;
-                                     console.warn(`[ImportService] Task ${taskId}, Row ${excelRowIndex}: Invalid date format for handoverDate: ${dateValue}`);
+                            const mappedKey = EXCEL_COLUMN_MAP[header];
+                            if (!mappedKey || mappedKey.startsWith('ignore_')) continue; // 跳过未映射或忽略的列
+
+                            const cellIndex = headerIndexMap[header];
+                            const cellValue = rowData[cellIndex] !== null ? String(rowData[cellIndex]).trim() : null;
+
+                            if (mappedKey === 'handoverDate') {
+                                if (cellValue) {
+                                    let parsedDate: Date | null = null;
+                                    const excelDateValue = rowData[cellIndex]; // 保留原始 Excel 值用于解析
+                                    if (typeof excelDateValue === 'number') {
+                                        parsedDate = xlsx.SSF.parse_date_code(excelDateValue);
+                                    } else if (typeof excelDateValue === 'string') {
+                                        parsedDate = new Date(excelDateValue);
+                                    }
+                                    // 检查解析结果是否有效
+                                    if (parsedDate && !isNaN(parsedDate.getTime())) {
+                                        documentToCreate.handoverDate = parsedDate;
+                                    } else {
+                                        // 对于可选日期字段，值无效或为空时设为 null
+                                        console.warn(`[ImportService] Task ${taskId}, Row ${excelRowIndex}: Invalid or empty date for '${header}', setting to null.`);
+                                        documentToCreate.handoverDate = null;
+                                    }
+                                } else {
+                                    documentToCreate.handoverDate = null; // Excel 单元格为空，设为 null
                                 }
-                            }
-                             if (parsedDate && !isNaN(parsedDate.getTime())) {
-                                documentToCreate.handoverDate = parsedDate;
+                            } else if (([] as string[]).includes(mappedKey)) {
+                                 // --- TODO: 添加其他特定字段的处理逻辑 ---
                             } else {
-                                 documentToCreate.handoverDate = null;
+                                // 对于其他可选字段，直接赋值 (null 如果单元格为空)
+                                (documentToCreate as any)[mappedKey] = cellValue;
                             }
-                        } else {
-                            documentToCreate.handoverDate = null;
                         }
 
+                        // c. 设置 createdBy (假设由上传用户决定)
+                        // documentToCreate.createdBy = task.userId; // 或者从 task 关联的 User 获取姓名?
+                        // 按照数据库设计，createdBy 存储姓名，这里需要获取用户名
+                        // const user = await User.findByPk(task.userId, { transaction });
+                        // documentToCreate.createdBy = user?.realName || `User_${task.userId}`;
 
-                        // --- TODO: 处理 docTypeName 和 sourceDepartmentName ---
-                        // 1. 从 docDataRaw 获取名称
-                        // 2. 调用 DocType.findOne({ where: { name: ... } }) 查找 ID
-                        // 3. 调用 Department.findOne({ where: { name: ... } }) 查找 ID
-                        // 4. 如果找到，设置 documentToCreate.docTypeName 和 documentToCreate.sourceDepartmentName
-                        // 5. 如果找不到，根据业务规则处理（报错、跳过、设置默认值？）
-                        // 示例（简化，需要错误处理和缓存优化）:
-                         if (docDataRaw.docTypeName) {
-                              // const docType = await DocType.findOne({ where: { name: docDataRaw.docTypeName }, transaction });
-                              // if (docType) documentToCreate.docTypeName = docType.name; // 或者存 ID?
-                              // else throw new Error(`未找到文档类型: ${docDataRaw.docTypeName}`);
-                              documentToCreate.docTypeName = docDataRaw.docTypeName; // 暂存名字
-                         }
-                         if (docDataRaw.sourceDepartmentName) {
-                              // const department = await Department.findOne({ where: { name: docDataRaw.sourceDepartmentName }, transaction });
-                              // if (department) documentToCreate.sourceDepartmentName = department.name; // 或者存 ID?
-                              // else throw new Error(`未找到来源部门: ${docDataRaw.sourceDepartmentName}`);
-                              documentToCreate.sourceDepartmentName = docDataRaw.sourceDepartmentName; // 暂存名字
-                         }
-                        // -----------------------------------------------------
-
-
-                        // d. 创建文档 (在事务中)
-                        // 注意：需要调整 create 方法以接受 Partial<Document> 并返回创建的实例或ID
-                        await Document.create(documentToCreate as any, { transaction, hooks: true }); // 强制类型转换需要谨慎
-                        // 假设 DocumentService.create 在内部处理 createdBy
+                        // d. 数据库插入 (修改为添加到批量列表)
+                        // ⚠️ 注意：sourceDepartmentId 未设置，如果数据库强制 NOT NULL 会失败！
+                        // await Document.create(documentToCreate as any, { transaction });
+                        documentsToBulkCreate.push(documentToCreate as Document);
 
                         task.successCount = (task.successCount || 0) + 1;
                         rowSuccess = true;
 
                     } catch (rowError: any) {
-                        console.error(`[ImportService] Task ${taskId}, Row ${excelRowIndex}: Error processing row - ${rowError.message}`);
+                        console.error(`[ImportService] Task ${taskId}, Row ${excelRowIndex}: Error - ${rowError.message}`);
                         task.failureCount = (task.failureCount || 0) + 1;
                         errors.push({ row: excelRowIndex, error: rowError.message || '未知行处理错误' });
-                        // 不抛出错误，继续处理下一行
                     }
-
-                    // e. 定期更新进度 (移到循环外，减少数据库写操作)
-                    // if ((i + 1) % 10 === 0 || (i + 1) === dataRows.length) { }
                 }
+
+                // --- 执行批量插入 ---
+                if (documentsToBulkCreate.length > 0) {
+                    console.log(`[ImportService] Task ${taskId}: Attempting to bulk create ${documentsToBulkCreate.length} documents.`);
+                    await Document.bulkCreate(documentsToBulkCreate as any[], { transaction });
+                    console.log(`[ImportService] Task ${taskId}: Bulk create successful.`);
+                } else {
+                    console.log(`[ImportService] Task ${taskId}: No valid documents to bulk create.`);
+                }
+                // -------------------
 
                 // 循环结束后，提交事务
                 await transaction.commit();
                 console.log(`[ImportService] Task ${taskId}: Transaction committed.`);
 
-            } catch (transactionError) {
-                // 如果事务处理中发生无法恢复的错误，则回滚
+            } catch (transactionError: any) {
+                // 如果事务处理中发生无法恢复的错误 (包括 bulkCreate 失败)，则回滚
                 await transaction.rollback();
                 console.error(`[ImportService] Task ${taskId}: Transaction rolled back due to error:`, transactionError);
                 // 将此错误记为任务的总体错误
-                throw new Error('导入过程中发生严重错误，事务已回滚');
+                // 如果是批量创建错误，可能需要调整错误信息和统计
+                if (transactionError.message && transactionError.message.includes('bulkCreate')) {
+                    task.failureCount = task.totalRows; // 假设批量失败导致所有行都失败
+                    task.successCount = 0;
+                    // 清空可能存在的行级错误，因为整体失败了
+                    errors.length = 0;
+                    errors.push({ row: 0, error: `批量插入失败: ${transactionError.message}` });
+                } else if (transactionError.message) {
+                     errors.push({ row: 0, error: `事务处理失败: ${transactionError.message}` });
+                }
+                throw new Error(`导入过程中发生严重错误，事务已回滚: ${transactionError.message}`);
             }
             // ----------------------------------------------------
 

@@ -16,21 +16,26 @@ export type ExportTaskStatus = 0 | 1 | 2 | 3;
 export interface ExportTask {
   id: number;
   userId: number;
-  taskType: string;
-  status: ExportTaskStatus; // 使用数字类型
-  fileName: string | null;       // 文件名可能在任务完成前为 null
-  fileType: 'xlsx' | 'csv';      // 文件类型
-  queryCriteria: string | null;        // 查询条件（JSON 字符串）
-  selectedFields: string;       // 选择的字段（JSON 字符串）
-  progress: number;        // 进度 (0-100)，处理中才有，否则为 null
-  filePath: string | null;        // 修改为 filePath，完成后才有
-  errorMessage: string | null;    // 错误信息，失败后才有
-  exportScope: ExportScope; // 添加导出范围
-  selectedIds: string | null;     // 添加选中 ID 列表 (JSON 字符串)
-  currentPageIds: string | null; // <-- 新增字段
-  createdAt: string;              // 创建时间 (ISO 8601 字符串)
-  updatedAt: string;              // 更新时间 (ISO 8601 字符串)
-  completedAt: string | null;    // 完成时间 (ISO 8601 字符串)
+  taskType: 'document_export' | 'document_import';
+  status: ExportTaskStatus;
+  progress: number;
+  queryCriteria: string | null;
+  selectedFields: string | null;
+  fileType: string | null;
+  fileName: string | null;
+  filePath: string | null;
+  errorMessage: string | null;
+  exportScope: ExportScope | null;
+  selectedIds: string | null;
+  currentPageIds: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  totalRows?: number | null;
+  processedRows?: number | null;
+  successCount?: number | null;
+  failureCount?: number | null;
+  errorDetails?: string | null;
 }
 
 /**
@@ -40,7 +45,7 @@ export interface ExportTaskQuery {
   page?: number;
   pageSize?: number;
   status?: ExportTaskStatus;      // 按状态筛选 (可选)
-  // 可以根据需要添加其他筛选条件，例如按创建时间范围等
+  taskType?: 'document_export' | 'document_import';
 }
 
 /**
@@ -63,4 +68,21 @@ export interface ExportTaskListResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/**
+ * 上传接口的响应
+ */
+export interface UploadResponse {
+  message: string;
+  fileName: string;
+  originalName: string;
+}
+
+/**
+ * 触发导入任务的请求参数
+ */
+export interface ImportRequestParams {
+  fileName: string;
+  originalName: string;
 } 
