@@ -112,6 +112,7 @@ router.get(
     [
         queryValidator('page').optional().isInt({ min: 1 }).toInt().withMessage('页码必须是正整数'),
         queryValidator('pageSize').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('每页数量必须是1到100之间的整数'),
+        queryValidator('taskType').optional().isIn(['document_export', 'document_import', 'all']).withMessage('无效的任务类型')
     ],
     async (req: Request, res: Response) => {
         const errors = validationResult(req);
@@ -130,22 +131,26 @@ router.get(
             // 直接使用验证器处理后的值，如果不存在，服务层会处理默认值
             const page = req.query.page as number | undefined; // 验证器已确保是 number 或 undefined
             const pageSize = req.query.pageSize as number | undefined; // 验证器已确保是 number 或 undefined
+            const taskType = req.query.taskType as 'document_export' | 'document_import' | 'all' | undefined;
 
             // 传递给服务层，让服务层处理默认值 (getTasksByUserId 有默认值 page=1, pageSize=10)
-            const result = await exportService.getTasksByUserId(userId, page, pageSize);
+            const result = await exportService.getTasksByUserId(userId, page, pageSize, taskType);
             
             // 格式化返回的分页数据
              const responseData = {
                 list: result.list.map((task: ExportTask) => ({
                     id: task.id,
                     userId: task.userId,
+                    taskType: task.taskType,
                     status: task.status,
                     fileName: task.fileName,
+                    originalFileName: task.originalFileName,
                     fileType: task.fileType,
-                    queryCriteria: task.queryCriteria,
-                    selectedFields: task.selectedFields,
+                    totalRows: task.totalRows,
+                    successCount: task.successCount,
+                    failureCount: task.failureCount,
+                    errorDetails: task.errorDetails,
                     progress: task.progress,
-                    filePath: task.filePath,
                     errorMessage: task.errorMessage,
                     createdAt: task.createdAt,
                     updatedAt: task.updatedAt,
@@ -340,6 +345,13 @@ router.post(
         try {
             const userId = req.user.userId; // 从认证中间件获取用户 ID
             const { fileName, originalName } = req.body;
+
+            // --- 添加 importService 空值检查 ---
+            if (!importService) {
+                console.error("[API Error] /documents/import: ImportService is not initialized.");
+                return res.status(500).json({ message: '导入服务未初始化，无法创建任务' });
+            }
+            // -----------------------------------
 
             // 调用 importService 创建导入任务
             const task = await importService.createImportTask(

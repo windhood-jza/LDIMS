@@ -1,210 +1,196 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import sequelize from '../config/database';
+import { Sequelize, DataTypes, Model, Optional } from 'sequelize';
+import sequelize from '../config/database'; // 确认路径正确
 
-// 定义 ExportTask 模型的属性接口
+// 属性接口 (保持 camelCase)
 interface ExportTaskAttributes {
   id: number;
   userId: number;
   taskType: 'document_export' | 'document_import';
-  status: number;
+  status: 0 | 1 | 2 | 3;
+  originalFileName: string | null; // camelCase in model and DB
   fileName: string | null;
   fileType: string | null;
-  queryCriteria: string | null;
-  progress: number | null;
-  selectedFields: string | null;
   filePath: string | null;
-  errorMessage: string | null;
-  exportScope: 'all' | 'selected' | 'currentPage';
-  selectedIds: string | null;
-  currentPageIds: string | null;
+  progress: number | null;
   totalRows: number | null;
   processedRows: number | null;
   successCount: number | null;
   failureCount: number | null;
   errorDetails: string | null;
+  errorMessage: string | null;
+  queryCriteria: string | null;
+  selectedFields: string | null;
+  exportScope: 'all' | 'selected' | 'currentPage' | null;
+  selectedIds: string | null;
+  currentPageIds: string | null; // camelCase in model and DB
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-// 定义创建 ExportTask 时可选的属性
-interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'status' | 'fileName' | 'fileType' | 'queryCriteria' | 'progress' | 'selectedFields' | 'filePath' | 'errorMessage' | 'exportScope' | 'selectedIds' | 'currentPageIds' | 'totalRows' | 'processedRows' | 'successCount' | 'failureCount' | 'errorDetails' | 'createdAt' | 'updatedAt'> {}
+// 创建接口
+interface ExportTaskCreationAttributes extends Optional<ExportTaskAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
 
-// 定义 ExportTask 模型类
+// 模型类 (保持 camelCase)
 class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttributes> implements ExportTaskAttributes {
   public id!: number;
   public userId!: number;
   public taskType!: 'document_export' | 'document_import';
-  public status!: number;
+  public status!: 0 | 1 | 2 | 3;
+  public originalFileName!: string | null;
   public fileName!: string | null;
   public fileType!: string | null;
-  public queryCriteria!: string | null;
-  public progress!: number | null;
-  public selectedFields!: string | null;
   public filePath!: string | null;
-  public errorMessage!: string | null;
-  public exportScope!: 'all' | 'selected' | 'currentPage';
-  public selectedIds!: string | null;
-  public currentPageIds!: string | null;
+  public progress!: number | null;
   public totalRows!: number | null;
   public processedRows!: number | null;
   public successCount!: number | null;
   public failureCount!: number | null;
   public errorDetails!: string | null;
+  public errorMessage!: string | null;
+  public queryCriteria!: string | null;
+  public selectedFields!: string | null;
+  public exportScope!: 'all' | 'selected' | 'currentPage' | null;
+  public selectedIds!: string | null;
+  public currentPageIds!: string | null; // 保持 camelCase
 
-  // 时间戳
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-// 初始化 ExportTask 模型
+// 初始化模型定义
 ExportTask.init(
   {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       autoIncrement: true,
       primaryKey: true,
     },
+    // userId -> user_id (underscored: true 会自动处理)
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
-      field: 'user_id',
-      comment: '用户ID',
-      // 外键关联将在模型关联部分定义
+      comment: '发起任务的用户ID',
     },
+    // taskType -> task_type
     taskType: {
       type: DataTypes.ENUM('document_export', 'document_import'),
       allowNull: false,
-      defaultValue: 'document_export',
-      field: 'task_type',
-      comment: '任务类型: document_export, document_import',
+      comment: '任务类型',
     },
     status: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.TINYINT.UNSIGNED,
       allowNull: false,
       defaultValue: 0,
-      comment: '状态：0-待处理，1-处理中，2-完成，3-失败',
+      comment: '任务状态 (0:排队中, 1:处理中, 2:已完成, 3:失败)',
     },
-    fileName: {
-      type: DataTypes.STRING(255),
+    // originalFileName -> originalFileName (显式指定 field)
+    originalFileName: {
+      type: DataTypes.STRING,
       allowNull: true,
-      field: 'file_name',
-      comment: '文件名 (导入时原始文件名/导出时生成文件名)',
+      field: 'originalFileName', // <-- 显式指定数据库列名
+      comment: '导入任务的原始文件名',
     },
+    // fileName -> file_name
+    fileName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '导出任务生成的文件名',
+    },
+    // fileType -> file_type
     fileType: {
       type: DataTypes.STRING(20),
       allowNull: true,
-      field: 'file_type',
-      comment: '文件类型 (e.g., xlsx, csv)',
+      comment: '文件类型 (xlsx, csv)',
     },
-    queryCriteria: {
-      type: DataTypes.TEXT('long'),
+    // filePath -> file_path
+    filePath: {
+      type: DataTypes.STRING,
       allowNull: true,
-      field: 'query_criteria',
-      comment: '导出时使用的查询条件 (JSON)',
+      comment: '服务器上的文件路径或安全文件名',
     },
     progress: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
       defaultValue: 0,
-      field: 'progress',
-      comment: '任务进度 (0-100)',
-      validate: {
-        min: 0,
-        max: 100,
-      }
     },
-    selectedFields: {
-      type: DataTypes.TEXT('medium'),
+    // totalRows -> total_rows
+    totalRows: {
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
-      field: 'selected_fields',
-      comment: '用户选择的导出字段 (JSON 数组)',
+      comment: '导入任务的总行数',
     },
-    filePath: {
-      type: DataTypes.STRING(255),
+    // processedRows -> processed_rows
+    processedRows: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        comment: '导入任务已处理的行数',
+    },
+    // successCount -> success_count
+    successCount: {
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
-      field: 'file_path',
-      comment: '文件路径 (导入/导出)',
+      comment: '导入任务成功的行数',
     },
-    errorMessage: {
+    // failureCount -> failure_count
+    failureCount: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      comment: '导入任务失败的行数',
+    },
+    // errorDetails -> error_details
+    errorDetails: {
       type: DataTypes.TEXT,
       allowNull: true,
-      field: 'error_message',
-      comment: '总体错误信息',
+      comment: '导入任务详细错误信息 (JSON)',
     },
+    // errorMessage -> error_message
+     errorMessage: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: '任务失败时的总体错误消息',
+    },
+    // queryCriteria -> query_criteria
+    queryCriteria: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: '导出任务的查询条件 (JSON)',
+    },
+    // selectedFields -> selected_fields
+    selectedFields: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: '导出任务选择的字段 (JSON array)',
+    },
+    // exportScope -> export_scope (根据你的截图调整)
     exportScope: {
       type: DataTypes.ENUM('all', 'selected', 'currentPage'),
-      allowNull: false,
-      defaultValue: 'all',
-      field: 'export_scope',
-      comment: '导出范围: all(根据查询条件), selected(根据选中ID), currentPage(根据当前页)',
+      allowNull: true,
+      field: 'export_Scope', // <-- 显式指定数据库列名 (根据截图调整)
+      comment: '导出范围',
     },
+    // selectedIds -> selected_ids
     selectedIds: {
-      type: DataTypes.JSON,
+      type: DataTypes.TEXT,
       allowNull: true,
-      field: 'selected_ids',
-      comment: '选中项的 ID 列表 (JSON 数组)',
+      comment: '导出选中的 ID 列表 (JSON array)',
     },
+    // currentPageIds -> currentPageIds (显式指定 field)
     currentPageIds: {
-      type: DataTypes.JSON,
+      type: DataTypes.TEXT,
       allowNull: true,
-      field: 'currentPageIds',
-      comment: '当前页的 ID 列表 (JSON 数组)',
+      field: 'currentPageIds', // <-- 显式指定数据库列名
+      comment: '导出当前页的 ID 列表 (JSON array)',
     },
-    totalRows: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      field: 'total_rows',
-      comment: '导入文件总行数'
-    },
-    processedRows: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      field: 'processed_rows',
-      comment: '已处理行数'
-    },
-    successCount: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      field: 'success_count',
-      comment: '成功导入行数'
-    },
-    failureCount: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      field: 'failure_count',
-      comment: '导入失败行数'
-    },
-    errorDetails: {
-      type: DataTypes.TEXT('long'),
-      allowNull: true,
-      field: 'error_details',
-      comment: '详细错误信息 (例如 JSON 数组 [{row: number, error: string}])'
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-      field: 'created_at',
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-      field: 'updated_at',
-    },
+    // createdAt -> created_at
+    // updatedAt -> updated_at
   },
   {
+    tableName: 'export_tasks', // 确认表名正确
     sequelize,
-    tableName: 'export_tasks',
-    timestamps: true,
-    underscored: true,
-    comment: '导出与导入任务表',
-    indexes: [
-      { fields: ['user_id'], name: 'idx_user' },
-      { fields: ['status'], name: 'idx_status' },
-      { fields: ['task_type'], name: 'idx_task_type' },
-    ],
+    timestamps: true, // 启用时间戳
+    underscored: true, // <--- 设置为 true 以匹配 snake_case
+    modelName: 'ExportTask',
   }
 );
 
-export default ExportTask; 
+export default ExportTask;

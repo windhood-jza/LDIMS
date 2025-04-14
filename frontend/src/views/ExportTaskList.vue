@@ -3,21 +3,34 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span>我的导出任务</span>
-          <el-button type="primary" :icon="'Refresh'" @click="fetchData" :loading="loading">刷新</el-button>
+          <span>我的后台任务</span>
+          <div class="filter-controls">
+            <el-radio-group v-model="filterTaskType" @change="fetchData" size="small">
+              <el-radio-button label="all">所有任务</el-radio-button>
+              <el-radio-button label="document_export">文档导出</el-radio-button>
+              <el-radio-button label="document_import">文档导入</el-radio-button>
+            </el-radio-group>
+            <el-button type="primary" :icon="'Refresh'" @click="fetchData" :loading="loading" style="margin-left: 10px;">刷新</el-button>
+          </div>
         </div>
       </template>
 
       <el-table :data="tasks" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="任务 ID" width="100" />
-        <el-table-column prop="fileName" label="文件名称" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="taskType" label="任务类型" width="120">
            <template #default="{ row }">
-            {{ row.fileName || '-' }}
+            <span>{{ formatTaskType(row.taskType) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="id" label="任务 ID" width="100" />
+        <el-table-column prop="fileName" label="文件名/源" min-width="180" show-overflow-tooltip>
+           <template #default="{ row }">
+            {{ row.fileName || row.originalFileName || '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="fileType" label="文件类型" width="100">
            <template #default="{ row }">
-            <el-tag :type="row.fileType === 'xlsx' ? 'success' : 'primary'" size="small">{{ row.fileType?.toUpperCase() }}</el-tag>
+            <el-tag v-if="row.fileType" :type="row.fileType === 'xlsx' ? 'success' : 'primary'" size="small">{{ row.fileType?.toUpperCase() }}</el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
@@ -25,31 +38,56 @@
             <el-tag :type="getStatusTagType(row.status)" size="small">{{ formatStatus(row.status) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="总行数" width="100" align="center">
+           <template #default="{ row }">
+             <span v-if="row.taskType === 'document_import'">{{ row.totalRows ?? '-' }}</span>
+             <span v-else>-</span>
+           </template>
+        </el-table-column>
+        <el-table-column label="成功数" width="100" align="center">
+           <template #default="{ row }">
+             <span v-if="row.taskType === 'document_import'" style="color: #67C23A;">{{ row.successCount ?? '-' }}</span>
+             <span v-else>-</span>
+           </template>
+        </el-table-column>
+        <el-table-column label="失败数" width="100" align="center">
+           <template #default="{ row }">
+             <span v-if="row.taskType === 'document_import'" :style="{ color: row.failureCount > 0 ? '#F56C6C' : '#606266' }">
+               {{ row.failureCount ?? '-' }}
+             </span>
+             <span v-else>-</span>
+           </template>
+        </el-table-column>
         <el-table-column prop="progress" label="进度" width="150">
           <template #default="{ row }">
-            <el-progress v-if="row.status === 'processing'" :percentage="row.progress || 0" :stroke-width="8" striped striped-flow />
+            <el-progress v-if="row.status === 1" :percentage="row.progress || 0" :stroke-width="8" striped striped-flow />
+            <span v-else-if="row.status === 2">完成</span>
+            <span v-else-if="row.status === 3">失败</span>
+            <span v-else-if="row.status === 0">排队中</span>
             <span v-else>{{ row.progress !== null ? `${row.progress}%` : '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" :formatter="formatDateTime" sortable />
-         <el-table-column prop="errorMessage" label="错误信息" min-width="150" show-overflow-tooltip>
+         <el-table-column prop="errorDetails" label="错误信息" min-width="150" show-overflow-tooltip>
            <template #default="{ row }">
-            <span style="color: #F56C6C;">{{ row.errorMessage || '-' }}</span>
+            <el-button v-if="row.status === 3 && row.errorDetails" type="danger" link size="small" @click="showErrorDetails(row)">查看错误</el-button>
+            <span v-else-if="row.status === 3">未知错误</span>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button
+              v-if="row.taskType === 'document_export' && row.status === 2 && row.filePath"
               type="primary"
               size="small"
               link
-              :disabled="row.status !== 2 || !row.filePath"
               @click="handleDownload(row)"
               :loading="row.downloading"
             >
               下载
             </el-button>
-            <!-- 可以添加删除或重试按钮 -->
+            <span v-else>-</span>
           </template>
         </el-table-column>
       </el-table>
@@ -68,15 +106,40 @@
         class="pagination-container"
       />
     </el-card>
+
+    <!-- 错误详情弹窗 -->
+    <el-dialog
+      v-model="errorDialogVisible"
+      title="错误详情"
+      width="60%"
+      top="5vh"
+    >
+      <div style="max-height: 70vh; overflow-y: auto;">
+        <pre style="white-space: pre-wrap; word-wrap: break-word;">{{ currentErrorDetails }}</pre>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="errorDialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElTag } from 'element-plus'
+import { ElMessage, ElTag, ElDialog, ElButton } from 'element-plus'
 import { getExportTasks, downloadExportFile } from '@/services/api/export'
 import type { ExportTask, ExportTaskQuery, ExportTaskStatus } from '@/types/export' // 确认类型路径
 import { saveAs } from 'file-saver' // 需要安装 file-saver: npm install file-saver @types/file-saver
+
+// --- 任务类型过滤状态 ---
+const filterTaskType = ref<'all' | 'document_export' | 'document_import'>('document_export');
+// --- 错误详情弹窗状态 ---
+const errorDialogVisible = ref(false);
+const currentErrorDetails = ref('');
+// -----------------------
 
 const tasks = ref<(ExportTask & { downloading?: boolean })[]>([])
 const total = ref(0)
@@ -95,8 +158,16 @@ const fetchData = async () => {
   // console.log('[Debug] fetchData function called!'); // 移除调试日志
   loading.value = true
   try {
+    // --- 准备查询参数，加入任务类型过滤 ---
+    const params: ExportTaskQuery = {
+      ...query,
+      // 如果 filterTaskType 不是 'all'，则传递给 API
+      taskType: filterTaskType.value === 'all' ? undefined : filterTaskType.value
+    };
+    // ------------------------------------
+
     // 假设 getExportTasks 在成功时直接返回 data 部分，失败时抛出错误
-    const data = await getExportTasks(query);
+    const data = await getExportTasks(params);
 
     // --- 移除调试日志 ---
     // console.log('[Debug] Received data directly:', JSON.stringify(data));
@@ -247,6 +318,40 @@ const stopAutoRefresh = () => {
     console.log('Stopped auto refreshing export tasks.');
   }
 }
+
+/**
+ * @description 格式化任务类型显示
+ * @param {string | undefined} taskType - 任务类型值
+ * @returns {string}
+ */
+const formatTaskType = (taskType: string | undefined): string => {
+  switch (taskType) {
+    case 'document_export': return '文档导出';
+    case 'document_import': return '文档导入';
+    default: return '未知类型';
+  }
+}
+
+/**
+ * @description 显示错误详情弹窗
+ * @param {ExportTask} task - 包含错误信息的任务对象
+ */
+const showErrorDetails = (task: ExportTask) => {
+  if (task.errorDetails) {
+    try {
+      // 尝试解析 JSON 格式的错误详情
+      const parsedDetails = JSON.parse(task.errorDetails);
+      // 格式化为易读的 JSON 字符串
+      currentErrorDetails.value = JSON.stringify(parsedDetails, null, 2);
+    } catch (e) {
+      // 如果解析失败，直接显示原始字符串
+      currentErrorDetails.value = task.errorDetails;
+    }
+  } else {
+    currentErrorDetails.value = '没有可用的错误详情。';
+  }
+  errorDialogVisible.value = true;
+};
 
 onMounted(() => {
   fetchData()

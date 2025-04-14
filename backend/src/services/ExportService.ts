@@ -297,9 +297,15 @@ export class ExportService {
    * @param userId 用户 ID
    * @param page 页码
    * @param pageSize 每页数量
+   * @param taskType 任务类型 (可选)
    * @returns {Promise<{ list: ExportTask[], total: number }>} 任务列表和总数
    */
-  async getTasksByUserId(userId: number, page: number | string = 1, pageSize: number | string = 10): Promise<{ list: ExportTask[], total: number }> {
+  async getTasksByUserId(
+    userId: number,
+    page: number | string = 1,
+    pageSize: number | string = 10,
+    taskType?: 'document_export' | 'document_import' | 'all' // 添加 taskType 参数
+  ): Promise<{ list: ExportTask[], total: number }> {
     // 确保分页参数是数字
     const numPage = typeof page === 'string' ? parseInt(page, 10) : page;
     const numPageSize = typeof pageSize === 'string' ? parseInt(pageSize, 10) : pageSize;
@@ -310,17 +316,26 @@ export class ExportService {
 
     const offset = (currentPage - 1) * currentLimit;
     const limit = currentLimit;
+
+    // 构建查询条件
+    const where: WhereOptions<ExportTask> = { userId };
+    if (taskType && taskType !== 'all') {
+      where.taskType = taskType;
+    }
+
     try {
       const result = await ExportTask.findAndCountAll({
-        where: { userId },
+        where, // 使用构建的 where 条件
         order: [['createdAt', 'DESC']],
         limit,
         offset,
+        // Sequelize 默认会选择所有字段，包括 originalFileName
+        // attributes: { exclude: ['queryCriteria'] } // 可以选择性排除大字段
       });
       return { list: result.rows, total: result.count };
     } catch (error) {
-      console.error(`[ExportService] Failed to fetch tasks for user ${userId}:`, error);
-      throw new Error('获取导出任务列表失败');
+      console.error(`[ExportService] Failed to fetch tasks for user ${userId} with type ${taskType}:`, error);
+      throw new Error('获取任务列表失败');
     }
   }
 
