@@ -210,7 +210,7 @@ import type { UploadResponse, ImportRequestParams } from '@/types/export';
 import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
-import { requestImport } from '@/services/api/export';
+import { requestExport, requestImport } from '@/services/api/task';
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
 import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
 import type { UploadProps, UploadRawFile } from 'element-plus';
@@ -255,16 +255,14 @@ const treeProps = { value: 'id', label: 'name', children: 'children' };
 const uploadUrl = computed(() => {
     // 确保使用完整的 API 地址
     // 假设后端 API 基础路径已通过环境变量或其他方式配置
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+    const baseUrl = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:3000/api/v1';
     return `${baseUrl}/upload/excel`;
 });
 
 const uploadHeaders = computed(() => {
     // 从 localStorage 或其他地方获取 token
     const token = localStorage.getItem('accessToken'); // 或你的 token 存储键
-    return {
-        Authorization: `Bearer ${token}`
-    };
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
 });
 
 // --- API 调用与数据处理 ---
@@ -326,30 +324,28 @@ const fetchData = async (sortParams?: { prop: string; order: string }) => {
 };
 
 // 获取文档类型树
-const fetchDocTypes = async () => {
+const fetchDocTypeTree = async () => {
   treeLoading.value = true;
   try {
     docTypeTree.value = await getDocTypeTree();
   } catch (error) {
-    // 错误提示已在 API 函数中处理
-    // console.error("获取文档类型失败:", error);
-    // ElMessage.error("获取文档类型失败");
+    console.error("Error fetching document type tree:", error);
+    ElMessage.error('获取文档类型失败');
   } finally {
-      treeLoading.value = false;
+    treeLoading.value = false;
   }
 };
 
 // 获取部门树
-const fetchDepartments = async () => {
+const fetchDepartmentTree = async () => {
   treeLoading.value = true;
   try {
     departmentTree.value = await getDepartmentTree();
   } catch (error) {
-     // 错误提示已在 API 函数中处理
-     // console.error("获取部门失败:", error);
-     // ElMessage.error("获取部门失败");
+    console.error("Error fetching department tree:", error);
+    ElMessage.error('获取部门失败');
   } finally {
-       treeLoading.value = false;
+    treeLoading.value = false;
   }
 };
 
@@ -486,7 +482,7 @@ const handleUploadSuccess: UploadProps['onSuccess'] = (response: UploadResponse,
   isUploading.value = false; // 上传结束
   // 触发导入任务创建
   if (response && response.fileName && response.originalName) {
-      triggerImportTask(response.fileName, response.originalName);
+      triggerImport(response.fileName, response.originalName);
   } else {
       ElMessage.error(response?.message || '文件上传成功，但服务器返回数据异常');
   }
@@ -515,19 +511,22 @@ const handleUploadError: UploadProps['onError'] = (error: any, uploadFile) => {
 /**
  * @description 触发后台导入任务
  */
-const triggerImportTask = async (fileName: string, originalName: string) => {
+const triggerImport = async (serverFileName: string, originalFileName: string) => {
     try {
-        const params: ImportRequestParams = { fileName, originalName };
-        const result = await requestImport(params);
-        if (result && result.taskId) {
-            ElMessage.success(`导入任务已创建 (ID: ${result.taskId})，请稍后在任务列表查看进度。`);
-            // 可以考虑跳转到任务列表页面或提供链接
+        const params: ImportRequestParams = {
+            fileName: serverFileName,
+            originalName: originalFileName
+        };
+        const res = await requestImport(params);
+        if (res && res.taskId) {
+            ElMessage.success(`已成功创建导入任务，任务 ID: ${res.taskId}. 请稍后在任务列表查看结果。`);
         } else {
-             ElMessage.error('启动导入任务失败：服务器响应异常');
+            console.error("Trigger import failed, response:", res);
+            ElMessage.warning('导入任务请求已发送，但未能获取任务 ID');
         }
     } catch (error: any) {
-        console.error('Request import task error:', error);
-        const message = error?.response?.data?.message || error?.message || '启动导入任务时发生错误';
+        console.error("Error triggering import:", error);
+        const message = error?.response?.data?.message || error?.message || '请求导入任务失败';
         ElMessage.error(message);
     }
 }
@@ -561,8 +560,8 @@ const formatDateTime = (date: Date | string | null): string => {
 
 // --- 生命周期钩子 ---
 onMounted(() => {
-  fetchDocTypes();
-  fetchDepartments();
+  fetchDocTypeTree();
+  fetchDepartmentTree();
   fetchData(); // 初始加载，无排序
 });
 

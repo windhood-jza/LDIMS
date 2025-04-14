@@ -130,9 +130,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElTag, ElDialog, ElButton } from 'element-plus'
-import { getExportTasks, downloadExportFile } from '@/services/api/export'
-import type { ExportTask, ExportTaskQuery, ExportTaskStatus } from '@/types/export' // 确认类型路径
-import { saveAs } from 'file-saver' // 需要安装 file-saver: npm install file-saver @types/file-saver
+import { getTasks, downloadTaskFile } from '@/services/api/task'
+import type { Task, TaskQuery, TaskStatus } from '@/types/export'
+import { saveAs } from 'file-saver'
 
 // --- 任务类型过滤状态 ---
 const filterTaskType = ref<'all' | 'document_export' | 'document_import'>('document_export');
@@ -141,10 +141,10 @@ const errorDialogVisible = ref(false);
 const currentErrorDetails = ref('');
 // -----------------------
 
-const tasks = ref<(ExportTask & { downloading?: boolean })[]>([])
+const tasks = ref<(Task & { downloading?: boolean })[]>([])
 const total = ref(0)
 const loading = ref(false)
-const query = reactive<ExportTaskQuery>({
+const query = reactive<TaskQuery>({
   page: 1,
   pageSize: 10
 })
@@ -155,52 +155,37 @@ let refreshInterval: number | null = null;
  * @description 获取任务列表数据
  */
 const fetchData = async () => {
-  // console.log('[Debug] fetchData function called!'); // 移除调试日志
   loading.value = true
   try {
-    // --- 准备查询参数，加入任务类型过滤 ---
-    const params: ExportTaskQuery = {
+    const params: TaskQuery = {
       ...query,
-      // 如果 filterTaskType 不是 'all'，则传递给 API
       taskType: filterTaskType.value === 'all' ? undefined : filterTaskType.value
     };
-    // ------------------------------------
 
-    // 假设 getExportTasks 在成功时直接返回 data 部分，失败时抛出错误
-    const data = await getExportTasks(params);
+    const data = await getTasks(params);
 
-    // --- 移除调试日志 ---
-    // console.log('[Debug] Received data directly:', JSON.stringify(data));
-    // console.log('[Debug] Array.isArray(data.list):', Array.isArray(data?.list));
-    // console.log('[Debug] typeof data.total:', typeof data?.total);
-    // --- 结束日志 ---
-
-    // 检查返回的数据结构是否符合预期
     if (data && Array.isArray(data.list) && typeof data.total === 'number') {
-        tasks.value = data.list.map(task => ({ ...task, downloading: false }));
+        tasks.value = data.list.map((task: Task) => ({ ...task, downloading: false }));
         total.value = data.total;
 
-        // 检查是否有正在处理的任务，如果有，则设置定时刷新
-        const processingTasks = tasks.value.some(task => task.status === 'pending' || task.status === 'processing');
+        const processingTasks = tasks.value.some(task => task.status === 0 || task.status === 1);
         if (processingTasks && !refreshInterval) {
           startAutoRefresh();
         } else if (!processingTasks && refreshInterval) {
           stopAutoRefresh();
         }
     } else {
-      // 如果数据结构不符合预期（理论上不应发生，除非API或拦截器行为改变）
-      console.error('Invalid data structure received from getExportTasks:', data);
+      console.error('Invalid data structure received from getTasks:', data);
       ElMessage.error('获取任务列表失败：数据格式错误');
       tasks.value = [];
       total.value = 0;
     }
 
-  } catch (error: any) { // 捕获 API 调用本身抛出的错误
-    console.error("Fetch export tasks error:", error);
-    // 尝试从 error 对象中获取后端返回的错误信息 (如果 Axios 拦截器有处理)
+  } catch (error: any) {
+    console.error("Fetch tasks error:", error);
     const message = error?.response?.data?.message || error?.message || '获取任务列表时发生错误';
     ElMessage.error(message);
-    tasks.value = []; // 清空列表
+    tasks.value = [];
     total.value = 0;
   } finally {
     loading.value = false
@@ -209,17 +194,16 @@ const fetchData = async () => {
 
 /**
  * @description 处理下载文件
- * @param {ExportTask & { downloading?: boolean }} task - 任务对象
+ * @param {Task & { downloading?: boolean }} task - 任务对象
  */
-const handleDownload = async (task: ExportTask & { downloading?: boolean }) => {
+const handleDownload = async (task: Task & { downloading?: boolean }) => {
   if (!task.id) return;
   task.downloading = true;
   try {
-    const blob = await downloadExportFile(task.id);
-    // 使用 file-saver 下载 blob
+    const blob = await downloadTaskFile(task.id);
     saveAs(blob, task.fileName || `export_${task.id}.${task.fileType || 'xlsx'}`);
   } catch (error) {
-    console.error("Download export file error:", error);
+    console.error("Download file error:", error);
     ElMessage.error('下载文件失败，请稍后重试或检查任务状态。');
   } finally {
     task.downloading = false;
@@ -228,10 +212,10 @@ const handleDownload = async (task: ExportTask & { downloading?: boolean }) => {
 
 /**
  * @description 格式化状态显示
- * @param {ExportTaskStatus} status - 状态值
+ * @param {TaskStatus} status - 状态值
  * @returns {string}
  */
-const formatStatus = (status: ExportTaskStatus): string => {
+const formatStatus = (status: TaskStatus): string => {
   switch (status) {
     case 0: return '排队中';
     case 1: return '处理中';
@@ -243,10 +227,10 @@ const formatStatus = (status: ExportTaskStatus): string => {
 
 /**
  * @description 获取状态标签类型
- * @param {ExportTaskStatus} status - 状态值
+ * @param {TaskStatus} status - 状态值
  * @returns {string}
  */
-const getStatusTagType = (status: ExportTaskStatus): ('primary' | 'warning' | 'success' | 'danger' | 'info') => {
+const getStatusTagType = (status: TaskStatus): ('primary' | 'warning' | 'success' | 'danger' | 'info') => {
   switch (status) {
     case 0: return 'primary';
     case 1: return 'warning';
@@ -282,30 +266,29 @@ const formatDateTime = (_row: any, _column: any, cellValue: string | null): stri
  * @description 启动自动刷新
  */
 const startAutoRefresh = () => {
-  if (refreshInterval) return; // 防止重复启动
+  if (refreshInterval) return;
   refreshInterval = window.setInterval(() => {
-    console.log('Auto refreshing export tasks...');
-    // 只获取第一页数据来检查状态，避免不必要的全量刷新
-    // 或者可以专门做一个只获取状态的 API
-    getExportTasks({ page: 1, pageSize: query.pageSize }).then(res => {
-        if (res.code === 200) {
-            const hasProcessing = res.data.list.some(task => task.status === 'pending' || task.status === 'processing');
+    console.log('Auto refreshing tasks...');
+    const refreshQuery: TaskQuery = {
+       page: query.page,
+       pageSize: query.pageSize,
+       taskType: filterTaskType.value === 'all' ? undefined : filterTaskType.value
+     };
+    getTasks(refreshQuery).then(data => {
+        if (data && Array.isArray(data.list)) {
+            const hasProcessing = data.list.some((task: Task) => task.status === 0 || task.status === 1);
             if (hasProcessing) {
-                // 如果当前页面有变化或者有任务完成/失败，则刷新当前页
-                // 简单起见，这里只要还有任务在处理就刷新当前页数据
                 fetchData();
             } else {
-                // 所有任务都处理完了，停止刷新并最后刷新一次
                 stopAutoRefresh();
                 fetchData();
             }
         }
     }).catch(err => {
         console.error("Auto refresh error:", err);
-        // 可以选择停止刷新或忽略错误
         stopAutoRefresh();
     });
-  }, 5000); // 每 5 秒刷新一次
+  }, 5000);
 }
 
 /**
@@ -315,7 +298,7 @@ const stopAutoRefresh = () => {
   if (refreshInterval) {
     clearInterval(refreshInterval);
     refreshInterval = null;
-    console.log('Stopped auto refreshing export tasks.');
+    console.log('Stopped auto refreshing tasks.');
   }
 }
 
@@ -334,17 +317,14 @@ const formatTaskType = (taskType: string | undefined): string => {
 
 /**
  * @description 显示错误详情弹窗
- * @param {ExportTask} task - 包含错误信息的任务对象
+ * @param {Task} task - 包含错误信息的任务对象
  */
-const showErrorDetails = (task: ExportTask) => {
+const showErrorDetails = (task: Task) => {
   if (task.errorDetails) {
     try {
-      // 尝试解析 JSON 格式的错误详情
       const parsedDetails = JSON.parse(task.errorDetails);
-      // 格式化为易读的 JSON 字符串
       currentErrorDetails.value = JSON.stringify(parsedDetails, null, 2);
     } catch (e) {
-      // 如果解析失败，直接显示原始字符串
       currentErrorDetails.value = task.errorDetails;
     }
   } else {
@@ -358,18 +338,22 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stopAutoRefresh(); // 组件卸载时停止刷新
+  stopAutoRefresh();
 })
 
 </script>
 
 <style scoped>
 .export-task-list-view {
-  /* padding: 20px; */ /* <-- 注释或移除这里的 padding */
+  padding: 20px;
 }
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+.filter-controls {
+  display: flex;
   align-items: center;
 }
 .pagination-container {
@@ -379,5 +363,16 @@ onUnmounted(() => {
 }
 .el-progress {
   width: 100%;
+}
+.el-table .el-table__cell {
+  &.error-column {
+    /* background-color: #fef0f0; */
+  }
+}
+pre {
+  background-color: #f4f4f5;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
 }
 </style> 

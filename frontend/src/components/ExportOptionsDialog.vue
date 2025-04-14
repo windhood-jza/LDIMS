@@ -56,7 +56,7 @@
 <script setup lang="ts">
 import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
 import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
-import { requestExport } from '@/services/api/export'
+import { requestExport } from '@/services/api/task'
 import type { ExportRequestParams, ExportScope } from '@/types/export';
 
 interface FieldOption {
