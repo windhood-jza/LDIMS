@@ -9,6 +9,11 @@ import uploadRouter from './routes/upload';
 import multer from 'multer';
 import morgan from 'morgan';
 
+// --- 导入服务初始化函数 ---
+import { initializeImportService } from './services/ImportService';
+// import { initializeTaskQueueService } from './services/TaskQueueService'; // TaskQueueService 使用单例模式导出实例
+// --- 只需确保 ImportService 初始化即可 ---
+
 // 加载环境变量
 dotenv.config();
 
@@ -19,6 +24,14 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(morgan('dev')); // 添加 morgan 日志中间件
+
+// --- 服务初始化 ---
+// !! 注意: ImportService 依赖 TaskQueueService 注入自身
+// !! 但 TaskQueueService 实例已在导入时创建
+// !! 只需调用 ImportService 的初始化即可
+initializeImportService();    // 初始化 ImportService (它内部会调用 taskQueueService.setImportService)
+// ------------------
 
 // --- API 路由 ---
 app.use('/api/v1', routes);
