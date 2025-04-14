@@ -58,6 +58,7 @@ import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
 import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
 import { requestExport } from '@/services/api/task'
 import type { ExportRequestParams, ExportScope, DocumentExportRequestParams } from '@/types/export';
+import type { DocumentListQuery } from '@/types/document';
 
 interface FieldOption {
   label: string;
@@ -87,7 +88,7 @@ const loading = ref(false)
 const selectedFields = ref<string[]>([])
 const fileType = ref('xlsx')
 const exportScope = ref<ExportScope>('all')
-const currentQueryCriteria = ref<any>(null)
+const currentQueryCriteria = ref<Partial<DocumentListQuery> | null>(null)
 const currentSelectedIds = ref<number[]>([])
 const currentCurrentPageIds = ref<number[]>([])
 
@@ -100,11 +101,11 @@ const currentPageItemCount = computed(() => currentCurrentPageIds.value.length)
 
 /**
  * @description 打开弹窗
- * @param {any} query - 当前的查询条件
+ * @param {Partial<DocumentListQuery>} query - 当前的查询条件 (Use specific type)
  * @param {number[]} [selectedItemIds=[]] - 选中项 ID
  * @param {number[]} [currentPageIds=[]] - 当前页 ID
  */
-const open = (query: any, selectedItemIds: number[] = [], currentPageIds: number[] = []) => {
+const open = (query: Partial<DocumentListQuery>, selectedItemIds: number[] = [], currentPageIds: number[] = []) => {
   console.log('[Debug] ExportOptionsDialog: Received selectedItemIds:', selectedItemIds);
   console.log('[Debug] ExportOptionsDialog: Received currentPageIds:', currentPageIds);
   currentQueryCriteria.value = query;

@@ -83,11 +83,11 @@ ExportTask.init(
       defaultValue: 0,
       comment: '任务状态 (0:排队中, 1:处理中, 2:已完成, 3:失败)',
     },
-    // originalFileName -> originalFileName (显式指定 field)
+    // originalFileName -> originalFileName (根据截图，实际为驼峰)
     originalFileName: {
       type: DataTypes.STRING,
       allowNull: true,
-      field: 'originalFileName', // <-- 显式指定数据库列名
+      field: 'originalFileName', // <-- 恢复并确认与截图一致
       comment: '导入任务的原始文件名',
     },
     // fileName -> file_name
@@ -161,11 +161,11 @@ ExportTask.init(
       allowNull: true,
       comment: '导出任务选择的字段 (JSON array)',
     },
-    // exportScope -> export_scope (根据你的截图调整)
+    // exportScope -> export_Scope (根据截图，实际为混合大小写)
     exportScope: {
       type: DataTypes.ENUM('all', 'selected', 'currentPage'),
       allowNull: true,
-      field: 'export_Scope', // <-- 显式指定数据库列名 (根据截图调整)
+      field: 'export_Scope', // <-- 恢复并确认与截图一致
       comment: '导出范围',
     },
     // selectedIds -> selected_ids
@@ -174,11 +174,11 @@ ExportTask.init(
       allowNull: true,
       comment: '导出选中的 ID 列表 (JSON array)',
     },
-    // currentPageIds -> currentPageIds (显式指定 field)
+    // currentPageIds -> currentPageIds (根据截图，实际为驼峰)
     currentPageIds: {
-      type: DataTypes.JSON, // <-- 修改为 DataTypes.JSON
+      type: DataTypes.JSON,
       allowNull: true,
-      field: 'currentPageIds', // <-- 显式指定数据库列名
+      field: 'currentPageIds', // <-- 恢复并确认与截图一致
       comment: '导出当前页的 ID 列表 (JSON 数组)',
     },
     // createdAt -> created_at

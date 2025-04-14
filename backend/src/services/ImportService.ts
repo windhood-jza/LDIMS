@@ -24,8 +24,6 @@ interface DocumentImportDataBase {
     // docSerialNumber?: string | null;
     // securityLevel?: string | null;
     // retentionPeriod?: string | null;
-    pageCount?: number | null;
-    copyCount?: number | null;
     // keywords?: string | null;
     // archiveDate?: Date | null;
 }
@@ -40,7 +38,7 @@ const EXCEL_COLUMN_MAP: Record<string, keyof DocumentImportDataBase | `ignore_${
     '来源部门': 'sourceDepartmentName', // 对应数据库 source_department_name, 允许为空
     '提交人': 'submitter', // 对应数据库 submitter, 必填
     '接收人': 'receiver', // 对应数据库 receiver, 必填
-    '签收人': 'signer', // 对应数据库 signer, 允许为空
+    '签收（章）人': 'signer', // 对应数据库 signer, 允许为空
     '保管位置': 'storageLocation', // 对应数据库 storage_location, 允许为空
     '备注': 'remarks', // 对应数据库 remarks, 允许为空
     '交接日期': 'handoverDate', // 对应数据库 handover_date, 允许为空
@@ -48,8 +46,8 @@ const EXCEL_COLUMN_MAP: Record<string, keyof DocumentImportDataBase | `ignore_${
     // '文档编号': 'docSerialNumber',
     // '密级': 'securityLevel',
     // '保管期限': 'retentionPeriod',
-    '页数': 'pageCount',
-    '份数': 'copyCount',
+    // '页数': 'pageCount',
+    // '份数': 'copyCount',
     // '主题词': 'keywords',
     // '归档日期': 'archiveDate',
     // --- 忽略的列 ---
@@ -164,18 +162,58 @@ export class ImportService {
 
             return newTask;
         } catch (error) {
-            console.error('[ImportService] Failed to create import task record:', error);
-            // 清理可能已创建的记录或文件 (如果适用)
-            // ... (错误处理逻辑，与之前类似)
+            // === 更详细的日志记录 ===
+            console.error("\n--- DETAILED ERROR START ---");
+            console.error("[ImportService] Caught error object:", error); // 打印完整错误对象
+            if (error instanceof Error) {
+                console.error(`[ImportService] Error Name: ${error.name}`);
+                console.error(`[ImportService] Error Message: ${error.message}`);
+                // Sequelize 错误通常将原始数据库错误放在 original 属性中
+                if ((error as any).original) {
+                    console.error("[ImportService] Sequelize Original Error:", (error as any).original);
+                }
+                // 如果是验证错误，打印详细信息
+                 if (error.name === 'SequelizeValidationError' && (error as any).errors) {
+                     console.error('[ImportService] Sequelize Validation Errors:', (error as any).errors);
+                 }
+            } else {
+                console.error("[ImportService] Caught non-Error object:", error);
+            }
+             console.error("--- DETAILED ERROR END ---\n");
+            // === 日志记录结束 ===
+
+            console.error('[ImportService] Failed to create import task record. Raw error message:', (error instanceof Error) ? error.message : String(error));
+            
+            // 清理逻辑... 
+            const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+            const potentialFilePath = path.join(uploadsDir, path.basename(uploadedFileName)); // 使用传入的 uploadedFileName
+            if (fs.existsSync(potentialFilePath)) {
+                try {
+                    fs.unlinkSync(potentialFilePath);
+                    console.log(`[API Cleanup] Deleted uploaded file due to task creation failure: ${potentialFilePath}`);
+                } catch (unlinkErr) {
+                    console.error(`[API Cleanup] Failed to delete file ${potentialFilePath}:`, unlinkErr);
+                }
+            }
+
             let message = '创建导入任务数据库记录失败，请稍后重试';
              if (error instanceof Error) {
-                 // 重新抛出更具体的错误信息
-                 message = error.message;
-                 if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeDatabaseError') {
-                     console.error('Sequelize Error:', error);
-                     message = '创建导入任务时数据库操作失败，请检查模型定义或约束。';
+                 message = error.message; // 使用原始消息，除非被覆盖
+                 if (error.name === 'SequelizeValidationError') {
+                     message = '数据验证失败: ' + (error as any).errors?.map((e: any) => e.message).join(', ') || error.message;
+                 } else if (error.name === 'SequelizeUniqueConstraintError') {
+                     message = '数据唯一性冲突: ' + (error as any).errors?.map((e: any) => e.message).join(', ') || error.message;
+                 } else if (error.name === 'SequelizeForeignKeyConstraintError') {
+                      message = '外键约束失败，关联数据可能不存在。' + ` (Details: ${error.message})`;
+                 } else if (error.name === 'SequelizeDatabaseError') {
+                     // 尝试从 original error 获取更具体信息
+                     const originalMsg = (error as any).original?.message || error.message;
+                     message = `数据库操作失败: ${originalMsg}`; 
+                     // 如果仍然不够具体，保留通用消息
+                     // message = '创建导入任务时数据库操作失败，请检查模型定义或约束。';
                  }
              }
+            // 抛出可能更具体的消息
             throw new Error(message);
         }
     }
@@ -225,12 +263,20 @@ export class ImportService {
             const headerRow: string[] = jsonData[0].map(cell => String(cell).trim());
             console.log(`[ImportService] Task ${taskId}: Headers: ${headerRow.join(', ')}`);
 
-            const definedColumns = Object.keys(EXCEL_COLUMN_MAP);
-            const expectedColumns = definedColumns.filter(key => typeof EXCEL_COLUMN_MAP[key as keyof typeof EXCEL_COLUMN_MAP] === 'string' && !(EXCEL_COLUMN_MAP[key as keyof typeof EXCEL_COLUMN_MAP] as string).startsWith('ignore_'));
-            const missingExpectedColumns = expectedColumns.filter(col => !headerRow.includes(col));
-            if (missingExpectedColumns.length > 0) {
-                throw new Error(`Excel missing required columns: ${missingExpectedColumns.join(', ')}`);
+            // -- 修改表头检查逻辑 --
+            // const definedColumns = Object.keys(EXCEL_COLUMN_MAP);
+            // const expectedColumns = definedColumns.filter(key => typeof EXCEL_COLUMN_MAP[key as keyof typeof EXCEL_COLUMN_MAP] === 'string' && !(EXCEL_COLUMN_MAP[key as keyof typeof EXCEL_COLUMN_MAP] as string).startsWith('ignore_'));
+            // const missingExpectedColumns = expectedColumns.filter(col => !headerRow.includes(col));
+            // if (missingExpectedColumns.length > 0) {
+            //     throw new Error(`Excel missing required columns: ${missingExpectedColumns.join(', ')}`);
+            // }
+
+            // 只检查 REQUIRED_EXCEL_COLUMNS 是否都存在于 headerRow 中
+            const missingRequiredColumns = REQUIRED_EXCEL_COLUMNS.filter(reqCol => !headerRow.includes(reqCol));
+            if (missingRequiredColumns.length > 0) {
+                throw new Error(`Excel is missing required columns: ${missingRequiredColumns.join(', ')}`);
             }
+            // -- 表头检查逻辑修改结束 --
 
             const requiredColumnIndices = REQUIRED_EXCEL_COLUMNS.map(reqCol => {
                 const index = headerRow.indexOf(reqCol);
@@ -281,14 +327,6 @@ export class ImportService {
                                 const parsedDate = this.parseExcelDate(cellValue);
                                 if (parsedDate) documentData.handoverDate = parsedDate;
                                 else { errors.push({ row: rowNumber, error: `Invalid date format in column '${excelColName}': ${cellValue}` }); rowHasError = true; }
-                            } else if (dbFieldName === 'pageCount') {
-                                const numValue = Number(cellValue);
-                                if (!isNaN(numValue) && Number.isInteger(numValue)) documentData.pageCount = numValue;
-                                else { errors.push({ row: rowNumber, error: `Invalid integer value in column '${excelColName}': ${cellValue}` }); rowHasError = true; }
-                            } else if (dbFieldName === 'copyCount') {
-                                const numValue = Number(cellValue);
-                                if (!isNaN(numValue) && Number.isInteger(numValue)) documentData.copyCount = numValue;
-                                else { errors.push({ row: rowNumber, error: `Invalid integer value in column '${excelColName}': ${cellValue}` }); rowHasError = true; }
                             } else if (dbFieldName === 'docName') documentData.docName = trimmedValue;
                             else if (dbFieldName === 'docTypeName') documentData.docTypeName = trimmedValue;
                             else if (dbFieldName === 'sourceDepartmentName') documentData.sourceDepartmentName = trimmedValue;
@@ -305,8 +343,6 @@ export class ImportService {
                                 else if (dbFieldName === 'storageLocation') documentData.storageLocation = null;
                                 else if (dbFieldName === 'remarks') documentData.remarks = null;
                                 else if (dbFieldName === 'handoverDate') documentData.handoverDate = null;
-                                else if (dbFieldName === 'pageCount') documentData.pageCount = null;
-                                else if (dbFieldName === 'copyCount') documentData.copyCount = null;
                             } else {
                                 errors.push({ row: rowNumber, error: `Required column '${excelColName}' is unexpectedly empty` });
                                 rowHasError = true;

@@ -106,16 +106,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed, nextTick, defineExpose } from 'vue';
 import { ElDialog, ElForm, ElMessage, FormInstance, FormRules } from 'element-plus';
-import type { CreateDocumentRequest, UpdateDocumentRequest, DocumentInfo } from '@/types/document.d';
+import type { CreateDocumentRequest, UpdateDocumentRequest, DocumentInfo } from '@/types/document';
+import type { TreeNode } from '@/types/common';
 // 假设 API 函数已定义并导出
 import { createDocument, updateDocument } from '@/services/api/document';
 
 // --- Props --- (从父组件接收数据)
 interface Props {
-  docTypeTreeData: any[]; // 文档类型树数据
-  departmentTreeData: any[]; // 部门树数据
+  docTypeTreeData: TreeNode[]; // Use TreeNode[]
+  departmentTreeData: TreeNode[]; // Use TreeNode[]
 }
 const props = defineProps<Props>();
 
@@ -248,7 +249,9 @@ const handleClose = () => {
 };
 
 // --- 暴露方法给父组件 ---
-defineExpose({ open });
+defineExpose({
+    open
+});
 
 </script>
 
