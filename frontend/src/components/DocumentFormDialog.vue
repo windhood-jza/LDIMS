@@ -248,9 +248,7 @@ const handleClose = () => {
 };
 
 // --- 暴露方法给父组件 ---
-defineExpose({
-  open,
-});
+defineExpose({ open });
 
 </script>
 

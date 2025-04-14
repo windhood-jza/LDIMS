@@ -30,13 +30,16 @@ const upload = multer({
     },
     fileFilter: (req, file, cb) => {
         // 只接受 Excel 文件
-        const allowedTypes = /excel|spreadsheetml/;
-        const mimeType = allowedTypes.test(file.mimetype);
-        const extName = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const allowedMimeTypes = /excel|spreadsheetml/;
+        const allowedExtensions = /\.(xls|xlsx)$/;
 
-        if (mimeType && extName) {
-            return cb(null, true);
+        const mimeTypeValid = allowedMimeTypes.test(file.mimetype);
+        const extensionValid = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
+
+        if (mimeTypeValid && extensionValid) {
+            cb(null, true);
         } else {
+            console.error(`File rejected: name=${file.originalname}, mimetype=${file.mimetype}, ext=${path.extname(file.originalname).toLowerCase()}, mimeTest=${mimeTypeValid}, extTest=${extensionValid}`);
             cb(new Error('文件类型错误，请上传 Excel 文件 (.xls, .xlsx)'));
         }
     }

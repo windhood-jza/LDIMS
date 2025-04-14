@@ -106,18 +106,7 @@
        <div class="toolbar">
          <div class="toolbar-buttons">
             <el-button type="primary" @click="openAddDialog" :icon="Plus">新增文档</el-button>
-            <el-upload
-              :action="uploadUrl" 
-              :headers="uploadHeaders"
-              :show-file-list="false" 
-              :on-success="handleUploadSuccess"
-              :on-error="handleUploadError"
-              :before-upload="beforeUpload"
-              accept=".xlsx, .xls" 
-              style="margin-left: 10px; display: inline-block;" 
-            >
-              <el-button type="success" :icon="UploadFilled" :loading="isUploading">批量导入</el-button>
-            </el-upload>
+            <el-button type="success" @click="handleImportClick" :icon="UploadFilled">批量导入</el-button>
             <el-button type="warning" @click="handleExport" :icon="Download" style="margin-left: 10px;">批量导出</el-button>
          </div>
        </div>
@@ -178,7 +167,7 @@
 
     <!-- 新增/编辑弹窗组件 -->
     <DocumentFormDialog
-      ref="formDialogRef" 
+      ref="documentFormDialogRef" 
       :doc-type-tree-data="docTypeTree" 
       :department-tree-data="departmentTree"
       @success="fetchData"
@@ -187,12 +176,15 @@
     <!-- 导出选项弹窗 -->
     <ExportOptionsDialog ref="exportOptionsDialogRef" />
 
+    <!-- 导入对话框组件 -->
+    <ImportDialog ref="importDialogRef" />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, computed } from 'vue';
-import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect, ElUpload } from 'element-plus';
+import { ref, reactive, onMounted, nextTick } from 'vue';
+import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect } from 'element-plus';
 import {
     Search,
     Refresh,
@@ -206,22 +198,21 @@ import {
 } from '@element-plus/icons-vue';
 import type { DocumentInfo, DocumentListQuery } from '@/types/document';
 import type { TreeNode } from '@/types/common';
-import type { UploadResponse, ImportRequestParams } from '@/types/export';
 import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
-import { requestExport, requestImport } from '@/services/api/task';
+import { requestExport } from '@/services/api/task';
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
 import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
-import type { UploadProps, UploadRawFile } from 'element-plus';
+import ImportDialog from '@/components/ImportDialog.vue';
 
 // --- ref 定义 ---
 const searchFormRef = ref<FormInstance>();
 const documentFormDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null>(null);
 const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
-const tableRef = ref(); // 表格实例 (如果需要调用方法)
-const selectedDocumentIds = ref<number[]>([]); // 存储选中行的 ID
-const isUploading = ref(false); // 控制导入按钮的加载状态
+const importDialogRef = ref<InstanceType<typeof ImportDialog> | null>(null);
+const tableRef = ref();
+const selectedDocumentIds = ref<number[]>([]);
 
 // --- 状态定义 ---
 const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null, docTypeNameFilter?: string, sourceDepartmentNameFilter?: string }>({
@@ -240,35 +231,19 @@ const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [s
 
 const tableData = ref<DocumentInfo[]>([]);
 const loading = ref(false);
-const treeLoading = ref(false); // 新增：树数据加载状态
+const treeLoading = ref(false);
 const pagination = reactive({
   page: 1,
   pageSize: 10,
   total: 0,
 });
 
-const docTypeTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
-const departmentTree = ref<TreeNode[]>([]); // 使用 TreeNode 类型
+const docTypeTree = ref<TreeNode[]>([]);
+const departmentTree = ref<TreeNode[]>([]);
 const treeProps = { value: 'id', label: 'name', children: 'children' };
 
-// --- 计算属性 (获取上传 URL 和 Headers) ---
-const uploadUrl = computed(() => {
-    // 确保使用完整的 API 地址
-    // 假设后端 API 基础路径已通过环境变量或其他方式配置
-    const baseUrl = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:3000/api/v1';
-    return `${baseUrl}/upload/excel`;
-});
-
-const uploadHeaders = computed(() => {
-    // 从 localStorage 或其他地方获取 token
-    const token = localStorage.getItem('accessToken'); // 或你的 token 存储键
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-});
-
 // --- API 调用与数据处理 ---
-
-// 获取文档列表
-const fetchData = async (sortParams?: { prop: string; order: string }) => {
+const fetchData = async (sortOptions?: Sort) => {
   loading.value = true;
   try {
     const params: DocumentListQuery = {
@@ -284,8 +259,8 @@ const fetchData = async (sortParams?: { prop: string; order: string }) => {
       signer: searchForm.signer || undefined,
       handoverDateStart: searchForm.handoverDateRange?.[0] || undefined,
       handoverDateEnd: searchForm.handoverDateRange?.[1] || undefined,
-      sortField: sortParams?.prop,
-      sortOrder: sortParams?.order === 'descending' ? 'DESC' : (sortParams?.order === 'ascending' ? 'ASC' : undefined),
+      sortField: sortOptions?.prop,
+      sortOrder: sortOptions?.order === 'descending' ? 'DESC' : (sortOptions?.order === 'ascending' ? 'ASC' : undefined),
     };
     Object.keys(params).forEach(key => {
         const k = key as keyof DocumentListQuery;
@@ -323,7 +298,6 @@ const fetchData = async (sortParams?: { prop: string; order: string }) => {
   }
 };
 
-// 获取文档类型树
 const fetchDocTypeTree = async () => {
   treeLoading.value = true;
   try {
@@ -336,7 +310,6 @@ const fetchDocTypeTree = async () => {
   }
 };
 
-// 获取部门树
 const fetchDepartmentTree = async () => {
   treeLoading.value = true;
   try {
@@ -350,14 +323,11 @@ const fetchDepartmentTree = async () => {
 };
 
 // --- 事件处理 ---
-
-// 处理搜索
 const handleSearch = () => {
   pagination.page = 1;
   fetchData();
 };
 
-// 重置搜索表单
 const resetSearch = () => {
   searchFormRef.value?.resetFields();
   searchForm.docTypeId = null;
@@ -372,9 +342,8 @@ const resetSearch = () => {
   handleSearch();
 };
 
-// 处理表格排序变化
-const handleSortChange = (sortData: Sort) => {
-    const { prop, order } = sortData;
+const handleSortChange = (sort: Sort) => {
+    const { prop, order } = sort;
     if (prop && order) {
         fetchData({ prop, order });
     } else {
@@ -383,27 +352,40 @@ const handleSortChange = (sortData: Sort) => {
     }
 };
 
-// 处理分页大小变化
 const handleSizeChange = (val: number) => {
   fetchData();
 };
 
-// 处理当前页变化
 const handleCurrentChange = (val: number) => {
   fetchData();
 };
 
 // --- CRUD 实现 ---
 const openAddDialog = () => {
-  documentFormDialogRef.value?.open('add', undefined);
+  if (documentFormDialogRef.value) {
+      documentFormDialogRef.value.open('add');
+  } else {
+      console.error('DocumentFormDialog reference is null');
+      ElMessage.error('无法打开新增对话框，请刷新重试');
+  }
 };
 
 const openEditDialog = (row: DocumentInfo) => {
-  documentFormDialogRef.value?.open('edit', row);
+  if (documentFormDialogRef.value) {
+      documentFormDialogRef.value.open('edit', row);
+  } else {
+      console.error('DocumentFormDialog reference is null');
+      ElMessage.error('无法打开编辑对话框，请刷新重试');
+  }
 };
 
 const openViewDialog = (row: DocumentInfo) => {
-  documentFormDialogRef.value?.open('view', row);
+  if (documentFormDialogRef.value) {
+      documentFormDialogRef.value.open('view', row);
+  } else {
+      console.error('DocumentFormDialog reference is null');
+      ElMessage.error('无法打开查看对话框，请刷新重试');
+  }
 };
 
 const handleDelete = async (row: DocumentInfo) => {
@@ -413,14 +395,13 @@ const handleDelete = async (row: DocumentInfo) => {
       cancelButtonText: '取消',
       type: 'warning',
     });
-    loading.value = true; // 添加删除时的加载状态
+    loading.value = true;
     await deleteDocument(row.id);
     ElMessage.success(`删除文档 "${row.docName}" 成功`);
-    fetchData(); // 刷新列表
+    fetchData();
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除文档失败:', error);
-      // 考虑显示更具体的后端错误信息
       ElMessage.error(`删除文档失败: ${(error as Error)?.message || '未知错误'}`);
     }
   } finally {
@@ -428,141 +409,75 @@ const handleDelete = async (row: DocumentInfo) => {
   }
 };
 
-/**
- * @description 表格行选择变化时触发
- * @param {DocumentInfo[]} selection - 当前选中的行对象数组
- */
 const handleSelectionChange = (selection: DocumentInfo[]) => {
   selectedDocumentIds.value = selection.map(item => item.id);
-  console.log('[Debug] DocumentListView: Selection changed, selected IDs:', selectedDocumentIds.value); // 添加日志
+  console.log('[Debug] DocumentListView: Selection changed, selected IDs:', selectedDocumentIds.value);
 };
 
-/**
- * @description 处理批量导出按钮点击
- */
 const handleExport = () => {
   if (exportOptionsDialogRef.value) {
-    // 获取当前页数据的 ID 列表
-    const currentPageIds = tableData.value.map(item => item.id);
+    const currentPageIds = tableData.value.map((item: DocumentInfo) => item.id);
 
     exportOptionsDialogRef.value.open(
-      searchForm, // 传递当前的搜索条件 (用于 'all' 范围)
-      selectedDocumentIds.value, // 传递选中的 ID 列表 (用于 'selected' 范围)
-      currentPageIds // <-- 新增: 传递当前页的 ID 列表
+      searchForm,
+      selectedDocumentIds.value,
+      currentPageIds
     );
   }
 };
 
-// --- 上传处理函数 ---
-
-/**
- * @description 上传文件之前的钩子：检查文件类型和大小
- */
-const beforeUpload: UploadProps['beforeUpload'] = (rawFile: UploadRawFile) => {
-  const allowedTypes = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-  const maxSize = 10 * 1024 * 1024; // 10MB
-
-  if (!allowedTypes.includes(rawFile.type)) {
-    ElMessage.error('只能上传 Excel 文件 (.xlsx 或 .xls)!');
-    return false;
+// --- 新增：批量导入处理函数 ---
+const handleImportClick = async () => {
+  console.log('[DocumentListView] handleImportClick called');
+  if (!importDialogRef.value) {
+    console.error('[DocumentListView] Import dialog reference is null');
+    ElMessage.error('导入对话框组件未正确加载，请刷新页面重试');
+    return;
   }
-  if (rawFile.size > maxSize) {
-    ElMessage.error('文件大小不能超过 10MB!');
-    return false;
-  }
-  isUploading.value = true; // 开始上传，显示加载状态
-  return true; // 允许上传
-}
-
-/**
- * @description 文件上传成功后的回调
- */
-const handleUploadSuccess: UploadProps['onSuccess'] = (response: UploadResponse, uploadFile) => {
-  console.log('Upload success:', response);
-  isUploading.value = false; // 上传结束
-  // 触发导入任务创建
-  if (response && response.fileName && response.originalName) {
-      triggerImport(response.fileName, response.originalName);
-  } else {
-      ElMessage.error(response?.message || '文件上传成功，但服务器返回数据异常');
-  }
-}
-
-/**
- * @description 文件上传失败后的回调
- */
-const handleUploadError: UploadProps['onError'] = (error: any, uploadFile) => {
-  console.error('Upload error:', error);
-  isUploading.value = false; // 上传结束
-  // 尝试解析错误信息
-  let message = '文件上传失败';
   try {
-      const errorData = JSON.parse(error.message || '{}');
-      message = errorData.message || message;
-  } catch (e) {
-      // 如果 error.message 不是 JSON 字符串，直接使用
-      if (error.message) {
-          message = error.message;
-      }
-  }
-  ElMessage.error(message);
-}
-
-/**
- * @description 触发后台导入任务
- */
-const triggerImport = async (serverFileName: string, originalFileName: string) => {
-    try {
-        const params: ImportRequestParams = {
-            fileName: serverFileName,
-            originalName: originalFileName
-        };
-        const res = await requestImport(params);
-        if (res && res.taskId) {
-            ElMessage.success(`已成功创建导入任务，任务 ID: ${res.taskId}. 请稍后在任务列表查看结果。`);
-        } else {
-            console.error("Trigger import failed, response:", res);
-            ElMessage.warning('导入任务请求已发送，但未能获取任务 ID');
-        }
-    } catch (error: any) {
-        console.error("Error triggering import:", error);
-        const message = error?.response?.data?.message || error?.message || '请求导入任务失败';
-        ElMessage.error(message);
-    }
-}
-
-// --- 工具函数 ---
-const formatDate = (date: Date | string | null): string => {
-  if (!date) return '-';
-  try {
-    const d = new Date(date);
-    // 检查日期是否有效
-    if (isNaN(d.getTime())) return '-';
-    const year = d.getFullYear();
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  } catch (e) {
-    return String(date);
+    console.log('[DocumentListView] Opening import dialog...');
+    await importDialogRef.value.open();
+    console.log('[DocumentListView] Import dialog opened successfully.');
+  } catch (error) {
+    console.error('[DocumentListView] Error opening import dialog:', error);
+    ElMessage.error('打开导入对话框时发生错误，请刷新页面重试');
   }
 };
 
+// --- 工具函数 ---
+const formatDisplayDate = (dateInput: string | number | Date | undefined | null, onlyDate: boolean = false): string => {
+  if (!dateInput) return '-';
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '-';
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    if (onlyDate) return `${year}-${month}-${day}`;
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  } catch (error) {
+    console.error('Error formatting date:', dateInput, error);
+    return '-';
+  }
+};
+
+const formatDate = (date: Date | string | null): string => {
+  return formatDisplayDate(date, true);
+};
+
 const formatDateTime = (date: Date | string | null): string => {
-    if (!date) return '-';
-    try {
-        const d = new Date(date);
-        if (isNaN(d.getTime())) return '-';
-        return d.toLocaleString('zh-CN', { hour12: false }); // 指定中文和24小时制
-    } catch (e) {
-        return String(date);
-    }
+  return formatDisplayDate(date);
 };
 
 // --- 生命周期钩子 ---
 onMounted(() => {
+  console.log('[DocumentListView] onMounted STARTING...');
   fetchDocTypeTree();
   fetchDepartmentTree();
-  fetchData(); // 初始加载，无排序
+  fetchData();
 });
 
 const handleDocTypeSelect = (value: number | null) => {
