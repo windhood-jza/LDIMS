@@ -275,27 +275,27 @@ CREATE TABLE doc_types (
 ```
 
 #### 7.1.4 文档信息表（documents）
-存储文档的基本信息
+用于存储文档的基本信息
 ```sql
 CREATE TABLE documents (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     doc_name VARCHAR(255) NOT NULL COMMENT '文档名称',
-    doc_type_name VARCHAR(255) COMMENT '文档类型名称, 允许为空',
-    source_department_name VARCHAR(255) NOT NULL COMMENT '来源部门名称',
     submitter VARCHAR(50) NOT NULL COMMENT '提交人',
     receiver VARCHAR(50) NOT NULL COMMENT '接收人',
-    signer VARCHAR(50) COMMENT '落款人, 允许为空',
-    storage_location VARCHAR(100) COMMENT '保管位置',
-    remarks TEXT COMMENT '备注说明',
-    handover_date DATE COMMENT '交接日期, 允许为空',
-    created_by VARCHAR(50) COMMENT '创建人姓名, 允许为空',
-    updated_by VARCHAR(50) COMMENT '最后修改人姓名, 允许为空',
+    signer VARCHAR(50) NULL COMMENT '签收人, 允许为空',
+    storage_location VARCHAR(100) NULL COMMENT '存放位置, 允许为空',
+    remarks TEXT NULL COMMENT '备注说明, 允许为空',
+    handover_date DATE NULL COMMENT '交接日期, 允许为空',
+    created_by VARCHAR(50) NULL COMMENT '创建人姓名, 允许为空',
+    updated_by VARCHAR(50) NULL COMMENT '最后修改人姓名, 允许为空',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deletedAt DATETIME NULL DEFAULT NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
-    INDEX idx_handover_date (handover_date),
-    INDEX idx_doc_name (doc_name),
-    FULLTEXT INDEX idx_content (doc_name, submitter, receiver, signer, remarks)
+    deletedAt DATETIME NULL COMMENT '逻辑删除时间戳 (由 Sequelize paranoid 管理)',
+    doc_type_name VARCHAR(255) NULL COMMENT '文档类型名称, 允许为空',
+    source_department_name VARCHAR(255) NULL COMMENT '来源部门名称, 允许为空',
+    INDEX idx_doc_type (doc_type_name),
+    INDEX idx_source_department (source_department_name),
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档信息表';
 ```
 

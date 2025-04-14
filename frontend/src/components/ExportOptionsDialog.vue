@@ -57,7 +57,7 @@
 import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
 import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
 import { requestExport } from '@/services/api/task'
-import type { ExportRequestParams, ExportScope } from '@/types/export';
+import type { ExportRequestParams, ExportScope, DocumentExportRequestParams } from '@/types/export';
 
 interface FieldOption {
   label: string;
@@ -150,18 +150,46 @@ const handleSubmit = async () => {
 
   loading.value = true;
   try {
-    const params: ExportRequestParams = {
+    const params: DocumentExportRequestParams = {
         fields: selectedFields.value,
-        fileType: fileType.value,
+        fileType: fileType.value as ('xlsx' | 'csv'),
         exportScope: exportScope.value,
     };
-    if (exportScope.value === 'all') {
-        params.query = currentQueryCriteria.value;
+
+    if (exportScope.value === 'all' && currentQueryCriteria.value) {
+        const rawQuery = currentQueryCriteria.value;
+        const cleanQuery: Record<string, any> = {};
+
+        const allowedQueryFields = [
+            'docName', 'submitter', 'receiver', 'docTypeId', 'sourceDepartmentId',
+            'docTypeNameFilter', 'sourceDepartmentNameFilter', 'signer'
+        ];
+
+        for (const key of allowedQueryFields) {
+            if (rawQuery[key] !== null && rawQuery[key] !== undefined && rawQuery[key] !== '') {
+                cleanQuery[key] = rawQuery[key];
+            }
+        }
+
+        if (rawQuery.handoverDateRange && Array.isArray(rawQuery.handoverDateRange) && rawQuery.handoverDateRange.length === 2) {
+            cleanQuery.handoverDateStart = rawQuery.handoverDateRange[0];
+            cleanQuery.handoverDateEnd = rawQuery.handoverDateRange[1];
+        }
+
+        if (cleanQuery.docTypeNameFilter === '') delete cleanQuery.docTypeNameFilter;
+        if (cleanQuery.sourceDepartmentNameFilter === '') delete cleanQuery.sourceDepartmentNameFilter;
+
+        if (Object.keys(cleanQuery).length > 0) {
+             params.query = cleanQuery;
+        }
+
     } else if (exportScope.value === 'selected') {
         params.selectedIds = currentSelectedIds.value;
     } else if (exportScope.value === 'currentPage') {
         params.currentPageIds = currentCurrentPageIds.value;
     }
+
+    console.log('[Debug] Export Request Params:', JSON.stringify(params));
 
     const resultData = await requestExport(params);
 

@@ -50,21 +50,18 @@ export class ExportService {
    * @returns {Promise<ExportTask>} 创建的任务对象
    */
   async createExportTask(
-    query: DocumentListQuery,
+    query: DocumentListQuery | null, // query 可以为 null
     options: { fields: string[]; fileType: 'xlsx' | 'csv' },
     userId: number,
-    exportScope: 'all' | 'selected' | 'currentPage' = 'all', // 更新范围类型
-    selectedIdsJson: string | null = null,
-    currentPageIdsJson: string | null = null // <-- 新增参数
+    exportScope: 'all' | 'selected' | 'currentPage' = 'all',
+    selectedIdsJson: string | null = null, // 保持 JSON 字符串 (假设 TEXT)
+    currentPageIds: number[] | null = null // <-- 修改参数类型为 number[] | null
   ): Promise<ExportTask> {
-    console.log('[ExportService] Creating export task for user:', userId, 'Scope:', exportScope, 'Query:', query, 'Options:', options);
+    console.log(`[ExportService] Creating export task for user: ${userId}, Scope: ${exportScope}, Query:`, query, 'Options:', options);
 
     const fileType = options.fileType || 'xlsx';
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `documents_export_${userId}_${timestamp}.${fileType === 'xlsx' ? 'xlsx' : 'csv'}`;
 
     try {
-      // **验证 fields 是否提供且不为空**
       if (!options.fields || options.fields.length === 0) {
           throw new Error('未指定要导出的字段');
       }
@@ -72,28 +69,41 @@ export class ExportService {
       const newTask = await ExportTask.create({
         userId,
         taskType: 'document_export',
-        status: 0, // Pending
-        // 仅在特定范围时保存对应条件
+        status: 0,
         queryCriteria: exportScope === 'all' ? JSON.stringify(query || {}) : null,
         selectedFields: JSON.stringify(options.fields || []),
         fileType: options.fileType,
         exportScope: exportScope,
-        selectedIds: exportScope === 'selected' ? selectedIdsJson : null,
-        currentPageIds: exportScope === 'currentPage' ? currentPageIdsJson : null, // <-- 保存 currentPageIds
-        // 其他字段默认为 null 或由数据库设置
+        selectedIds: selectedIdsJson, // selectedIds 假设仍是 TEXT
+        currentPageIds: currentPageIds, // <-- 直接传递数组或 null
+        // 初始化其他可能为 null 的字段
+        originalFileName: null,
+        fileName: null,
+        filePath: null,
+        progress: 0,
+        totalRows: null,
+        processedRows: null,
+        successCount: null,
+        failureCount: null,
+        errorDetails: null,
+        errorMessage: null,
       });
 
       console.log(`[ExportService] Created new export task ${newTask.id} with scope: ${exportScope}`);
 
-      // 异步触发任务处理
-      taskQueueService.addTask(newTask.id);
-      console.log(`[ExportService] Task ${newTask.id} added to queue.`);
+      if (taskQueueService) {
+          taskQueueService.addTask(newTask.id);
+          console.log(`[ExportService] Task ${newTask.id} added to queue.`);
+      } else {
+          console.error(`[ExportService] TaskQueueService not available, task ${newTask.id} cannot be queued.`);
+          // Consider failing the task creation if queue is essential
+          throw new Error('任务队列服务不可用，无法创建导出任务');
+      }
 
       return newTask;
     } catch (error) {
       console.error('[ExportService] Failed to create export task:', error);
-      // 考虑更具体的错误类型和消息
-      if (error instanceof Error && error.message === '未指定要导出的字段') {
+      if (error instanceof Error && (error.message === '未指定要导出的字段' || error.message.includes('任务队列服务不可用'))) {
           throw error;
       }
       throw new Error('创建导出任务数据库记录失败');
@@ -125,7 +135,7 @@ export class ExportService {
       const fileType = task.fileType as 'xlsx' | 'csv';
       const exportScope = task.exportScope;
       const selectedIds: number[] | null = JSON.parse(task.selectedIds || 'null');
-      const currentPageIds: number[] | null = JSON.parse(task.currentPageIds || 'null'); // <-- 解析 currentPageIds
+      const currentPageIds: number[] | null = task.currentPageIds as number[] | null; // 直接使用，类型断言以兼容
 
       if (selectedFields.length === 0) {
         throw new Error('未指定要导出的字段');

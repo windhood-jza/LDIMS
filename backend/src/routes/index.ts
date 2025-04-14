@@ -1,25 +1,68 @@
 import { Router } from 'express';
-import authRoutes from './auth'; // 引入认证路由
-import userRoutes from './user'; // 引入用户路由
-import departmentRoutes from './department'; // 引入部门路由
-// 引入文档类型路由
-import docTypeRoutes from './doctype';
-import documentRoutes from './document'; // 引入文档路由
-import exportRoutes from './export'; // **新增**: 引入导出路由
 
-const router = Router();
+// --- 导入服务类型 (用于函数签名) ---
+import { DocumentService } from '../services/DocumentService';
+import { DocTypeService } from '../services/DocTypeService';
+// import { DepartmentService } from '../services/DepartmentService'; // <-- 移除此行
+import { ExportService } from '../services/ExportService';
+import { ImportService } from '../services/ImportService';
+// import { UserService } from '../services/UserService';
+// import { AuthService } from '../services/AuthService';
 
-// 后续在此处挂载各个模块的路由
-router.use('/auth', authRoutes); // 挂载认证路由
-router.use('/users', userRoutes); // 挂载用户路由
-router.use('/departments', departmentRoutes); // 挂载部门路由
-// 挂载文档类型路由
-router.use('/doctypes', docTypeRoutes);
-router.use('/documents', documentRoutes); // 挂载文档路由
-router.use(exportRoutes); // **新增**: 挂载导出路由 (注意: export.ts 内部路由已包含完整路径，如 /documents/export 和 /export-tasks)
+// --- 导入路由创建函数 ---
+import { createDocumentRouter } from './document';
+import { createDocTypeRouter } from './doctype';
+import { createExportRouter } from './export';
+// import { createUserRouter } from './user';
+// import { createAuthRouter } from './auth';
 
-// 例如:
-// import userRoutes from './user';
-// router.use('/users', userRoutes);
+// --- 导入不需要改造的路由 (如 department) ---
+import departmentRoutes from './department';
+// 假设 user.ts 和 auth.ts 也不需要改造
+import userRoutes from './user';
+import authRoutes from './auth';
 
-export default router; 
+// --- 定义服务容器接口 (方便传递) ---
+interface AppServices {
+    documentService: DocumentService;
+    docTypeService: DocTypeService;
+    // DepartmentService 已移除，无需在此引用
+    exportService: ExportService;
+    importService: ImportService;
+    // userService?: UserService;
+    // authService?: AuthService;
+}
+
+// --- 主路由创建函数 ---
+export const createApiRouter = (services: AppServices): Router => {
+    const router = Router();
+
+    // --- 创建并挂载需要依赖注入的路由 ---
+    const documentRouter = createDocumentRouter(services.documentService);
+    router.use('/documents', documentRouter);
+
+    const docTypeRouter = createDocTypeRouter(services.docTypeService);
+    router.use('/doctypes', docTypeRouter);
+
+    // Export/Import 路由挂载在 /api/v1 下，由 export.ts 内部定义完整路径
+    const exportImportRouter = createExportRouter(services.exportService, services.importService);
+    router.use(exportImportRouter); // 直接挂载，路径由 export.ts 控制
+
+    // --- 挂载不需要依赖注入的路由 ---
+    // (假设 department, user, auth 使用静态方法或控制器内部处理)
+    router.use('/departments', departmentRoutes);
+    router.use('/users', userRoutes);
+    router.use('/auth', authRoutes);
+
+    // --- 如果 user 或 auth 也需要注入 ---
+    // const userRouter = createUserRouter(services.userService, services.authService);
+    // router.use('/users', userRouter);
+    // const authRouter = createAuthRouter(services.authService);
+    // router.use('/auth', authRouter);
+
+    console.log("[Router] API router created and mounted.");
+    return router;
+};
+
+// --- 移除旧的默认导出 ---
+// export default router; 

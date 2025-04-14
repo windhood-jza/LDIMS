@@ -1,155 +1,211 @@
+// LDIMS/backend/src/routes/doctype.ts
 import { Router, Request, Response, NextFunction } from 'express';
-import { DocTypeService } from '../services/DocTypeService'; // 注意路径
+import { DocTypeService } from '../services/DocTypeService'; // 确认路径
 import { success, fail } from '../utils/response';
-// import { authenticateToken, isAdmin } from '../middleware/auth'; // 假设有认证和权限中间件
-// 导入中间件
 import authenticateToken from '../middleware/authenticateToken';
 import checkAdminRole from '../middleware/checkAdminRole';
+import { body, param, validationResult } from 'express-validator'; // 引入验证器和结果处理
 
-const router = Router();
-
-// 实例化 Service (这里需要确定 Service 的实例化方式)
-// 方案一：简单实例化 (如果 Service 没有复杂依赖)
-const docTypeService = new DocTypeService();
-// 方案二：依赖注入容器 (如果项目使用)
-// const docTypeService = container.get(DocTypeService);
-
-// GET /api/v1/doctypes/tree - 获取文档类型树 (已登录即可访问)
-router.get('/tree', authenticateToken, async (req, res, next) => {
-  try {
-    const treeData = await docTypeService.getDocTypeTree();
-    res.json(success(treeData));
-  } catch (error) {
-    console.error('获取文档类型树失败:', error);
-    // 使用全局错误处理或返回错误
-    next(error); // 传递给全局错误处理
-    // 或者: res.status(500).json(fail('获取文档类型树失败'));
-  }
-});
-
-// --- 取消注释并实现 CRUD 路由 ---
-
-// POST /api/v1/doctypes - 创建文档类型 (需要管理员权限)
-router.post('/', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // --- Input Validation ---
-    const { name, parentId, sortOrder, description } = req.body;
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        res.status(400).json(fail('类型名称不能为空'));
-        return;
-    }
-    if (parentId !== null && parentId !== undefined && (typeof parentId !== 'number' || !Number.isInteger(parentId) || parentId < 0)) {
-        res.status(400).json(fail('无效的上级类型ID'));
-        return;
-    }
-    // Add more validation as needed
-
-    // @ts-ignore - Get userId from authenticated request
-    const userId = req.user?.id;
-    if (!userId) {
-        res.status(401).json(fail('无法获取用户信息'));
-        return;
-    }
-
-    const createdDocType = await docTypeService.create({ name, parentId, sortOrder, description }, userId);
-    res.status(201).json(success(createdDocType, '创建成功'));
-  } catch (error: any) { // Catch specific errors if possible
-    if (error.message === '指定的上级类型不存在') {
-         res.status(400).json(fail(error.message));
+// 假设有一个通用的验证错误处理器，如果没有需要创建或直接处理
+// import { handleValidationErrors } from '../validators/commonValidators';
+// 临时的错误处理函数，如果上面的 validator 不存在
+const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      // 直接构建包含 errors 的响应，不使用 fail
+      res.status(400).json({
+          code: 400,
+          message: '请求参数验证失败',
+          errors: errors.array()
+      });
+      // NO RETURN here after sending response
     } else {
-         next(error); // Pass to global error handler
+        next();
     }
-  }
-});
-
-// PUT /api/v1/doctypes/:id - 更新文档类型 (需要管理员权限)
-router.put('/:id', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-        res.status(400).json(fail('无效的文档类型ID'));
-        return;
-    }
-    // --- Input Validation ---
-    const { name, parentId, sortOrder, description } = req.body;
-     if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
-         res.status(400).json(fail('类型名称不能为空'));
-         return;
-     }
-     if (parentId !== undefined && parentId !== null && (typeof parentId !== 'number' || !Number.isInteger(parentId) || parentId < 0)) {
-         res.status(400).json(fail('无效的上级类型ID'));
-         return;
-     }
-     // Add more validation
-
-    const updatedDocType = await docTypeService.update(id, { name, parentId, sortOrder, description });
-    if (!updatedDocType) {
-      res.status(404).json(fail('文档类型未找到'));
-      return;
-    }
-    res.json(success(updatedDocType, '更新成功'));
-  } catch (error: any) {
-     if (error.message === '指定的上级类型不存在' || error.message === '不能将类型的上级设置为自身') {
-         res.status(400).json(fail(error.message));
-     } else {
-        next(error);
-     }
-  }
-});
-
-// DELETE /api/v1/doctypes/:id - 删除文档类型 (需要管理员权限)
-router.delete('/:id', authenticateToken, checkAdminRole, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-     if (isNaN(id)) {
-         res.status(400).json(fail('无效的文档类型ID'));
-         return;
-     }
-
-    const deleted = await docTypeService.delete(id);
-    if (!deleted) {
-         res.status(404).json(fail('文档类型未找到或无法删除'));
-         return;
-    }
-    res.json(success(null, '删除成功'));
-  } catch (error: any) {
-     if (error.message === '请先删除该类型下的所有子类型') {
-        res.status(400).json(fail(error.message));
-     } else {
-        next(error);
-     }
-  }
-});
-
-// GET /api/v1/doctypes/:id - 获取单个文档类型信息 (已登录即可访问)
-router.get('/:id', authenticateToken, async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-     if (isNaN(id)) {
-         res.status(400).json(fail('无效的文档类型ID'));
-         return;
-     }
-    const docType = await docTypeService.info(id);
-    if (!docType) {
-      res.status(404).json(fail('文档类型未找到'));
-      return;
-    }
-    res.json(success(docType));
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET /api/v1/doctypes - 获取文档类型列表 (分页/查询) (已登录即可访问)
-router.get('/', authenticateToken, async (req, res, next) => {
-  try {
-    // Pass query parameters to the service layer
-    const result = await docTypeService.list(req.query);
-    res.json(success(result));
-  } catch (error) {
-    next(error);
-  }
-});
+};
 
 
-export default router; 
+// --- 将路由设置封装在函数中 ---
+export const createDocTypeRouter = (docTypeService: DocTypeService): Router => {
+    const router = Router();
+
+    /**
+     * @route   GET /tree
+     * @desc    获取文档类型树
+     * @access  Private (Authenticated)
+     */
+    router.get('/tree', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+        try {
+             // --- 使用传入的 docTypeService ---
+            const treeData = await docTypeService.getDocTypeTree();
+            res.json(success(treeData));
+        } catch (error) {
+            console.error('获取文档类型树失败:', error);
+            next(error); // 错误交给全局处理
+        }
+    });
+
+    /**
+     * @route   POST /
+     * @desc    创建文档类型
+     * @access  Private (Admin)
+     */
+    router.post(
+        '/',
+        authenticateToken,
+        checkAdminRole,
+        [ // 添加验证规则
+            body('name').trim().notEmpty().withMessage('类型名称不能为空'),
+            body('parentId').optional({ nullable: true }).isInt({ min: 0 }).withMessage('无效的上级类型ID'), // 允许 0 或 null/undefined
+            body('sortOrder').optional({ nullable: true }).isInt().withMessage('排序值必须是整数'),
+            body('description').optional({ nullable: true }).isString().trim(), // 添加 trim
+        ],
+        handleValidationErrors, // 处理验证错误
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                // @ts-ignore - 假设 authenticateToken 添加了 user
+                const userId = req.user?.id;
+                if (!userId) {
+                    // 通常 authenticateToken 会处理未授权情况，但以防万一
+                    res.status(401).json(fail('无法获取用户信息', 401));
+                    return; // <-- Keep return for early exit
+                }
+                 // --- 使用传入的 docTypeService ---
+                const createdDocType = await docTypeService.create(req.body, userId);
+                res.status(201).json(success(createdDocType, '创建成功'));
+            } catch (error: any) { // Catch specific errors if possible
+                // Service 层应该抛出可识别的错误
+                // 例如: if (error instanceof ParentNotFoundError) ...
+                // 暂时将所有错误传递给全局处理器
+                 console.error('创建文档类型路由出错:', error);
+                 next(error);
+            }
+        }
+    );
+
+    /**
+     * @route   PUT /:id
+     * @desc    更新文档类型
+     * @access  Private (Admin)
+     */
+    router.put(
+        '/:id',
+        authenticateToken,
+        checkAdminRole,
+        [ // 添加验证规则
+            param('id').isInt({ min: 1 }).withMessage('无效的文档类型ID').toInt(), // 添加 toInt
+            body('name').optional().trim().notEmpty().withMessage('类型名称不能为空'),
+            body('parentId').optional({ nullable: true }).isInt({ min: 0 }).withMessage('无效的上级类型ID'),
+            body('sortOrder').optional({ nullable: true }).isInt().withMessage('排序值必须是整数'),
+            body('description').optional({ nullable: true }).isString().trim(), // 添加 trim
+        ],
+        handleValidationErrors,
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                //验证器已转换ID为数字，但仍需检查
+                const id = (req.params as any).id as number; // 使用类型断言获取已验证和转换的ID
+
+                // --- 使用传入的 docTypeService ---
+                const updatedDocType = await docTypeService.update(id, req.body);
+                if (!updatedDocType) {
+                    res.status(404).json(fail('文档类型未找到', 404));
+                    return; // <-- Keep return for early exit (Not Found)
+                }
+                res.json(success(updatedDocType, '更新成功'));
+            } catch (error) {
+                 console.error('更新文档类型路由出错:', error);
+                 next(error); // 将错误传递给全局错误处理器
+            }
+        }
+    );
+
+    /**
+     * @route   DELETE /:id
+     * @desc    删除文档类型
+     * @access  Private (Admin)
+     */
+    router.delete(
+        '/:id',
+        authenticateToken,
+        checkAdminRole,
+        [ // 添加验证规则
+            param('id').isInt({ min: 1 }).withMessage('无效的文档类型ID').toInt()
+        ],
+        handleValidationErrors,
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                const id = (req.params as any).id as number; // 获取已验证和转换的ID
+                // --- 使用传入的 docTypeService ---
+                await docTypeService.delete(id);
+                // delete 方法现在会在找不到或无法删除时抛出错误
+                res.json(success(null, '删除成功'));
+            } catch (error) {
+                 console.error('删除文档类型路由出错:', error);
+                 next(error);
+            }
+        }
+    );
+
+    /**
+     * @route   GET /:id
+     * @desc    获取单个文档类型信息
+     * @access  Private (Authenticated)
+     */
+    router.get(
+        '/:id',
+        authenticateToken,
+        [ // 添加验证规则
+            param('id').isInt({ min: 1 }).withMessage('无效的文档类型ID').toInt()
+        ],
+        handleValidationErrors,
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                const id = (req.params as any).id as number; // 获取已验证和转换的ID
+                 // --- 使用传入的 docTypeService ---
+                const docType = await docTypeService.info(id);
+                if (!docType) {
+                    // Service 层应处理未找到的情况，但这里可以加一层保险
+                    res.status(404).json(fail('文档类型未找到', 404));
+                    return; // <-- Keep return for early exit (Not Found)
+                }
+                res.json(success(docType));
+            } catch (error) {
+                 console.error('获取单个文档类型路由出错:', error);
+                 next(error);
+            }
+        }
+    );
+
+    /**
+     * @route   GET /
+     * @desc    获取文档类型列表 (分页/查询)
+     * @access  Private (Authenticated)
+     */
+    router.get(
+        '/',
+        authenticateToken,
+        // 可选：添加查询参数验证器 (例如验证 page, pageSize, name 等)
+        // [
+        //    query('page').optional().isInt({ min: 1 }).toInt(),
+        //    query('pageSize').optional().isInt({ min: 1, max: 100 }).toInt(),
+        //    query('name').optional().isString().trim(),
+        // ],
+        // handleValidationErrors,
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                 // --- 使用传入的 docTypeService ---
+                // 传递验证和清理后的查询参数
+                const result = await docTypeService.list(req.query);
+                res.json(success(result));
+            } catch (error) {
+                 console.error('获取文档类型列表路由出错:', error);
+                 next(error);
+            }
+        }
+    );
+
+    return router;
+};
+
+// --- 移除旧的默认导出 ---
+// export default router;

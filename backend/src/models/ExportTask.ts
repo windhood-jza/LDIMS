@@ -22,7 +22,7 @@ interface ExportTaskAttributes {
   selectedFields: string | null;
   exportScope: 'all' | 'selected' | 'currentPage' | null;
   selectedIds: string | null;
-  currentPageIds: string | null; // camelCase in model and DB
+  currentPageIds: number[] | null; // <-- 确保类型是 number[] | null
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -51,7 +51,7 @@ class ExportTask extends Model<ExportTaskAttributes, ExportTaskCreationAttribute
   public selectedFields!: string | null;
   public exportScope!: 'all' | 'selected' | 'currentPage' | null;
   public selectedIds!: string | null;
-  public currentPageIds!: string | null; // 保持 camelCase
+  public currentPageIds!: number[] | null; // <-- 确保类型是 number[] | null
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -176,10 +176,10 @@ ExportTask.init(
     },
     // currentPageIds -> currentPageIds (显式指定 field)
     currentPageIds: {
-      type: DataTypes.TEXT,
+      type: DataTypes.JSON, // <-- 修改为 DataTypes.JSON
       allowNull: true,
       field: 'currentPageIds', // <-- 显式指定数据库列名
-      comment: '导出当前页的 ID 列表 (JSON array)',
+      comment: '导出当前页的 ID 列表 (JSON 数组)',
     },
     // createdAt -> created_at
     // updatedAt -> updated_at
