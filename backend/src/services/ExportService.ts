@@ -16,7 +16,7 @@ const fieldToHeaderMap: Record<string, string> = {
   sourceDepartmentName: '来源部门',
   submitter: '提交人',
   receiver: '接收人',
-  signer: '签收（章）人',
+  signer: '签章人',
   handoverDate: '交接日期',
   storageLocation: '保管位置',
   remarks: '备注',
