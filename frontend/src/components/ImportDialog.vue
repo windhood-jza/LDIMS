@@ -149,46 +149,34 @@ const handleManualUpload = () => {
  * @description 文件上传成功钩子
  */
 const handleUploadSuccess: UploadProps['onSuccess'] = (response: any, uploadFile: UploadFile, uploadFiles: UploadFiles) => {
-  console.log('[ImportDialog Upload Success] Raw Response Object:', response); // Log the raw object
-  console.log('[ImportDialog Upload Success] Type of Response:', typeof response);
+  console.log('[ImportDialog Upload Success] Response:', response);
   isUploading.value = false; // 上传结束
 
-  // --- 修正：尝试从 response 中提取实际的后端响应数据 ---
-  let serverResponse = response; // 先假设 response 就是后端 JSON 数据
-
-  // 常见情况：如果 response 是字符串，尝试解析 JSON
-  if (typeof response === 'string') {
-      try {
-          serverResponse = JSON.parse(response);
-          console.log('[ImportDialog Upload Success] Parsed response from string:', serverResponse);
-      } catch (e) {
-          console.error('[ImportDialog Upload Success] Failed to parse response string:', response, e);
-          ElMessage.error('文件上传成功，但无法解析服务器响应');
-          return; // 解析失败，无法继续
-      }
-  }
-  // 注意：Element Plus 的 el-upload 有时会将结果包装在 xhr 对象或特定属性中
-  // 如果上面的尝试失败，检查 response 的结构，可能需要 response.data, response.response 等
-
-  // --- 使用提取到的 serverResponse 进行判断 ---
-  if (serverResponse && 
-      (serverResponse.code === 200 || serverResponse.code === 201) && 
-      serverResponse.data && 
-      typeof serverResponse.data.fileName === 'string' 
-     ) {
-    const taskId = serverResponse.data.taskId;
-    if (taskId) {
-        ElMessage.success(`文件上传成功，导入任务已创建 (ID: ${taskId})`);
-    } else {
-        ElMessage.success('文件上传成功，导入任务已创建！');
-    }
-    handleClose();
+  if (response && typeof response.fileName === 'string' && typeof response.originalName === 'string') {
+    ElMessage.info('文件上传成功，正在请求后台处理导入任务...');
+    const importParams: ImportRequestParams = {
+      fileName: response.fileName,
+      originalName: response.originalName
+    };
+    requestImport(importParams)
+      .then((importRes: any) => {
+        if (importRes?.code === 200) {
+           ElMessage.success('后台导入任务已创建！');
+           handleClose(); // 导入请求成功后关闭对话框
+        } else {
+           ElMessage.error(importRes?.message || '触发导入任务失败');
+        }
+      })
+      .catch((err: any) => {
+        console.error('[ImportDialog Request Import] API Call Failed:', err);
+        const errMsg = err.response?.data?.message || err.message || '请求触发导入任务时出错';
+        ElMessage.error(`触发导入任务失败: ${errMsg}`);
+      });
   } else {
-    console.error('[ImportDialog Upload Success] Invalid or error server response structure after extraction:', serverResponse);
-    const errorMsg = serverResponse?.message || '文件上传成功，但服务器响应异常或未能创建任务';
-    ElMessage.error(errorMsg);
+    console.error('[ImportDialog Upload Success] Invalid upload response:', response);
+    ElMessage.error(response?.message || '文件上传接口响应异常');
   }
-  // 成功或失败后不清空文件，保留状态显示，方便用户查看
+  // 成功后不清空文件，保留状态显示
 };
 
 /**

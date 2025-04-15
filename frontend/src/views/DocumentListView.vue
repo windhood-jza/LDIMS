@@ -372,6 +372,9 @@ const openAddDialog = () => {
 
 const openEditDialog = (row: DocumentInfo) => {
   if (documentFormDialogRef.value) {
+      // 添加日志：检查传递给对话框的树数据
+      console.log('[ListView] Before opening edit dialog - docTypeTree:', JSON.stringify(docTypeTree.value));
+      console.log('[ListView] Before opening edit dialog - departmentTree:', JSON.stringify(departmentTree.value));
       documentFormDialogRef.value.open('edit', row);
   } else {
       console.error('DocumentFormDialog reference is null');
@@ -381,6 +384,9 @@ const openEditDialog = (row: DocumentInfo) => {
 
 const openViewDialog = (row: DocumentInfo) => {
   if (documentFormDialogRef.value) {
+      // 添加日志：检查传递给对话框的树数据
+      console.log('[ListView] Before opening view dialog - docTypeTree:', JSON.stringify(docTypeTree.value));
+      console.log('[ListView] Before opening view dialog - departmentTree:', JSON.stringify(departmentTree.value));
       documentFormDialogRef.value.open('view', row);
   } else {
       console.error('DocumentFormDialog reference is null');

@@ -352,26 +352,22 @@ export class DocumentService {
      * @public
      */
     public formatDocumentInfo(document: Document): DocumentInfo {
-        // --- Temporarily revert createdByName logic ---
-        const creatorUsername = document.createdBy ?? null; // Use createdBy directly for now
-
-        const result = {
+        return {
             id: document.id,
             docName: document.docName,
-            docTypeName: document.docTypeName ?? null,
-            departmentName: document.sourceDepartmentName ?? null,
-            submitter: document.submitter ?? null,
-            receiver: document.receiver ?? null,
-            signer: document.signer ?? null,
-            storageLocation: document.storageLocation ?? null,
-            remarks: document.remarks ?? null,
-            handoverDate: document.handoverDate ?? null,
-            createdByName: creatorUsername, // Assign the temporary value
-            updatedBy: document.updatedBy ?? null,
+            docTypeName: document.docTypeName,
+            departmentName: document.sourceDepartmentName,
+            submitter: document.submitter,
+            receiver: document.receiver,
+            signer: document.signer,
+            storageLocation: document.storageLocation,
+            remarks: document.remarks,
+            handoverDate: document.handoverDate,
+            createdByName: document.createdBy,
+            updatedBy: document.updatedBy,
             createdAt: document.createdAt,
             updatedAt: document.updatedAt,
         };
-        return result;
     }
 
     /**
