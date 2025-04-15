@@ -50,6 +50,12 @@ const routes: Array<RouteRecordRaw> = [
         name: 'ExportTaskList',
         component: () => import('../views/ExportTaskList.vue'),
         meta: { title: '导出任务', requiresAuth: true }
+      },
+      {
+        path: 'statistics',
+        name: 'Statistics',
+        component: () => import('../views/StatisticsView.vue'),
+        meta: { title: '统计报表', requiresAuth: true }
       }
       // ... 其他使用 DefaultLayout 的页面路由
     ]

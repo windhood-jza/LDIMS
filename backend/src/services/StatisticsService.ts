@@ -19,10 +19,10 @@ class StatisticsService {
       console.log('[StatisticsService] Fetching stats by department...');
       const results = await Document.findAll({
         attributes: [
-          ['sourceDepartmentName', 'name'],
+          ['source_department_name', 'name'],
           [fn('COUNT', col('id')), 'value']
         ],
-        group: ['sourceDepartmentName'],
+        group: ['source_department_name'],
         where: {
           sourceDepartmentName: { [Op.ne]: null }
         },
@@ -55,10 +55,10 @@ class StatisticsService {
       console.log('[StatisticsService] Fetching stats by doc type...');
       const results = await Document.findAll({
         attributes: [
-          ['docTypeName', 'name'],
+          ['doc_type_name', 'name'],
           [fn('COUNT', col('id')), 'value']
         ],
-        group: ['docTypeName'],
+        group: ['doc_type_name'],
          where: {
            docTypeName: { [Op.ne]: null }
          },

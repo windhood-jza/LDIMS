@@ -39,7 +39,11 @@
           </el-menu-item>
           <el-menu-item index="/export-tasks">
             <el-icon><Download /></el-icon>
-            <span>导出任务</span>
+            <span>导入导出</span>
+          </el-menu-item>
+          <el-menu-item index="/statistics">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>统计报表</span>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -93,7 +97,8 @@ import {
   OfficeBuilding, // 确保已引入
   Setting,
   ArrowDown,
-  Download
+  Download,
+  DataAnalysis // <<< Import the new icon
 } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 
