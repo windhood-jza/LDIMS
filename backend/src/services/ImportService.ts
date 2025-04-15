@@ -79,7 +79,7 @@ export class ImportService {
         // 将 ImportService 实例注入 TaskQueueService
         // 确保 taskQueueService 已经被正确初始化
         if (taskQueueService) {
-          taskQueueService.setImportService(this);
+        taskQueueService.setImportService(this);
         } else {
            console.error("[ImportService] TaskQueueService is not initialized!");
            // 在实际应用中，这可能应该阻止服务启动
@@ -121,7 +121,7 @@ export class ImportService {
              if (!fs.existsSync(filePath)) {
                  console.error(`[ImportService] Uploaded file not found at path: ${filePath}.`);
                  throw new Error(`上传的文件未在服务器上找到，请重新上传`);
-             }
+            }
 
             const newTask = await ExportTask.create({
                 userId,
@@ -149,8 +149,8 @@ export class ImportService {
 
             // !! 确保 taskQueueService 已被注入并可用
             if (taskQueueService) {
-                taskQueueService.addTask(newTask.id);
-                console.log(`[ImportService] Task ${newTask.id} added to queue.`);
+            taskQueueService.addTask(newTask.id);
+            console.log(`[ImportService] Task ${newTask.id} added to queue.`);
             } else {
                  // 这个情况理论上不应该发生，因为我们会在 app.ts 中确保注入
                  console.error(`[ImportService Critical Error] TaskQueueService not available when trying to add task ${newTask.id}. Dependency injection might have failed.`);
@@ -289,7 +289,7 @@ export class ImportService {
             task.processedRows = 0;
             task.successCount = 0;
             task.failureCount = 0;
-            await task.save();
+                 await task.save();
 
             console.log(`[ImportService] Task ${taskId}: Processing rows (Total: ${totalRows})`);
             const columnMapIndices: Record<string, number> = {};
@@ -354,9 +354,9 @@ export class ImportService {
 
                 if (!rowHasError) {
                     documentsToInsert.push(documentData);
-                    task.successCount = (task.successCount || 0) + 1;
+                        task.successCount = (task.successCount || 0) + 1;
                 } else {
-                    task.failureCount = (task.failureCount || 0) + 1;
+                        task.failureCount = (task.failureCount || 0) + 1;
                 }
 
                 task.processedRows = (task.processedRows || 0) + 1;
@@ -373,11 +373,11 @@ export class ImportService {
                 const transaction = await sequelize.transaction();
                 try {
                     await Document.bulkCreate(documentsToInsert as any[], { transaction, ignoreDuplicates: false });
-                    await transaction.commit();
+                await transaction.commit();
                     console.log(`[ImportService] Task ${taskId}: Inserted ${documentsToInsert.length} documents.`);
                     task.progress = 95;
                 } catch (bulkError: any) {
-                    await transaction.rollback();
+                await transaction.rollback();
                     console.error(`[ImportService] Task ${taskId}: Bulk insert failed:`, bulkError);
                     task.failureCount = (task.failureCount || 0) + (task.successCount || 0);
                     task.successCount = 0;
