@@ -1,10 +1,15 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus'; // 引入 Element Plus 消息提示
 
+// 读取环境变量，如果未定义则回退到默认值
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const timeout = parseInt(import.meta.env.VITE_API_TIMEOUT || '5000', 10);
+console.log(`[request.ts] API baseURL: ${baseURL}, Timeout: ${timeout}`);
+
 // 创建 axios 实例
 const instance = axios.create({
-  baseURL: '/api/v1', // 再次将 baseURL 修改为 /api/v1
-  timeout: 5000, // 请求超时时间
+  baseURL: baseURL,
+  timeout: timeout,
 });
 
 // 请求拦截器 (可选, 用于添加 token 等)
