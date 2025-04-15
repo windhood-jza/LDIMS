@@ -22,6 +22,7 @@ import departmentRoutes from './department';
 import userRoutes from './user';
 import authRoutes from './auth';
 import statisticsRoutes from './statistics';
+import { createSystemRouter } from './system';
 
 // --- 定义服务容器接口 (方便传递) ---
 interface AppServices {
@@ -55,6 +56,7 @@ export const createApiRouter = (services: AppServices): Router => {
     router.use('/users', userRoutes);
     router.use('/auth', authRoutes);
     router.use('/statistics', statisticsRoutes);
+    router.use('/system', createSystemRouter());
 
     // --- 如果 user 或 auth 也需要注入 ---
     // const userRouter = createUserRouter(services.userService, services.authService);

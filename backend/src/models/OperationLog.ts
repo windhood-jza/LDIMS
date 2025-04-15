@@ -23,7 +23,7 @@ class OperationLog extends Model<OperationLogAttributes, OperationLogCreationAtt
   public ipAddress!: string;
 
   // 时间戳
-  public readonly createdAt!: Date;
+  public createdAt!: Date;
 }
 
 // 初始化 OperationLog 模型
