@@ -21,6 +21,7 @@ import departmentRoutes from './department';
 // 假设 user.ts 和 auth.ts 也不需要改造
 import userRoutes from './user';
 import authRoutes from './auth';
+import statisticsRoutes from './statistics';
 
 // --- 定义服务容器接口 (方便传递) ---
 interface AppServices {
@@ -53,6 +54,7 @@ export const createApiRouter = (services: AppServices): Router => {
     router.use('/departments', departmentRoutes);
     router.use('/users', userRoutes);
     router.use('/auth', authRoutes);
+    router.use('/statistics', statisticsRoutes);
 
     // --- 如果 user 或 auth 也需要注入 ---
     // const userRouter = createUserRouter(services.userService, services.authService);
