@@ -1,7 +1,8 @@
 // LDIMS/backend/src/controllers/SystemController.ts
 import { Request, Response, NextFunction } from 'express';
 import { SystemConfigService, SystemConfigMap } from '../services/SystemConfigService';
-import { OperationLogService, OperationLogQuery } from '../services/OperationLogService';
+import { OperationLogService } from '../services/OperationLogService';
+import { OperationLogQuery } from '../types/operationLog';
 import { success } from '../utils/response'; // 假设有统一的成功响应工具
 import { validateRequest } from '../middleware/validation'; // 假设有请求验证中间件
 import { body, query } from 'express-validator'; // 用于请求验证

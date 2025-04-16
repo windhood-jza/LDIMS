@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import DepartmentService from '../services/DepartmentService';
 import { success, fail } from '../utils/response';
 import { CreateDepartmentRequest, UpdateDepartmentRequest } from '../types/department';
+import { JwtPayload } from '../types/auth'; // 引入 JwtPayload 类型
 
 class DepartmentController {
 
@@ -48,7 +49,14 @@ class DepartmentController {
          res.status(400).json(fail('部门名称不能为空'));
          return;
       }
-      const newDept = await DepartmentService.createDepartment(deptData);
+      
+      // 从请求中获取用户ID
+      const userData = req.user as JwtPayload | undefined;
+      const userId = userData?.id || 0;
+      
+      // 传递请求对象 req 到服务方法
+      const newDept = await DepartmentService.createDepartment(deptData, userId, req);
+      
       res.status(201).json(success(newDept, '部门创建成功'));
     } catch (error: any) {
       console.error('创建部门控制器出错:', error);
@@ -72,13 +80,20 @@ class DepartmentController {
         res.status(400).json(fail('无效的部门 ID'));
         return;
       }
+      
       const deptData: UpdateDepartmentRequest = req.body;
       if (Object.keys(deptData).length === 0) {
            res.status(400).json(fail('未提供任何更新数据'));
            return;
       }
 
-      const updatedDept = await DepartmentService.updateDepartment(deptId, deptData);
+      // 从请求中获取用户ID
+      const userData = req.user as JwtPayload | undefined;
+      const userId = userData?.id || 0;
+      
+      // 传递请求对象 req 到服务方法
+      const updatedDept = await DepartmentService.updateDepartment(deptId, deptData, userId, req);
+      
       if (!updatedDept) {
         res.status(404).json(fail('未找到指定部门或更新失败', 404));
       } else {
@@ -107,7 +122,13 @@ class DepartmentController {
         return;
       }
 
-      const deleted = await DepartmentService.deleteDepartment(deptId);
+      // 从请求中获取用户ID
+      const userData = req.user as JwtPayload | undefined;
+      const userId = userData?.id || 0;
+      
+      // 传递请求对象 req 到服务方法
+      const deleted = await DepartmentService.deleteDepartment(deptId, userId, req);
+      
       if (!deleted) {
         res.status(404).json(fail('未找到指定部门或删除失败', 404));
       } else {

@@ -40,7 +40,20 @@
              <el-input v-model="logQuery.userId" placeholder="用户ID或用户名" clearable />
            </el-form-item>
            <el-form-item label="操作类型">
-             <el-input v-model="logQuery.operationType" placeholder="模糊查询" clearable />
+             <el-select v-model="logQuery.operationType" placeholder="请选择操作类型" clearable class="operation-type-select">
+               <el-option-group
+                 v-for="group in operationTypeGroups"
+                 :key="group.label"
+                 :label="group.label"
+               >
+                 <el-option
+                   v-for="type in group.types"
+                   :key="type"
+                   :label="operationTypeNames[type]"
+                   :value="type"
+                 />
+               </el-option-group>
+             </el-select>
            </el-form-item>
            <el-form-item label="操作时间">
               <el-date-picker
@@ -74,12 +87,16 @@
          >
            <el-table-column prop="id" label="ID" width="80" sortable="custom" />
            <el-table-column prop="createdAt" label="操作时间" width="180" sortable="custom" />
-           <el-table-column prop="username" label="操作用户" width="150" sortable="custom">
+           <el-table-column label="操作用户" width="150" sortable="custom">
                 <template #default="{ row }">
-                   {{ row.username || '-' }}
+                   {{ row.realName || row.username || '-' }}
                 </template>
            </el-table-column>
-           <el-table-column prop="operationType" label="操作类型" width="150" sortable="custom" />
+           <el-table-column label="操作类型" width="150" sortable="custom">
+                <template #default="{ row }">
+                   {{ operationTypeNames[row.operationType] || row.operationType }}
+                </template>
+           </el-table-column>
            <el-table-column prop="operationContent" label="操作内容" min-width="250" />
            <el-table-column prop="ipAddress" label="IP 地址" width="150" />
          </el-table>
@@ -106,14 +123,20 @@
 import { ref, reactive, onMounted, watch } from 'vue';
 // 恢复导入的图标和组件
 import { Setting, Platform, Document, Search, Refresh } from '@element-plus/icons-vue';
-import { ElMessage, ElTable, ElTableColumn, ElPagination, ElDatePicker, ElForm, ElFormItem, ElInput, ElButton, ElIcon, ElContainer, ElAside, ElMain, ElMenu, ElMenuItem } from 'element-plus';
+import { ElMessage, ElTable, ElTableColumn, ElPagination, ElDatePicker, ElForm, ElFormItem, ElInput, ElButton, ElIcon, ElContainer, ElAside, ElMain, ElMenu, ElMenuItem, ElSelect, ElOption, ElOptionGroup } from 'element-plus';
 // 只保留 getOperationLogs
 import { getOperationLogs } from '@/services/api/system';
 import type { OperationLogQuery, OperationLogInfo } from '@backend-types/services/OperationLogService';
 import type { PageResult } from '@backend-types/utils/response';
+// 导入操作类型枚举和名称映射
+import { OperationType, OperationTypeNames, OperationTypeGroups } from '@/types/system';
 
 // --- 响应式状态 ---
 const activeSection = ref<string>('operationLog'); // 默认激活日志
+
+// 操作类型映射 - 便于模板使用
+const operationTypeNames = OperationTypeNames;
+const operationTypeGroups = OperationTypeGroups;
 
 // 日志相关状态 (保持不变)
 const logQuery = reactive<OperationLogQuery>({ 
@@ -262,5 +285,20 @@ const resetLogSearch = () => {
 
 .log-search-form .el-form-item {
   margin-bottom: 10px;
+}
+
+.operation-type-select {
+  width: 180px;
+}
+
+.settings-section {
+  margin-bottom: 20px;
+}
+
+.log-search-form {
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 </style> 

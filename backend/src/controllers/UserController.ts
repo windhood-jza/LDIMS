@@ -43,7 +43,7 @@ class UserController {
     try {
       const userData: CreateUserRequest = req.body;
       // 注意：密码处理应该在 Service 层完成
-      const newUser = await UserService.createUser(userData);
+      const newUser = await UserService.createUser(userData, req);
       res.status(201).json(success(newUser, '用户创建成功'));
     } catch (error: any) {
       console.error('创建用户控制器出错:', error);
@@ -90,7 +90,7 @@ class UserController {
       }
       const userData: UpdateUserRequest = req.body;
       // 注意：更新操作的权限检查通常在中间件或 Service 层完成
-      const updatedUser = await UserService.updateUser(userId, userData);
+      const updatedUser = await UserService.updateUser(userId, userData, req);
       if (!updatedUser) {
         res.status(404).json(fail('未找到指定用户或更新失败', 404));
       } else {
@@ -116,7 +116,7 @@ class UserController {
         return;
       }
       // 注意：删除操作的权限检查通常在中间件或 Service 层完成
-      const deleted = await UserService.deleteUser(userId);
+      const deleted = await UserService.deleteUser(userId, req);
       if (!deleted) {
         res.status(404).json(fail('未找到指定用户或删除失败', 404));
       } else {
@@ -146,7 +146,7 @@ class UserController {
         return;
       }
       // 注意：更新操作的权限检查通常在中间件或 Service 层完成
-      const updated = await UserService.updateUserStatus(userId, status as 0 | 1);
+      const updated = await UserService.updateUserStatus(userId, status as 0 | 1, req);
       if (!updated) {
         res.status(404).json(fail('未找到指定用户或更新失败', 404));
       } else {
@@ -159,6 +159,35 @@ class UserController {
     }
   }
 
+  /**
+   * 重置用户密码
+   * @param req Express 请求对象 (params 包含 id, body 包含 newPassword)
+   * @param res Express 响应对象
+   */
+  public async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id, 10);
+      if (isNaN(userId)) {
+        res.status(400).json(fail('无效的用户 ID', 400));
+        return;
+      }
+      const { newPassword } = req.body;
+      if (!newPassword || typeof newPassword !== 'string') {
+        res.status(400).json(fail('无效的密码', 400));
+        return;
+      }
+      
+      const updated = await UserService.resetPassword(userId, newPassword, req);
+      if (!updated) {
+        res.status(404).json(fail('未找到指定用户或重置密码失败', 404));
+      } else {
+        res.json(success(null, '用户密码重置成功'));
+      }
+    } catch (error: any) {
+      console.error('重置用户密码控制器出错:', error);
+      res.status(500).json(fail(error.message || '重置用户密码时发生服务器错误', 500));
+    }
+  }
 }
 
 export default new UserController(); 

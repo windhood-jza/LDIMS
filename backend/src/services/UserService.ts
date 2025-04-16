@@ -3,6 +3,9 @@ import { Op } from 'sequelize';
 import { PageResult } from '../utils/response';
 import { UserInfo, CreateUserRequest, UpdateUserRequest } from '../types/user'; // 确保引入了类型
 import { Model } from 'sequelize'; // 引入 Model 类型
+import { Request } from 'express'; // 引入 Request 类型
+import { OperationLogService } from './OperationLogService'; // 引入日志服务
+import { OperationType } from '../types/operationLog'; // 引入操作类型枚举
 
 interface UserListQuery {
   page?: number;
@@ -83,10 +86,11 @@ class UserService {
   /**
    * 创建用户
    * @param userData 用户数据 (包含明文密码)
+   * @param req Express请求对象
    * @returns 创建后的用户信息
    * @throws 如果用户名已存在或其他数据库错误
    */
-  public async createUser(userData: CreateUserRequest): Promise<UserInfo> {
+  public async createUser(userData: CreateUserRequest, req?: Request): Promise<UserInfo> {
     // 检查用户名是否已存在 (可选)
     const existingUser = await User.findOne({ where: { username: userData.username } });
     if (existingUser) {
@@ -106,6 +110,18 @@ class UserService {
       // 理论上创建成功后应该能查到，除非立刻被删除
       throw new Error('创建用户后无法立即查询到该用户');
     }
+
+    // 记录日志
+    if (req) {
+      await OperationLogService.logDetailedChange(
+        req, 
+        OperationType.USER_CREATE, 
+        newUser.id,
+        userData.username,
+        {} // 创建用户只传空对象，而不是null
+      );
+    }
+
     return createdUserWithDept;
   }
 
@@ -148,14 +164,24 @@ class UserService {
    * 更新用户信息
    * @param id 用户 ID
    * @param userData 更新数据 (密码字段可选，如果提供则更新)
+   * @param req Express请求对象
    * @returns 更新后的用户信息或 null
    * @throws 如果尝试更新的用户名已存在(被其他用户占用)
    */
-  public async updateUser(id: number, userData: UpdateUserRequest): Promise<UserInfo | null> {
+  public async updateUser(id: number, userData: UpdateUserRequest, req?: Request): Promise<UserInfo | null> {
     const user = await User.findByPk(id);
     if (!user) {
       return null; // 用户不存在
     }
+
+    // 保存原始值，用于日志记录
+    const oldValues = {
+      username: user.username,
+      realName: user.realName,
+      departmentId: user.departmentId,
+      role: user.role,
+      status: user.status
+    };
 
     // 检查用户名是否冲突 (如果尝试修改用户名)
     if (userData.username && userData.username !== user.username) {
@@ -178,6 +204,30 @@ class UserService {
 
     await user.update(updateData);
 
+    // 构建变更记录
+    const changes = Object.fromEntries(
+      Object.entries(updateData)
+        .filter(([key]) => key !== 'password') // 排除密码字段
+        .map(([key, value]) => [
+          key, 
+          { 
+            before: oldValues[key as keyof typeof oldValues], 
+            after: value 
+          }
+        ])
+    );
+
+    // 记录日志
+    if (req) {
+      await OperationLogService.logDetailedChange(
+        req, 
+        OperationType.USER_UPDATE, 
+        id,
+        oldValues.username,
+        changes
+      );
+    }
+
     // 返回更新后的用户信息 (包含部门)
     return this.getUserById(id);
   }
@@ -185,14 +235,31 @@ class UserService {
   /**
    * 删除用户 (软删除)
    * @param id 用户 ID
+   * @param req Express请求对象
    * @returns 是否删除成功 (如果用户存在则返回 true)
    */
-  public async deleteUser(id: number): Promise<boolean> {
+  public async deleteUser(id: number, req?: Request): Promise<boolean> {
     const user = await User.findByPk(id);
     if (!user) {
       return false; // 用户不存在
     }
+    
+    const username = user.username;
+    const realName = user.realName;
+    
     await user.destroy(); // 执行软删除 (需要模型启用 paranoid: true)
+    
+    // 记录日志
+    if (req) {
+      await OperationLogService.logDetailedChange(
+        req, 
+        OperationType.USER_DELETE, 
+        id,
+        username || `用户${id}`,
+        {} // 删除用户只传空对象，而不是null
+      );
+    }
+    
     return true;
   }
 
@@ -200,17 +267,71 @@ class UserService {
    * 更新用户状态
    * @param id 用户 ID
    * @param status 新的状态值 (0 或 1)
+   * @param req Express请求对象
    * @returns 是否更新成功
    */
-  public async updateUserStatus(id: number, status: 0 | 1): Promise<boolean> {
+  public async updateUserStatus(id: number, status: 0 | 1, req?: Request): Promise<boolean> {
     const user = await User.findByPk(id);
     if (!user) {
       return false; // 用户不存在
     }
+    
+    const oldStatus = user.status;
+    const username = user.username;
+    
     await user.update({ status });
+    
+    // 记录日志
+    if (req) {
+      const operationType = status ? OperationType.USER_ENABLE : OperationType.USER_DISABLE;
+      
+      await OperationLogService.logDetailedChange(
+        req, 
+        operationType, 
+        id,
+        username || `用户${id}`,
+        { 
+          status: { 
+            before: oldStatus, 
+            after: status 
+          } 
+        }
+      );
+    }
+    
     return true;
   }
 
+  /**
+   * 重置用户密码
+   * @param id 用户 ID
+   * @param newPassword 新密码
+   * @param req Express请求对象
+   * @returns 是否重置成功
+   */
+  public async resetPassword(id: number, newPassword: string, req?: Request): Promise<boolean> {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return false; // 用户不存在
+    }
+    
+    const username = user.username;
+    
+    await user.update({ password: newPassword }); // 明文密码，实际应用中应哈希
+    
+    // 记录日志
+    if (req) {
+      await OperationLogService.logDetailedChange(
+        req, 
+        OperationType.PASSWORD_RESET, 
+        id,
+        username || `用户${id}`,
+        { password: { before: '******', after: '******' } }  // 不显示具体密码值
+      );
+    }
+    
+    return true;
+  }
 }
 
 export default new UserService(); 

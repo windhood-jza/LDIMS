@@ -34,7 +34,8 @@ export const createDocumentRouter = (documentService: DocumentService): Router =
                 const creatorName = getUserName(req);
                 const data: CreateDocumentRequest = req.body;
                 // --- 使用传入的 documentService ---
-                const newDocument = await documentService.create(data, creatorName);
+                // 传递 req 对象用于记录日志
+                const newDocument = await documentService.create(data, creatorName, req);
                 // --- 使用传入的 documentService ---
                 const documentInfo = await documentService.info(newDocument.id);
                 res.status(201).json(success(documentInfo, '文档创建成功'));
@@ -65,7 +66,8 @@ export const createDocumentRouter = (documentService: DocumentService): Router =
                 }
                 const data: UpdateDocumentRequest = req.body;
                 // --- 使用传入的 documentService ---
-                const updatedDocumentInstance = await documentService.update(documentId, data, updaterName);
+                // 传递 req 对象用于记录日志
+                const updatedDocumentInstance = await documentService.update(documentId, data, updaterName, req);
 
                 if (!updatedDocumentInstance) {
                     res.status(404).json(fail('文档未找到或无权更新'));
@@ -98,7 +100,8 @@ export const createDocumentRouter = (documentService: DocumentService): Router =
                     return; // 提前退出
                 }
                 // --- 使用传入的 documentService ---
-                await documentService.delete(documentId, deleterName);
+                // 传递 req 对象用于记录日志
+                await documentService.delete(documentId, deleterName, req);
                 res.json(success(null, '文档删除成功'));
             } catch (error) {
                 // Service 层抛出的错误（如未找到）会在这里被捕获

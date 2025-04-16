@@ -25,4 +25,7 @@ router.delete('/:id', authenticateToken, checkAdminRole, UserController.deleteUs
 // PATCH /api/v1/users/:id/status - 更新用户状态 (需要认证 + 管理员权限)
 router.patch('/:id/status', authenticateToken, checkAdminRole, UserController.updateUserStatus);
 
+// POST /api/v1/users/:id/reset-password - 重置用户密码 (需要认证 + 管理员权限)
+router.post('/:id/reset-password', authenticateToken, checkAdminRole, UserController.resetPassword);
+
 export default router; 

@@ -19,6 +19,11 @@ import User from '../models/User'; // Needed for createdBy association if you ad
 // 移除: 不再需要 calculateLevel
 // import { calculateLevel } from '../utils/treeUtils'; // Assuming a utility for level calculation
 
+// 引入日志相关模块
+import { OperationLogService } from './OperationLogService';
+import { OperationType } from '../types/operationLog';
+import { Request } from 'express';
+
 /**
  * 文档类型服务 (Express 版本)
  */
@@ -96,9 +101,10 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
    * 创建文档类型
    * @param data CreateDocTypeRequest
    * @param userId 创建者ID
+   * @param req Express请求对象，用于记录日志
    * @returns Promise<DocType>
    */
-  async create(data: CreateDocTypeRequest, userId: number): Promise<DocType> { // Return DocType
+  async create(data: CreateDocTypeRequest, userId: number, req?: Request): Promise<DocType> { // 添加 req 参数
     let level = 1;
     let parent: DocType | null = null;
 
@@ -107,28 +113,31 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
       if (!parent) {
         throw new Error('指定的上级类型不存在');
       }
-      // 使用简单的层级计算
       level = parent.level + 1;
-      // 可以在这里添加层级限制逻辑, 例如: if (level > 3) throw new Error('最多支持三级');
     } else {
-       data.parentId = 0; // Ensure top-level has parentId 0
+       data.parentId = 0;
     }
 
-    // Ensure parentId is not null before creating
     const parentIdToSave = data.parentId ?? 0;
 
-    // 添加日志记录，检查传入的 data
-    console.log('DocTypeService.create - Received data:', data);
-    console.log('DocTypeService.create - sortOrder value:', data.sortOrder, 'Type:', typeof data.sortOrder);
-
-    // 修复：明确传递 sortOrder 并提供默认值
     const newDocType = await DocType.create({
       name: data.name,
-      parentId: parentIdToSave, // Use the determined parentId
+      parentId: parentIdToSave,
       level: level,
       createdBy: userId,
-      sortOrder: data.sortOrder ?? 0, // 显式包含 sortOrder，如果未提供则默认为 0
+      sortOrder: data.sortOrder ?? 0,
     });
+
+    // 恢复操作日志记录
+    if (req) {
+      // 使用静态方法调用
+      await OperationLogService.logFromRequest(
+        req,
+        OperationType.DOCTYPE_CREATE,
+        `创建文档类型: ${data.name}`
+      );
+    }
+
     return newDocType;
   }
 
@@ -136,18 +145,19 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
    * 更新文档类型
    * @param id DocType ID
    * @param data UpdateDocTypeRequest
+   * @param userId 操作用户ID (可选，用于日志)
+   * @param req Express请求对象，用于记录日志
    * @returns Promise<DocType | null>
    */
-  async update(id: number, data: UpdateDocTypeRequest): Promise<DocType | null> { // Return DocType
+  async update(id: number, data: UpdateDocTypeRequest, userId?: number, req?: Request): Promise<DocType | null> { // 添加 req 和 userId 参数
     const docType = await this.docTypeModel.findByPk(id);
     if (!docType) {
-      return null; // Or throw an error ('文档类型未找到')
+      return null;
     }
 
     let newLevel = docType.level;
     let parent: DocType | null = null;
 
-    // Check if parentId is being updated
     if (data.parentId !== undefined && data.parentId !== docType.parentId) {
         if (data.parentId === id) {
             throw new Error('不能将类型的上级设置为自身');
@@ -157,40 +167,69 @@ export class DocTypeService /* extends BaseService */ { // 不再继承 BaseServ
             if (!parent) {
                 throw new Error('指定的上级类型不存在');
             }
-            // 使用简单的层级计算
             newLevel = parent.level + 1;
-            // 可以在这里添加层级限制逻辑
         } else {
-            newLevel = 1; // Moving to top level
-            data.parentId = 0; // Explicitly set parentId to 0 for top level
+            newLevel = 1;
+            data.parentId = 0;
         }
     }
 
-    // Prevent updating parentId to null if it wasn't explicitly provided as null or 0
     const parentIdToUpdate = data.parentId === undefined ? docType.parentId : (data.parentId ?? 0);
-
 
     await docType.update({
       ...data,
       parentId: parentIdToUpdate,
-      level: newLevel !== undefined ? newLevel : docType.level, // Update level if changed
+      level: newLevel !== undefined ? newLevel : docType.level,
     });
-    return docType.reload(); // Return updated instance
+
+    const updatedDocType = await docType.reload(); // 重载以获取最新数据
+
+    // 恢复操作日志记录
+    if (req && updatedDocType) {
+        // 注意：userId 可能未从路由传递，但日志服务应该能从 req 中获取
+      // 使用静态方法调用
+      await OperationLogService.logFromRequest(
+        req,
+        OperationType.DOCTYPE_UPDATE,
+        `更新文档类型: ${updatedDocType.name}(ID: ${id})`
+      );
+    }
+
+    return updatedDocType;
   }
 
   /**
    * 删除文档类型
    * @param id 要删除的文档类型ID
+   * @param userId 操作用户ID (可选，用于日志)
+   * @param req Express请求对象，用于记录日志
    */
-  async delete(id: number): Promise<boolean> {
-     // 检查是否存在子类型
+  async delete(id: number, userId?: number, req?: Request): Promise<boolean> { // 添加 req 和 userId 参数
      const childrenCount = await this.docTypeModel.count({ where: { parentId: id } });
      if (childrenCount > 0) {
        throw new Error('请先删除该类型下的所有子类型');
      }
 
+     const docTypeToDelete = await this.docTypeModel.findByPk(id);
+     if (!docTypeToDelete) {
+       return false;
+     }
+     const typeName = docTypeToDelete.name;
+
      const result = await this.docTypeModel.destroy({ where: { id } });
-     return result > 0; // 返回是否成功删除
+
+     // 恢复操作日志记录
+     if (req && result > 0) {
+        // 注意：userId 可能未从路由传递，但日志服务应该能从 req 中获取
+       // 使用静态方法调用
+       await OperationLogService.logFromRequest(
+         req,
+         OperationType.DOCTYPE_DELETE,
+         `删除文档类型: ${typeName}(ID: ${id})`
+       );
+     }
+
+     return result > 0;
   }
 
   /**

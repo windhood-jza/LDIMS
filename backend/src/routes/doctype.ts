@@ -104,9 +104,14 @@ export const createDocTypeRouter = (docTypeService: DocTypeService): Router => {
             try {
                 //验证器已转换ID为数字，但仍需检查
                 const id = (req.params as any).id as number; // 使用类型断言获取已验证和转换的ID
+                
+                // 重新添加 userId 的定义
+                // @ts-ignore - 假设 authenticateToken 添加了 user
+                const userId = req.user?.id;
 
                 // --- 使用传入的 docTypeService ---
-                const updatedDocType = await docTypeService.update(id, req.body);
+                // 传递 req 对象和用户ID用于记录日志
+                const updatedDocType = await docTypeService.update(id, req.body, userId, req);
                 if (!updatedDocType) {
                     res.status(404).json(fail('文档类型未找到', 404));
                     return; // <-- Keep return for early exit (Not Found)
@@ -135,8 +140,14 @@ export const createDocTypeRouter = (docTypeService: DocTypeService): Router => {
         async (req: Request, res: Response, next: NextFunction) => {
             try {
                 const id = (req.params as any).id as number; // 获取已验证和转换的ID
+                
+                // 重新添加 userId 的定义
+                // @ts-ignore - 假设 authenticateToken 添加了 user
+                const userId = req.user?.id;
+                
                 // --- 使用传入的 docTypeService ---
-                await docTypeService.delete(id);
+                // 传递 req 对象和用户ID用于记录日志
+                await docTypeService.delete(id, userId, req);
                 // delete 方法现在会在找不到或无法删除时抛出错误
                 res.json(success(null, '删除成功'));
             } catch (error) {

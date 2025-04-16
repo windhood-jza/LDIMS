@@ -9,6 +9,9 @@ import {
     UpdateDocumentRequest,
     DocumentListQuery
 } from '../types/document.d';
+import { OperationLogService } from './OperationLogService';
+import { OperationType } from '../types/operationLog';
+import { Request } from 'express';
 
 /**
  * @class DocumentService
@@ -20,9 +23,10 @@ export class DocumentService {
      * @description 创建新文档 (使用 Sequelize)
      * @param {CreateDocumentRequest} data - 创建数据
      * @param {string | null} creatorName - 创建者姓名/标识符
+     * @param {Request} [req] - Express请求对象，用于记录日志
      * @returns {Promise<Document>} 返回创建的 Sequelize 文档实例
      */
-    async create(data: CreateDocumentRequest, creatorName: string | null): Promise<Document> {
+    async create(data: CreateDocumentRequest, creatorName: string | null, req?: Request): Promise<Document> {
         console.debug('[DocumentService] create called with data:', JSON.stringify(data));
 
         // 假设请求类型中有 sourceDepartmentId
@@ -64,6 +68,16 @@ export class DocumentService {
             console.debug('[DocumentService] Sequelize create args:', JSON.stringify(documentData));
             const newDocument = await Document.create(documentData as any); // 使用 as any 暂时绕过类型检查
             console.debug('[DocumentService] Document created successfully:', newDocument.id);
+            
+            // 记录操作日志
+            if (req) {
+                await OperationLogService.logFromRequest(
+                    req,
+                    OperationType.DOCUMENT_CREATE,
+                    `创建文档: ${data.docName}`
+                );
+            }
+            
             return newDocument;
         } catch (error) {
             console.error('[DocumentService] Error creating document:', error);
@@ -78,9 +92,10 @@ export class DocumentService {
      * @param {number} id - 文档ID
      * @param {UpdateDocumentRequest} data - 更新数据
      * @param {string | null} updaterName - 操作用户姓名/标识符
+     * @param {Request} [req] - Express请求对象，用于记录日志
      * @returns {Promise<Document | null>} 返回更新后的 Sequelize 文档实例，如果未找到则返回 null
      */
-    async update(id: number, data: UpdateDocumentRequest, updaterName: string | null): Promise<Document | null> {
+    async update(id: number, data: UpdateDocumentRequest, updaterName: string | null, req?: Request): Promise<Document | null> {
         console.debug(`[DocumentService] update called for ID ${id} with data:`, JSON.stringify(data));
         const { docTypeId, sourceDepartmentId, ...restData } = data; // 假设 DTO 使用 sourceDepartmentId
 
@@ -134,6 +149,16 @@ export class DocumentService {
 
             await document.save();
             console.debug('[DocumentService] Document updated successfully:', document.id);
+            
+            // 记录操作日志
+            if (req) {
+                await OperationLogService.logFromRequest(
+                    req,
+                    OperationType.DOCUMENT_UPDATE,
+                    `更新文档: ${document.docName}(ID: ${id})`
+                );
+            }
+            
             return document;
         } catch (error) {
             console.error(`[DocumentService] Error updating document ${id}:`, error);
@@ -146,17 +171,37 @@ export class DocumentService {
      * @description 删除文档 (软删除 - 假设模型配置了 paranoid: true)
      * @param {number} id - 文档ID
      * @param {string | null} [deleterName] - 操作用户ID (可选)
+     * @param {Request} [req] - Express请求对象，用于记录日志
      * @returns {Promise<boolean>} 返回是否删除成功 (影响的行数 > 0)
      */
-    async delete(id: number, deleterName?: string | null): Promise<boolean> {
+    async delete(id: number, deleterName?: string | null, req?: Request): Promise<boolean> {
         console.debug(`[DocumentService] delete called for ID ${id} by ${deleterName}`);
         try {
+            // 记录文档名称用于日志
+            const document = await Document.findByPk(id);
+            if (!document) {
+                console.warn(`[DocumentService] Document with ID ${id} not found or already deleted.`);
+                return false;
+            }
+            
+            const docName = document.docName;
+            
             // Sequelize 的 destroy 配合 paranoid: true 实现软删除
             const affectedRows = await Document.destroy({ where: { id } });
             if (affectedRows > 0) {
                 console.debug(`[DocumentService] Document soft deleted successfully: ID ${id}`);
                  // 可选：记录删除者，如果模型有 deletedBy 字段
                 // await Document.update({ deletedBy: deleterName }, { where: { id }, paranoid: false });
+                
+                // 记录操作日志
+                if (req) {
+                    await OperationLogService.logFromRequest(
+                        req,
+                        OperationType.DOCUMENT_DELETE,
+                        `删除文档: ${docName}(ID: ${id})`
+                    );
+                }
+                
                 return true;
             } else {
                 console.warn(`[DocumentService] Document with ID ${id} not found or already deleted.`);

@@ -1,6 +1,9 @@
 import { Department, User } from '../models'; // 引入 User 用于检查关联
 import { Op } from 'sequelize';
 import { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '../types/department';
+import { OperationLogService } from './OperationLogService'; // 引入日志服务
+import { OperationType } from '../types/operationLog'; // 引入操作类型枚举
+import { Request } from 'express'; // 引入 Request 类型
 
 interface DeptMap { [key: number]: DepartmentInfo & { raw?: Department } } // raw is optional
 
@@ -97,10 +100,12 @@ class DepartmentService {
   /**
    * 创建新部门
    * @param deptData 部门数据
+   * @param userId 操作用户ID
+   * @param req Express请求对象，用于记录日志
    * @returns 创建后的部门信息
    * @throws 如果同级下名称已存在(未删除的)或父部门不存在
    */
-  public async createDepartment(deptData: CreateDepartmentRequest): Promise<DepartmentInfo> {
+  public async createDepartment(deptData: CreateDepartmentRequest, userId: number = 0, req?: Request): Promise<DepartmentInfo> {
     // 1. 检查同级下名称是否重复 (只检查未删除的)
     const whereClauseForCheck = {
       name: deptData.name,
@@ -116,8 +121,7 @@ class DepartmentService {
       throw new Error(message);
     }
 
-    // ... (计算 level, 创建部门, 更新 code, 返回信息 - 保持不变) ...
-     // 2. 计算 level
+    // 2. 计算 level
     let level = 1; // Default for top-level
     if (deptData.parentId) {
       const parentDept = await Department.findByPk(deptData.parentId);
@@ -150,6 +154,16 @@ class DepartmentService {
     if (!createdDeptInfo) { 
         throw new Error('创建部门后无法查询到信息');
     }
+
+    // 记录操作日志
+    if (req) {
+      await OperationLogService.logFromRequest(
+        req, 
+        OperationType.DEPARTMENT_CREATE, 
+        `创建部门: ${deptData.name}`
+      );
+    }
+
     return createdDeptInfo;
   }
 
@@ -157,10 +171,12 @@ class DepartmentService {
    * 更新部门信息
    * @param id 部门 ID
    * @param deptData 更新数据
+   * @param userId 操作用户ID
+   * @param req Express请求对象，用于记录日志
    * @returns 更新后的部门信息或 null
    * @throws 如果同级下名称已存在
    */
-  public async updateDepartment(id: number, deptData: UpdateDepartmentRequest): Promise<DepartmentInfo | null> {
+  public async updateDepartment(id: number, deptData: UpdateDepartmentRequest, userId: number = 0, req?: Request): Promise<DepartmentInfo | null> {
     const department = await Department.findByPk(id);
     if (!department) {
       return null;
@@ -194,20 +210,31 @@ class DepartmentService {
     if (deptData.name !== undefined) updatePayload.name = deptData.name;
     if (deptData.parentId !== undefined) updatePayload.parentId = deptData.parentId; // null is acceptable here for update
     if (deptData.sortOrder !== undefined) updatePayload.sortOrder = deptData.sortOrder;
-    // 确保不传递 undefined 的 parentId (如果 deptData.parentId 是 undefined)
-    // 如果 updatePayload.parentId 在这里是 undefined，Sequelize 会忽略它
 
     await department.update(updatePayload);
-    return this.getDepartmentById(id);
+    const updatedDept = await this.getDepartmentById(id);
+
+    // 记录操作日志
+    if (req && updatedDept) {
+      await OperationLogService.logFromRequest(
+        req, 
+        OperationType.DEPARTMENT_UPDATE, 
+        `更新部门: ${updatedDept.name}(ID: ${id})`
+      );
+    }
+
+    return updatedDept;
   }
 
   /**
    * 删除部门 (软删除)
    * @param id 部门 ID
+   * @param userId 操作用户ID
+   * @param req Express请求对象，用于记录日志
    * @returns 是否删除成功
    * @throws 如果部门下还有子部门
    */
-  public async deleteDepartment(id: number): Promise<boolean> {
+  public async deleteDepartment(id: number, userId: number = 0, req?: Request): Promise<boolean> {
     const childCount = await Department.count({ where: { parentId: id } });
     if (childCount > 0) {
       throw new Error('无法删除，该部门下存在子部门');
@@ -217,7 +244,21 @@ class DepartmentService {
     if (!department) {
       return false;
     }
+
+    // 记录部门名称用于日志记录
+    const deptName = department.name;
+
     await department.destroy();
+
+    // 记录操作日志
+    if (req) {
+      await OperationLogService.logFromRequest(
+        req, 
+        OperationType.DEPARTMENT_DELETE, 
+        `删除部门: ${deptName}(ID: ${id})`
+      );
+    }
+
     return true;
   }
 
