@@ -99,6 +99,7 @@ const loading = ref(false);
 const formRef = ref<FormInstance>();
 
 const formData = reactive({
+  id: undefined as number | undefined,
   username: '',
   realName: '',
   departmentId: undefined as number | undefined,
@@ -168,6 +169,7 @@ const open = (type: 'add' | 'edit', data?: UserInfo) => {
   
   if (type === 'edit' && data) {
     Object.assign(formData, {
+      id: data.id,
       username: data.username,
       realName: data.realName,
       departmentId: data.departmentId,
@@ -177,6 +179,7 @@ const open = (type: 'add' | 'edit', data?: UserInfo) => {
   } else {
     // 新增时重置表单
     Object.assign(formData, {
+      id: undefined,
       username: '',
       realName: '',
       departmentId: undefined,
@@ -202,11 +205,15 @@ const handleSubmit = async () => {
     if (valid) {
       loading.value = true;
       try {
+        // 确保status为数值类型
         const submitData = {
           ...formData,
+          status: Number(formData.status),
           // 编辑时不提交密码字段
           ...(dialogType.value === 'edit' ? { password: undefined } : {}),
         };
+        
+        console.log('提交的表单数据:', submitData);
         
         if (dialogType.value === 'add') {
           await createUser(submitData);
@@ -219,6 +226,7 @@ const handleSubmit = async () => {
         emit('success');
         handleClose();
       } catch (error: any) {
+        console.error('表单提交错误:', error);
         ElMessage.error(error.message || '操作失败');
       } finally {
         loading.value = false;

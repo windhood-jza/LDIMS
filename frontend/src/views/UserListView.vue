@@ -23,14 +23,14 @@
             />
           </el-form-item>
           <el-form-item label="角色">
-            <el-select v-model="searchParams.role" placeholder="请选择角色" clearable>
+            <el-select v-model="searchParams.role" placeholder="请选择角色" clearable style="width: 180px;">
               <el-option label="管理员" value="admin"></el-option>
               <el-option label="录入员" value="editor"></el-option>
               <el-option label="查看员" value="viewer"></el-option>
             </el-select>
           </el-form-item>
           <el-form-item label="状态">
-            <el-select v-model="searchParams.status" placeholder="请选择状态" clearable>
+            <el-select v-model="searchParams.status" placeholder="请选择状态" clearable style="width: 180px;">
               <el-option label="启用" :value="1"></el-option>
               <el-option label="禁用" :value="0"></el-option>
             </el-select>
@@ -373,12 +373,39 @@ onMounted(() => {
 
 .table-card {
   /* 表格卡片样式 */
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 /* 表格操作列按钮水平排列 */
 .action-links {
-  display: inline-flex; /* 使用 inline-flex 使按钮水平排列 */
-  gap: 8px; /* 按钮之间的间距 */
+  display: flex; /* 使用flex布局 */
+  gap: 4px; /* 减小按钮之间的间距 */
+  justify-content: center; /* 按钮居中 */
+}
+
+/* 确保操作列按钮风格一致 */
+.action-links .el-button {
+  padding: 4px;
+  margin: 0;
+}
+
+/* 表格行高度控制 */
+:deep(.el-table) {
+  --el-table-row-height: 48px;
+}
+
+/* 确保表格内容垂直居中 */
+:deep(.el-table .cell) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100%;
+}
+
+/* 状态列特殊处理 */
+:deep(.el-table .el-switch) {
+  --el-switch-on-color: var(--el-color-success);
+  --el-switch-off-color: var(--el-color-danger);
 }
 
 .pagination-container {
@@ -394,26 +421,6 @@ onMounted(() => {
   height: 36px;
   /* 对于 Select 和 Input，可能需要调整内部元素使其垂直居中 */
   :deep(.el-input__wrapper), :deep(.el-select__wrapper) {
-      height: 100%;
-      box-sizing: border-box;
-  }
-}
-
-/* 为下拉选择框设置固定宽度 */
-.search-form .el-select {
-  width: 150px; /* 或根据需要调整宽度 */
-}
-
-/* 如果按钮高度不一致，也可以单独为按钮设置 */
-/* .control-container .el-button {
-  height: 36px;
-} */
-
-/* 为下拉选择框设置固定宽度 - 对 TreeSelect 可能也需要调整 */
-.search-form .el-tree-select {
-  width: 180px; /* 或根据需要调整宽度 */
-  height: 36px; /* 保持高度一致 */
-   :deep(.el-select__wrapper) {
       height: 100%;
       box-sizing: border-box;
   }

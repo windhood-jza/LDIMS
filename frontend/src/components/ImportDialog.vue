@@ -152,6 +152,14 @@ const handleUploadSuccess: UploadProps['onSuccess'] = (response: any, uploadFile
   console.log('[ImportDialog Upload Success] Response:', response);
   isUploading.value = false; // 上传结束
 
+  // 处理后端返回code为201的情况（创建成功）
+  if (response && response.code === 201 && response.data) {
+    ElMessage.success(response.message || '文件上传成功，导入任务已创建');
+    handleClose(); // 上传成功后关闭对话框
+    return;
+  }
+
+  // 兼容旧版响应格式
   if (response && typeof response.fileName === 'string' && typeof response.originalName === 'string') {
     ElMessage.info('文件上传成功，正在请求后台处理导入任务...');
     const importParams: ImportRequestParams = {
