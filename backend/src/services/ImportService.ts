@@ -118,7 +118,7 @@ export class ImportService {
             }
 
             // 验证文件是否存在 (理论上文件应该已被上传到 uploadsDir)
-             if (!fs.existsSync(filePath)) {
+            if (!fs.existsSync(filePath)) {
                  console.error(`[ImportService] Uploaded file not found at path: ${filePath}.`);
                  throw new Error(`上传的文件未在服务器上找到，请重新上传`);
             }

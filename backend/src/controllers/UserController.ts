@@ -128,6 +128,37 @@ class UserController {
     }
   }
 
+  /**
+   * 更新用户状态
+   * @param req Express 请求对象 (params 包含 id, body 包含 status)
+   * @param res Express 响应对象
+   */
+  public async updateUserStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id, 10);
+      if (isNaN(userId)) {
+        res.status(400).json(fail('无效的用户 ID', 400));
+        return;
+      }
+      const status = parseInt(req.body.status, 10);
+      if (isNaN(status) || (status !== 0 && status !== 1)) {
+        res.status(400).json(fail('无效的用户状态', 400));
+        return;
+      }
+      // 注意：更新操作的权限检查通常在中间件或 Service 层完成
+      const updated = await UserService.updateUserStatus(userId, status as 0 | 1);
+      if (!updated) {
+        res.status(404).json(fail('未找到指定用户或更新失败', 404));
+      } else {
+        res.json(success(null, '用户状态更新成功'));
+      }
+    } catch (error: any) {
+      console.error('更新用户状态控制器出错:', error);
+      // 可以根据错误类型返回不同状态码
+      res.status(500).json(fail(error.message || '更新用户状态时发生服务器错误', 500));
+    }
+  }
+
 }
 
 export default new UserController(); 

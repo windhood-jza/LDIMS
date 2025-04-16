@@ -196,6 +196,21 @@ class UserService {
     return true;
   }
 
+  /**
+   * 更新用户状态
+   * @param id 用户 ID
+   * @param status 新的状态值 (0 或 1)
+   * @returns 是否更新成功
+   */
+  public async updateUserStatus(id: number, status: 0 | 1): Promise<boolean> {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return false; // 用户不存在
+    }
+    await user.update({ status });
+    return true;
+  }
+
 }
 
 export default new UserService(); 

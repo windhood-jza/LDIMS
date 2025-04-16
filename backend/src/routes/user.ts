@@ -22,4 +22,7 @@ router.put('/:id', authenticateToken, checkAdminRole, UserController.updateUser)
 // DELETE /api/v1/users/:id - 删除用户 (需要认证 + 管理员权限)
 router.delete('/:id', authenticateToken, checkAdminRole, UserController.deleteUser);
 
+// PATCH /api/v1/users/:id/status - 更新用户状态 (需要认证 + 管理员权限)
+router.patch('/:id/status', authenticateToken, checkAdminRole, UserController.updateUserStatus);
+
 export default router; 

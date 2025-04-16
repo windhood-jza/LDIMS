@@ -60,7 +60,10 @@
             <el-tag :type="getRoleTagType(row.role)">{{ formatRole(row.role) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="departmentName" label="所属部门" width="180"></el-table-column>
+        <el-table-column prop="departmentName" label="所属部门" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.departmentName || '未分配' }} </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-switch 

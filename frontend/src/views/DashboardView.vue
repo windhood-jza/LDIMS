@@ -200,10 +200,19 @@ const renderCharts = () => {
         
         chartsInitialized.value = true;
         console.log('图表初始化完成');
+        
+        // 在图表初始化完成后，确保尺寸正确适应容器
+        setTimeout(() => {
+          handleResize();
+          // 再次调整以确保完美适配
+          setTimeout(() => {
+            handleResize();
+          }, 300);
+        }, 200);
       } catch (error) {
         console.error('图表渲染过程中出错：', error);
       }
-    }, 500); // 延长延迟时间到500ms
+    }, 600); // 延长延迟时间到600ms
   });
 };
 
@@ -263,18 +272,20 @@ const renderDocTypeChart = (data: DashboardSummaryData['charts']['docsByType']) 
           series: [{
             type: 'treemap',
             data: treeData,
+            width: '95%',
+            height: '95%',
+            top: '2.5%',
+            left: '2.5%',
             // 配置圆角和间距
             breadcrumb: { show: false },
-            left: 0,
-            right: 0,
-            top: 10,
-            bottom: 10,
             roam: false,
             nodeClick: false,
+            squareRatio: 0.8, // 控制矩形比例
+            gap: 3, // 设置矩形间距
             itemStyle: {
-              borderRadius: 5,
-              borderWidth: 2,
-              gapWidth: 4
+              borderRadius: 4,
+              borderWidth: 1,
+              gapWidth: 2
             },
             label: {
               show: true,
@@ -326,7 +337,7 @@ const renderDocTypeChart = (data: DashboardSummaryData['charts']['docsByType']) 
           grid: {
             left: '3%',
             right: '4%',
-            bottom: '3%',
+            bottom: '5%',
             top: '3%',
             containLabel: true
           },
@@ -389,15 +400,17 @@ const renderDocTypeChart = (data: DashboardSummaryData['charts']['docsByType']) 
             type: 'scroll',
             orient: 'vertical',
             right: 10,
-            top: 20,
-            bottom: 20,
+            top: 25,
+            bottom: 25,
+            pageButtonItemGap: 5,
+            pageButtonGap: 5,
             data: topData.map(item => item.name)
           },
           series: [{
             name: '文档数量',
             type: 'pie',
-            radius: ['30%', '75%'],
-            center: ['45%', '50%'],
+            radius: ['20%', '75%'],
+            center: ['45%', '55%'],
             avoidLabelOverlap: true,
             itemStyle: {
               borderRadius: 6,
@@ -499,18 +512,20 @@ const renderDepartmentChart = (data: DashboardSummaryData['charts']['docsByDepar
           series: [{
             type: 'treemap',
             data: treeData,
+            width: '95%',
+            height: '95%',
+            top: '2.5%',
+            left: '2.5%',
             // 配置圆角和间距
             breadcrumb: { show: false },
-            left: 0,
-            right: 0,
-            top: 10,
-            bottom: 10,
             roam: false,
             nodeClick: false,
+            squareRatio: 0.8, // 控制矩形比例
+            gap: 3, // 设置矩形间距
             itemStyle: {
-              borderRadius: 5,
-              borderWidth: 2,
-              gapWidth: 4
+              borderRadius: 4,
+              borderWidth: 1,
+              gapWidth: 2
             },
             label: {
               show: true,
@@ -562,7 +577,7 @@ const renderDepartmentChart = (data: DashboardSummaryData['charts']['docsByDepar
           grid: {
             left: '3%',
             right: '4%',
-            bottom: '3%',
+            bottom: '5%',
             top: '3%',
             containLabel: true
           },
@@ -625,15 +640,17 @@ const renderDepartmentChart = (data: DashboardSummaryData['charts']['docsByDepar
             type: 'scroll',
             orient: 'vertical',
             right: 10,
-            top: 20,
-            bottom: 20,
+            top: 25,
+            bottom: 25,
+            pageButtonItemGap: 5,
+            pageButtonGap: 5,
             data: topData.map(item => item.name)
           },
           series: [{
             name: '文档数量',
             type: 'pie',
-            radius: ['30%', '75%'],
-            center: ['45%', '50%'],
+            radius: ['20%', '75%'],
+            center: ['45%', '55%'],
             avoidLabelOverlap: true,
             itemStyle: {
               borderRadius: 6,
@@ -709,7 +726,7 @@ const handleResize = () => {
 
 <style scoped>
 .dashboard-container {
-  padding: 20px;
+  /* 移除内边距，让其跟随父级布局 */
 }
 
 .summary-cards .el-card {
@@ -728,18 +745,24 @@ const handleResize = () => {
   font-weight: bold;
 }
 
+.chart-section {
+  margin-bottom: 0; /* 移除chart-section的底部边距 */
+}
+
 .chart-section .el-card {
-  margin-bottom: 20px;
+  margin-bottom: 20px; /* 恢复卡片默认底部边距 */
 }
 
 .chart-card {
-  height: 550px;
+  height: 500px; /* 稍微调整卡片高度 */
+  overflow: hidden;
 }
 
 .chart-container {
   width: 100%;
-  height: 480px;
+  height: 430px; /* 对应调整图表容器高度 */
   position: relative;
+  padding: 5px; /* 减小内边距 */
 }
 
 .chart-dom {
