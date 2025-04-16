@@ -71,7 +71,8 @@ export const createDocTypeRouter = (docTypeService: DocTypeService): Router => {
                     return; // <-- Keep return for early exit
                 }
                  // --- 使用传入的 docTypeService ---
-                const createdDocType = await docTypeService.create(req.body, userId);
+                // 恢复传递 req 对象用于记录日志
+                const createdDocType = await docTypeService.create(req.body, userId, req);
                 res.status(201).json(success(createdDocType, '创建成功'));
             } catch (error: any) { // Catch specific errors if possible
                 // Service 层应该抛出可识别的错误
