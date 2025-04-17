@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import UserService from '../services/UserService';
 import { success, fail, page as pageResponse } from '../utils/response'; // 引入分页响应
 import { CreateUserRequest, UpdateUserRequest } from '../types/user';
+import { body } from 'express-validator';
 
 class UserController {
   /**
@@ -188,6 +189,59 @@ class UserController {
       res.status(500).json(fail(error.message || '重置用户密码时发生服务器错误', 500));
     }
   }
+
+  // 验证创建用户的输入
+  public createUserValidation = [
+    body('username')
+      .notEmpty().withMessage('用户名不能为空')
+      .isLength({ min: 3, max: 20 }).withMessage('用户名长度必须在 3 到 20 个字符之间')
+      .isAlphanumeric().withMessage('用户名只能包含字母和数字') // Added isAlphanumeric
+      .trim(), // Added trim
+    body('password')
+      .notEmpty().withMessage('密码不能为空')
+      .isLength({ min: 6 }).withMessage('密码长度至少需要 6 个字符'),
+    body('realName')
+      .notEmpty().withMessage('真实姓名不能为空')
+      .isLength({ max: 50 }).withMessage('真实姓名不能超过 50 个字符')
+      .trim(), // Added trim
+    body('email')
+      .optional({ checkFalsy: true })
+      .isEmail().withMessage('请输入有效的邮箱地址')
+      .trim(), // Added trim
+    body('departmentId')
+      .notEmpty().withMessage('部门 ID 不能为空')
+      .isInt({ gt: 0 }).withMessage('部门 ID 必须是正整数'),
+    body('status')
+      .optional()
+      .isInt({ min: 0, max: 1 }).withMessage('状态值必须是 0 或 1')
+  ];
+
+  // 验证更新用户的输入 (不允许更新用户名和密码)
+  public updateUserValidation = [
+    body('realName')
+      .optional()
+      .notEmpty().withMessage('真实姓名不能为空')
+      .isLength({ max: 50 }).withMessage('真实姓名不能超过 50 个字符')
+      .trim(), // Added trim
+    body('email')
+      .optional({ checkFalsy: true })
+      .isEmail().withMessage('请输入有效的邮箱地址')
+      .trim(), // Added trim
+    body('departmentId')
+      .optional()
+      .notEmpty().withMessage('部门 ID 不能为空')
+      .isInt({ gt: 0 }).withMessage('部门 ID 必须是正整数'),
+    body('status')
+      .optional()
+      .isInt({ min: 0, max: 1 }).withMessage('状态值必须是 0 或 1')
+  ];
+
+  // 验证重置密码的输入
+  public resetPasswordValidation = [
+      body('password')
+          .notEmpty().withMessage('新密码不能为空')
+          .isLength({ min: 6 }).withMessage('密码长度至少需要 6 个字符')
+  ];
 }
 
 export default new UserController(); 

@@ -3,6 +3,7 @@ import DepartmentService from '../services/DepartmentService';
 import { success, fail } from '../utils/response';
 import { CreateDepartmentRequest, UpdateDepartmentRequest } from '../types/department';
 import { JwtPayload } from '../types/auth'; // 引入 JwtPayload 类型
+import { body } from 'express-validator';
 
 class DepartmentController {
 
@@ -36,6 +37,62 @@ class DepartmentController {
       res.status(500).json(fail(error.message || '获取部门树失败'));
     }
   }
+
+  // 验证创建部门的输入
+  public createDepartmentValidation = [
+    body('name')
+      .notEmpty().withMessage('部门名称不能为空')
+      .isLength({ max: 50 }).withMessage('部门名称不能超过 50 个字符')
+      .trim(), // Added trim
+    body('code')
+      .notEmpty().withMessage('部门编码不能为空')
+      .isLength({ max: 50 }).withMessage('部门编码不能超过 50 个字符')
+      .matches(/^[a-zA-Z0-9_]+$/).withMessage('部门编码只能包含字母、数字和下划线') // Added stricter pattern match
+      .trim(), // Added trim
+    body('parentId')
+      .optional({ nullable: true })
+      .isInt({ gt: 0 }).withMessage('父部门 ID 必须是正整数'),
+    body('sortOrder')
+      .optional()
+      .isInt().withMessage('排序号必须是整数'),
+    body('status')
+      .optional()
+      .isInt({ min: 0, max: 1 }).withMessage('状态值必须是 0 或 1')
+  ];
+
+  // 验证更新部门的输入
+  public updateDepartmentValidation = [
+    body('name')
+      .optional()
+      .notEmpty().withMessage('部门名称不能为空')
+      .isLength({ max: 50 }).withMessage('部门名称不能超过 50 个字符')
+      .trim(), // Added trim
+    body('code')
+      .optional()
+      .notEmpty().withMessage('部门编码不能为空')
+      .isLength({ max: 50 }).withMessage('部门编码不能超过 50 个字符')
+      .matches(/^[a-zA-Z0-9_]+$/).withMessage('部门编码只能包含字母、数字和下划线') // Added stricter pattern match
+      .trim(), // Added trim
+    body('parentId')
+      .optional({ nullable: true })
+      .isInt({ gt: 0 }).withMessage('父部门 ID 必须是正整数')
+      .custom((value, { req }) => {
+        // 防止将部门的父级设置为自身或其子部门，这里仅做基本检查，服务层会做更严谨的循环依赖检查
+        if (req.params && value !== null && value === parseInt(req.params.id, 10)) {
+          throw new Error('不能将部门设置为自身的父部门');
+        }
+        return true;
+      }),
+    body('sortOrder')
+      .optional()
+      .isInt().withMessage('排序号必须是整数'),
+    body('status')
+      .optional()
+      .isInt({ min: 0, max: 1 }).withMessage('状态值必须是 0 或 1')
+  ];
+
+  // 验证删除部门的输入
+  public deleteDepartmentValidation = []; // 通常只需要 ID 在 URL 中
 
   /**
    * 创建新部门

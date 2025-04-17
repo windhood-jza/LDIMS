@@ -67,39 +67,47 @@ const loginRules = reactive<FormRules>({
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return;
-  await loginFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true;
-      try {
-        // 调用真实的登录 API
-        const response = await loginUser(loginForm);
-        
-        // 后端 API 成功响应 (code 200)，包含 token 和 user
-        const { token, user } = response.data; 
+  // Validate returns a Promise that resolves/rejects based on validation
+  try {
+    await loginFormRef.value.validate(); // Await validation directly
+    // If validate() resolves, it means validation passed
+    loading.value = true;
+    try {
+      const response = await loginUser(loginForm);
+      
+      // Check if response and response.data exist before destructuring
+      if (response && response.data) {
+        const { token, user } = response.data;
 
-        // 存储 Token 和用户信息
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('userInfo', JSON.stringify(user));
-        console.log('登录成功，Token:', token);
-        console.log('用户信息:', user);
+        // Ensure token and user are not null/undefined if needed
+        if (token && user) {
+          localStorage.setItem('authToken', token);
+          localStorage.setItem('userInfo', JSON.stringify(user));
+          console.log('登录成功，Token:', token);
+          console.log('用户信息:', user);
 
-        ElMessage.success(response.message || '登录成功');
-        // 跳转到仪表盘页面
-        router.push('/dashboard');
-
-      } catch (error: any) {
-        // API 调用失败 (网络错误或后端返回非200 code)
-        // 响应拦截器已经处理了错误消息提取
-        console.error('登录失败:', error);
-        ElMessage.error(error.message || '登录失败，请稍后重试');
-      } finally {
-        loading.value = false;
+          ElMessage.success(response.message || '登录成功');
+          router.push('/dashboard');
+        } else {
+           console.error('登录响应格式错误: token 或 user 不存在');
+           ElMessage.error('登录响应格式错误');
+        }
+      } else {
+        console.error('登录响应格式错误: response 或 response.data 不存在');
+        ElMessage.error('登录响应格式错误');
       }
-    } else {
-      console.log('表单验证失败');
-      return false;
+
+    } catch (error: any) {
+      console.error('登录失败:', error);
+      ElMessage.error(error.message || '登录失败，请稍后重试');
+    } finally {
+      loading.value = false;
     }
-  });
+  } catch (validationError) {
+    // If validate() rejects, it means validation failed
+    console.log('表单验证失败:', validationError);
+    // No need to return false here, validate() rejection handles it
+  }
 };
 
 </script>
