@@ -309,8 +309,8 @@ const handleResetPassword = (row: UserInfo) => {
   ).then(async () => {
     loading.value = true;
     try {
-      await resetUserPassword(row.id);
-      ElMessage.success('密码重置成功');
+      await resetUserPassword(row.id, { newPassword: '123456' });
+      ElMessage.success('密码已重置为默认密码 123456');
     } catch (error: any) {
       ElMessage.error('密码重置失败: ' + error.message);
     } finally {

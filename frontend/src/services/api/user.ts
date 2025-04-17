@@ -45,9 +45,10 @@ export const updateUserStatus = (id: number, status: number) => {
 /**
  * 重置用户密码
  * @param id 用户ID
+ * @param data 请求体，应包含 newPassword
  */
-export const resetUserPassword = (id: number) => {
-  return request.post(`/users/${id}/reset-password`);
+export const resetUserPassword = (id: number, data: { newPassword: string }) => {
+  return request.post(`/users/${id}/reset-password`, data);
 };
 
 /**
