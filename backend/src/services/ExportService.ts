@@ -7,6 +7,9 @@ import { taskQueueService } from './TaskQueueService'; // 引入任务队列服�
 import * as fs from 'fs'; // 修改为导入标准 fs 模块
 import * as path from 'path';
 import * as xlsx from 'xlsx'; // 用于生成 Excel
+import { OperationLogService } from './OperationLogService';
+import { OperationType } from '../types/operationLog';
+import { Request } from 'express';
 
 // 中英文列名映射
 const fieldToHeaderMap: Record<string, string> = {
@@ -46,7 +49,8 @@ export class ExportService {
    * @param userId 用户 ID
    * @param exportScope 导出范围 ('all' 或 'selected' 或 'currentPage')
    * @param selectedIdsJson 选中项 ID 列表 (JSON 字符串, 如果 scope='selected')
-   * @param currentPageIdsJson 当前页 ID 列表 (JSON 字符串, 如果 scope='currentPage')
+   * @param currentPageIds 当前页 ID 列表 (JSON 字符串, 如果 scope='currentPage')
+   * @param req Express 请求对象，用于记录日志
    * @returns {Promise<ExportTask>} 创建的任务对象
    */
   async createExportTask(
@@ -54,8 +58,9 @@ export class ExportService {
     options: { fields: string[]; fileType: 'xlsx' | 'csv' },
     userId: number,
     exportScope: 'all' | 'selected' | 'currentPage' = 'all',
-    selectedIdsJson: string | null = null, // 保持 JSON 字符串 (假设 TEXT)
-    currentPageIds: number[] | null = null // <-- 修改参数类型为 number[] | null
+    selectedIdsJson: string | null = null,
+    currentPageIds: number[] | null = null,
+    req?: Request // 添加 req 参数
   ): Promise<ExportTask> {
     console.log(`[ExportService] Creating export task for user: ${userId}, Scope: ${exportScope}, Query:`, query, 'Options:', options);
 
@@ -90,6 +95,18 @@ export class ExportService {
       });
 
       console.log(`[ExportService] Created new export task ${newTask.id} with scope: ${exportScope}`);
+
+      // 添加日志记录
+      if (req) {
+          await OperationLogService.logFromRequest(
+              req,
+              OperationType.DOCUMENT_EXPORT, // 修复：使用正确的操作类型
+              `发起文档导出任务 (范围: ${exportScope}, 类型: ${fileType})`
+          );
+      } else {
+          // 如果没有 req 对象，仍然可以记录一个不带 IP 和用户信息的系统日志，但意义不大
+          console.warn(`[ExportService] Cannot log export task start for task ${newTask.id} because Request object is missing.`);
+      }
 
       if (taskQueueService) {
           taskQueueService.addTask(newTask.id);
@@ -262,6 +279,23 @@ export class ExportService {
 
       console.log(`[ExportService] Task ${taskId} completed successfully.`);
 
+      // --- 添加日志记录点：任务成功 ---
+      const logUserIdSuccess = task?.userId;
+      if(logUserIdSuccess) {
+          try {
+              await OperationLogService.createLog(
+                  logUserIdSuccess,
+                  OperationType.DOCUMENT_EXPORT, // 使用通用导出类型
+                  `文档导出任务 #${taskId} (文件: ${task.fileName}) 处理成功完成。`,
+                  'SYSTEM' // IP 地址设为 SYSTEM
+              );
+              console.log(`[ExportService] Logged export task ${taskId} success status.`);
+          } catch (logError) {
+              console.error(`[ExportService] Failed to log export task ${taskId} success status:`, logError);
+          }
+      }
+      // -------------------------------
+
     } catch (error: any) {
       console.error(`[ExportService] Error processing task ${taskId}:`, error);
       if (task) {
@@ -271,6 +305,24 @@ export class ExportService {
           task.errorMessage = error.message || '导出过程中发生未知错误';
           await task.save();
           console.log(`[ExportService] Task ${taskId} status updated to Failed.`);
+
+          // --- 添加日志记录点：任务失败 ---
+          const logUserIdFail = task?.userId;
+          if(logUserIdFail) {
+              try {
+                  await OperationLogService.createLog(
+                      logUserIdFail,
+                      OperationType.DOCUMENT_EXPORT, // 使用通用导出类型
+                      `文档导出任务 #${taskId} 处理失败。错误: ${task.errorMessage}`,
+                      'SYSTEM' // IP 地址设为 SYSTEM
+                  );
+                   console.log(`[ExportService] Logged export task ${taskId} failure status.`);
+              } catch (logError) {
+                   console.error(`[ExportService] Failed to log export task ${taskId} failure status:`, logError);
+              }
+          }
+          // -------------------------------
+
         } catch (saveError) {
           console.error(`[ExportService] Failed to update task ${taskId} status to Failed:`, saveError);
         }

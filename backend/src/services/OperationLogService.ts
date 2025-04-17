@@ -200,9 +200,11 @@ export class OperationLogService {
         operationType: OperationType,
         operationContent: string
     ): Promise<void> {
+        console.log('--- logFromRequest called ---'); // 标识方法被调用
+        console.log('req.user:', JSON.stringify(req.user)); // 打印 req.user 内容
         const userId = (req.user as any)?.id;
         if (!userId) {
-            console.warn('无法记录日志: 请求中未找到用户ID');
+            console.warn('[OperationLogService] 无法记录日志: 请求中未找到用户ID');
             return;
         }
 

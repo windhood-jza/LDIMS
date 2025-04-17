@@ -7,6 +7,9 @@ import * as path from 'path';
 import sequelize from '../config/database'; // 引入 sequelize 实例用于事务
 import Document /*, { DocumentAttributes } */ from '../models/Document'; // 引入 Document 模型, 暂时不导入 DocumentAttributes
 // import User from '../models/User'; // 如果需要获取创建者姓名，取消注释
+import { OperationLogService } from './OperationLogService'; // 添加导入
+import { OperationType } from '../types/operationLog'; // 添加导入
+import { Request } from 'express'; // 添加导入
 
 // --- 定义导入数据的类型，手动列出可导入字段 ---
 // (替代 Omit<DocumentAttributes,...> 以避免导入问题)
@@ -92,9 +95,10 @@ export class ImportService {
      * @param userId 用户 ID
      * @param originalFileName 上传的原始文件名
      * @param uploadedFileName 服务器上存储的唯一文件名 (在 uploads/ 目录下)
+     * @param req Express 请求对象，用于记录日志
      * @returns {Promise<ExportTask>} 创建的任务对象
      */
-    async createImportTask(userId: number, originalFileName: string, uploadedFileName: string): Promise<ExportTask> {
+    async createImportTask(userId: number, originalFileName: string, uploadedFileName: string, req?: Request): Promise<ExportTask> {
         console.log(`[ImportService] Creating import task for user: ${userId}, original file: ${originalFileName}, uploaded file: ${uploadedFileName}`);
 
         const safeUploadedFileName = path.basename(uploadedFileName);
@@ -146,6 +150,17 @@ export class ImportService {
             });
 
             console.log(`[ImportService] Created new import task ${newTask.id}`);
+
+            // 添加日志记录 (发起导入)
+            if (req) {
+                await OperationLogService.logFromRequest(
+                    req,
+                    OperationType.DOCUMENT_IMPORT,
+                    `发起文档导入任务 (文件: ${originalFileName})`
+                );
+            } else {
+                console.warn(`[ImportService] Cannot log import task start for task ${newTask.id} because Request object is missing.`);
+            }
 
             // !! 确保 taskQueueService 已被注入并可用
             if (taskQueueService) {
@@ -404,6 +419,34 @@ export class ImportService {
                  console.log(`[ImportService] Task ${taskId} completed successfully. Status: ${task.status}`);
             }
             await task.save();
+
+            // --- 日志记录点 1: 任务处理结果 --- 
+            const logUserId = task?.userId; // 获取用户ID
+            let logContent = '';
+            const logType = OperationType.DOCUMENT_IMPORT; // 修复：使用存在的通用类型
+
+            if (task?.status === 2) { // 成功
+                logContent = `文档导入任务 #${taskId} (文件: ${task.originalFileName}) 完成，成功导入 ${task.successCount || 0} 条记录。`;
+            } else if (task?.status === 3) { // 失败
+                logContent = `文档导入任务 #${taskId} (文件: ${task.originalFileName}) 处理失败，成功 ${task.successCount || 0} 条，失败 ${task.failureCount || 0} 条。错误: ${task.errorMessage}`;
+            } else {
+                 logContent = `文档导入任务 #${taskId} (文件: ${task.originalFileName}) 处理结束，最终状态未知 (${task?.status})。`;
+            }
+            
+            if(logUserId){ // 确保 userId 存在
+                 try {
+                     await OperationLogService.createLog(
+                         logUserId, 
+                         logType, 
+                         logContent,
+                         'SYSTEM' // IP 地址设为 SYSTEM 或其他标识
+                     );
+                     console.log(`[ImportService] Logged import task ${taskId} completion status.`);
+                 } catch (logError) {
+                     console.error(`[ImportService] Failed to log import task ${taskId} completion status:`, logError);
+                 }
+            }
+            // --------------------------------------
 
         } catch (error: any) {
             console.error(`[ImportService] Error processing task ${taskId}:`, error);

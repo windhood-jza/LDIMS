@@ -106,7 +106,8 @@ export const createExportRouter = (exportService: ExportService, importService: 
                     userId,
                     exportScope,
                     selectedIdsJson,  // selectedIds 假设仍是 TEXT
-                    currentPageIdsValue // 直接传递数组或 null
+                    currentPageIdsValue, // 直接传递数组或 null
+                    req // <-- 添加 req 参数
                 );
                 res.status(201).json({ code: 201, message: '导出任务已创建', data: { taskId: newTask.id } });
                 return;
@@ -418,7 +419,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
             const uploadedFileName = req.file.filename;
 
             try {
-                const newTask = await importService.createImportTask(userId, originalFileName, uploadedFileName);
+                const newTask = await importService.createImportTask(userId, originalFileName, uploadedFileName, req);
                 res.status(201).json({
                     code: 201,
                     message: '文件上传成功，导入任务已创建',
