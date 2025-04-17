@@ -3,7 +3,7 @@
     <el-container class="layout-container">
       <!-- Sidebar -->
       <el-aside width="200px" class="sidebar">
-        <div class="logo">LDIMS</div>
+        <div class="logo">融合业务部文档管理</div>
         <el-menu
           :default-active="activeMenu"
           class="el-menu-vertical-demo"
@@ -61,7 +61,7 @@
             <el-dropdown @command="handleCommand">
               <span class="el-dropdown-link user-info">
                 <el-avatar :size="30" :src="avatarUrl"/>
-                <span class="username">{{ username }}</span>
+                <span class="username">{{ displayName }}</span>
                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
               </span>
               <template #dropdown>
@@ -108,8 +108,10 @@ const router = useRouter();
 // 根据当前路由计算激活的菜单项
 const activeMenu = computed(() => route.path);
 
-// 模拟用户信息和头像
-const username = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')!).username : '未登录';
+// --- Modified User Info Logic ---
+const userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')!) : null;
+// Attempt to display realName, fallback to username, then to '未登录'
+const displayName = computed(() => userInfo ? (userInfo.realName || userInfo.username) : '未登录'); 
 const avatarUrl = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23409eff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E`;
 
 // 处理下拉菜单命令
@@ -143,10 +145,14 @@ const handleCommand = (command: string) => {
   height: 60px;
   line-height: 60px;
   text-align: center;
-  font-size: 20px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 600;
   background-color: #263445;
   color: white;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .logo img {
   width: 28px;
@@ -223,6 +229,7 @@ const handleCommand = (command: string) => {
   display: flex;
   align-items: center;
   cursor: pointer;
+  outline: none; /* Remove default focus outline */
 }
 
 .username {
@@ -233,6 +240,14 @@ const handleCommand = (command: string) => {
 .el-dropdown-link {
   display: flex;
   align-items: center;
+  outline: none; /* Remove default focus outline */
+}
+
+.el-dropdown-link:focus,
+.el-dropdown-link:focus-visible,
+.user-info:focus,
+.user-info:focus-visible {
+  outline: none !important; /* Ensure outline removal */
 }
 
 /* 主内容区域 */

@@ -3,8 +3,11 @@
     <div class="login-container">
       <div class="login-banner">
         <div class="banner-content">
-          <h1>文档信息管理系统</h1>
-          <p>高效的文档管理平台，助力企业信息化建设。提供文档录入、存储、查询和统计分析等全方位功能，让文档管理更简单。</p>
+          <h1 class="main-title">
+            <span class="org-name">技术中心融合业务部</span>
+            <span class="system-name">文档管理系统</span>
+          </h1>
+          <p>高效的文档管理平台，助力台信息化建设。提供文档录入、存储、查询和统计分析等全方位功能，让文档管理更简单。</p>
         </div>
       </div>
       <div class="login-form-container">
@@ -122,14 +125,45 @@ const handleLogin = async () => {
 }
 .banner-content {
   max-width: 600px;
+  text-align: center; /* 标题和描述文字居中 */
 }
 .banner-content h1 {
-  font-size: 40px; /* 调整大小 */
-  margin-bottom: 20px;
+  margin-bottom: 25px; /* 增加标题和描述间距 */
+}
+.main-title {
+  font-size: 36px; /* 调整基础字体大小 */
+  font-weight: 300; /* 默认较细的字重 */
+  color: #ffffff;
+  letter-spacing: 1.5px; /* 增加字间距 */
+  position: relative;
+  padding-bottom: 15px; /* 为下划线留出空间 */
+  display: inline-block; /* 使下划线宽度自适应内容 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* 微调阴影 */
+}
+.main-title .org-name {
+  font-weight: 500; /* 组织名称稍粗 */
+  color: #e6f7ff; /* 组织名称颜色稍亮 */
+  margin-right: 10px; /* 增加两部分间距 */
+}
+.main-title .system-name {
+  font-weight: 300; /* 系统名称使用默认细字重 */
+  opacity: 0.9; /* 系统名称稍透明 */
+}
+.main-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%; /* 下划线宽度与标题一致 */
+  max-width: 300px; /* 最大宽度限制 */
+  height: 3px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1)); /* 渐变下划线 */
+  border-radius: 1.5px;
 }
 .banner-content p {
-  font-size: 16px; /* 调整大小 */
-  opacity: 0.9;
+  font-size: 16px;
+  opacity: 0.85; /* 微调透明度 */
   line-height: 1.8;
 }
 .login-form-container {
