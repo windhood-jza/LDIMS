@@ -37,7 +37,7 @@
         <!-- 筛选区域 -->
         <el-form :inline="true" :model="logQuery" class="log-search-form">
            <el-form-item label="操作用户">
-             <el-input v-model="logQuery.userId" placeholder="用户ID或用户名" clearable />
+             <el-input v-model="logQuery.userId" placeholder="用户ID或用户名" clearable style="width: 180px;" />
            </el-form-item>
            <el-form-item label="操作类型">
              <el-select v-model="logQuery.operationType" placeholder="请选择操作类型" clearable class="operation-type-select">
@@ -180,6 +180,7 @@ const handleMenuSelect = (index: string) => {
 
 // 日志相关方法 (保持不变)
 const fetchLogs = async () => { 
+    console.log('Fetching logs with query:', JSON.stringify(logQuery)); // 添加调试日志
     logLoading.value = true;
     try {
         const params: OperationLogQuery = {};

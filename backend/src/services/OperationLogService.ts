@@ -3,6 +3,7 @@ import { OperationLog, User } from '../models'; // 导入 OperationLog 和 User 
 import { PageResult } from '../utils/response'; // 假设有分页结果类型
 import { format } from 'date-fns'; // 用于格式化日期
 import { Request } from 'express';
+import sequelize from 'sequelize';
 
 // 导入枚举和类型
 import { 
@@ -32,7 +33,7 @@ export class OperationLogService {
         const limit = pageSize;
 
         const where: WhereOptions<OperationLog> = {};
-        const userWhere: WhereOptions<User> = {}; // 用于关联查询User表
+        let userFilterCondition: WhereOptions<User> | undefined = undefined;
 
         // 用户筛选 (可以是 ID 或模糊用户名)
         if (query.userId) {
@@ -40,12 +41,17 @@ export class OperationLogService {
             if (!isNaN(userIdNum)) {
                 where.userId = userIdNum; // 精确匹配用户ID
             } else {
-                // 模糊匹配用户名或真实姓名 - 需要关联 User 表
-                // 使用类型断言解决 Op.or 的类型问题
-                (userWhere as any)[Op.or] = [
-                    { username: { [Op.like]: `%${query.userId}%` } },
-                    { realName: { [Op.like]: `%${query.userId}%` } }
-                ];
+                // 只根据 realName 进行大小写不敏感的模糊匹配
+                // 直接构造 User 模型的 where 条件
+                userFilterCondition = {
+                    [Op.and]: [
+                        sequelize.where(
+                            sequelize.fn('LOWER', sequelize.col('user.real_name')), // 使用实际的数据库列名 real_name
+                            Op.like,
+                            '%' + String(query.userId).toLowerCase() + '%' // 将查询字符串转为小写并添加 %%
+                        )
+                    ]
+                };
             }
         }
 
@@ -82,7 +88,7 @@ export class OperationLogService {
 
 
         console.debug('[OperationLogService] Constructed WHERE clause:', JSON.stringify(where));
-        console.debug('[OperationLogService] Constructed User WHERE clause:', JSON.stringify(userWhere));
+        console.debug('[OperationLogService] Constructed User Filter Condition:', JSON.stringify(userFilterCondition));
         console.debug('[OperationLogService] Constructed ORDER clause:', JSON.stringify(order));
 
         try {
@@ -90,10 +96,10 @@ export class OperationLogService {
                 where,
                 include: [{
                     model: User,
-                    as: 'user', // 与模型定义中的关联别名一致
-                    attributes: ['username', 'realName'], // 获取用户名和真实姓名
-                    where: Object.keys(userWhere).length > 0 ? userWhere : undefined, // 仅当需要按用户名筛选时添加 where
-                    required: Object.keys(userWhere).length > 0 // 如果按用户名筛选，则需要内连接 (required: true)
+                    as: 'user',
+                    attributes: ['username', 'realName'],
+                    where: userFilterCondition,
+                    required: !!userFilterCondition
                 }],
                 order,
                 limit,
