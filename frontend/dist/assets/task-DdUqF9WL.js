@@ -1,0 +1,1 @@
+import{w as e}from"./index-BRnZ6Wrp.js";const r=t=>e.post("/documents/import",t);function s(t){return e.post("/documents/export",t)}function n(t){return e.get("/export-tasks",{params:t})}function p(t){return e.get(`/export-tasks/${t}/download`,{responseType:"blob"})}export{r as a,p as d,n as g,s as r};
