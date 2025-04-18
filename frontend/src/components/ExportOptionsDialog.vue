@@ -54,10 +54,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineExpose, defineEmits, watch } from 'vue'
+import { ref, computed, defineExpose, defineEmits} from 'vue'
 import { ElMessage, ElCheckboxGroup, ElCheckbox, ElRow, ElCol, ElRadioGroup, ElRadio, ElButton, ElDialog, ElForm, ElFormItem } from 'element-plus'
 import { requestExport } from '@/services/api/task'
-import type { ExportRequestParams, ExportScope, DocumentExportRequestParams } from '@/types/export';
+import type { ExportScope, DocumentExportRequestParams } from '@/types/export';
 import type { DocumentListQuery } from '@/types/document';
 
 interface FieldOption {
@@ -192,16 +192,20 @@ const handleSubmit = async () => {
 
     console.log('[Debug] Export Request Params:', JSON.stringify(params));
 
-    const resultData = await requestExport(params);
+    // Assume requestExport returns the payload directly after interceptor handling
+    // The expected payload should contain taskId
+    const resultPayload = await requestExport(params);
 
-    if (resultData && typeof resultData.taskId === 'number') {
+    // Check if the payload itself contains the taskId
+    if (resultPayload && typeof resultPayload.taskId === 'number') { 
       console.log('[Debug] handleSubmit: Success path executing.');
       ElMessage.success('导出任务已创建，请稍后在"导出任务"页面查看进度和下载。');
-      emit('export-started', resultData.taskId);
+      emit('export-started', resultPayload.taskId); // Use taskId from the payload
       handleClose();
     } else {
-      console.error('Invalid data structure received after creating export task:', resultData);
-      console.log('[Debug] handleSubmit: Invalid data structure path executing.');
+      // Log the actual payload received
+      console.error('Invalid payload structure received after creating export task:', resultPayload); 
+      console.log('[Debug] handleSubmit: Invalid payload structure path executing.');
       ElMessage.error('创建导出任务失败：响应数据异常');
     }
   } catch (error: any) {

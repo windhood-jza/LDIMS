@@ -1,9 +1,9 @@
 // LDIMS/frontend/src/services/api/system.ts
 import request from '../request'; // 导入封装的 axios 实例
 // 导入需要的类型 (假设后端类型已通过别名配置或相对路径导入)
-import type { SystemConfigMap } from '@backend-types/services/SystemConfigService'; // 需要确认后端类型路径或定义前端副本
-import type { OperationLogQuery, OperationLogInfo } from '@backend-types/services/OperationLogService'; // 需要确认后端类型路径或定义前端副本
-import type { PageResult } from '@backend-types/utils/response'; // 需要确认后端类型路径或定义前端副本
+import type { SystemConfigMap } from '@/types/api'; // 从前端 types/api 导入
+import type { OperationLogQuery, OperationLogInfo } from '@backend-types/operationLog'; // 指向后端 operationLog 类型
+import type { PageResult } from '@/types/common'; // 从前端 types/common 导入
 
 /**
  * @description 获取所有系统配置项

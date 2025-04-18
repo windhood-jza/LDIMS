@@ -95,7 +95,8 @@ const router = createRouter({
 });
 
 // --- 路由守卫 ---
-router.beforeEach((to, from, next) => {
+// Prefixed unused 'from' below (was line 98)
+router.beforeEach((to, _from, next) => { 
   const isAuthenticated = !!localStorage.getItem('authToken');
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiredRoles = to.meta.roles as string[] | undefined; // 获取路由所需的角色

@@ -1,12 +1,14 @@
 import request from '../request';
 import type { UserInfo } from '@backend-types/user';
+import type { PageResult } from '@/types/common';
 
 /**
  * 获取用户列表
  * @param params 查询参数
+ * @returns Promise containing the page result { list, total }
  */
-export const getUsers = (params: any) => {
-  return request.get('/users', { params });
+export const getUsers = (params: any): Promise<PageResult<UserInfo>> => {
+  return request.get<PageResult<UserInfo>>('/users', { params });
 };
 
 /**

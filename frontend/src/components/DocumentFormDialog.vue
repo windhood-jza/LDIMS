@@ -17,8 +17,8 @@
     >
       <el-row :gutter="20">
         <el-col :span="12">
-          <el-form-item label="文档名称" prop="docName">
-            <el-input v-model="formData.docName" placeholder="请输入文档名称" :disabled="isViewMode"/>
+          <el-form-item label="文档名称" prop="doc_name">
+            <el-input v-model="formData.doc_name" placeholder="请输入文档名称" :disabled="isViewMode"/>
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -153,7 +153,7 @@ const isEditingDepartment = ref(false);
 // 表单数据 (类型应与 Create/Update 请求 DTO 匹配)
 // 使用函数返回初始状态，方便重置
 const getInitialFormData = () => ({
-  docName: '',
+  doc_name: '',
   docTypeId: null as number | null, // ID for submission ONLY when changed
   docTypeName: '' as string | null, // Name from database record
   sourceDepartmentId: null as number | null, // ID for submission ONLY when changed
@@ -178,7 +178,7 @@ const treeProps = { value: 'id', label: 'name', children: 'children' };
 
 // --- 表单验证规则 (Focus on name/other required fields) ---
 const rules = reactive<FormRules>({
-  docName: [{ required: true, message: '请输入文档名称', trigger: 'blur' }],
+  doc_name: [{ required: true, message: '请输入文档名称', trigger: 'blur' }],
   // Validate names if necessary, or rely on backend validation
   // docTypeName: [{ required: true, message: '文档类型不能为空', trigger: 'change' }], 
   // sourceDepartmentName: [{ required: true, message: '来源部门不能为空', trigger: 'change' }],
@@ -202,51 +202,80 @@ const open = (type: 'add' | 'edit' | 'view', data?: DocumentInfo) => {
   dialogVisible.value = true;
   loading.value = false;
   currentId.value = null;
-  // Reset editing state
-  isEditingDocType.value = false; 
-  isEditingDepartment.value = false;
+  
+  // Initialize editing state based on mode
+  isEditingDocType.value = (type === 'add');     // True for add, false for edit/view
+  isEditingDepartment.value = (type === 'add'); // True for add, false for edit/view
+
+  // Helper function to safely parse potential string IDs to number | null
+  const parseId = (id: number | string | undefined | null): number | null => {
+    if (id === undefined || id === null || id === '') {
+      return null;
+    }
+    if (typeof id === 'number') {
+      return id;
+    }
+    const parsed = parseInt(id, 10);
+    return isNaN(parsed) ? null : parsed;
+  };
 
   nextTick(() => {
      formRef.value?.resetFields();
-     // Reset formData, including IDs to null initially
      Object.assign(formData, getInitialFormData());
-     // console.log('[Dialog] FormData after reset:', JSON.parse(JSON.stringify(formData))); // Keep this log if useful
+     console.log('[Dialog] FormData after reset:', JSON.parse(JSON.stringify(formData)));
 
      if ((type === 'edit' || type === 'view') && data) {
-       console.log('[Dialog - open] Received data:', JSON.parse(JSON.stringify(data))); // <<< Log 1: Raw data
-       currentId.value = data.id;
+       console.log('[Dialog] Populating form for edit/view. Data ID:', data.id);
+       console.log('[Dialog] Data docTypeId:', data.docTypeId, typeof data.docTypeId);
+       console.log('[Dialog] Data sourceDepartmentId:', data.sourceDepartmentId, typeof data.sourceDepartmentId);
 
-       // Directly assign names from data
-       console.log(`[Dialog - open] Assigning docTypeName from data: '${data.docTypeName}'`); // <<< Log 2: docTypeName value
-       formData.docName = data.docName;
-       formData.docTypeName = data.docTypeName;
-
-       console.log(`[Dialog - open] Assigning sourceDepartmentName from data: '${data.departmentName}'`); // <<< Log 3: departmentName value
-       formData.sourceDepartmentName = data.departmentName; // Use departmentName from DocumentInfo
-
-       formData.submitter = data.submitter;
-       formData.receiver = data.receiver;
-       formData.signer = data.signer;
-       formData.storageLocation = data.storageLocation;
-       formData.handoverDate = data.handoverDate ? new Date(data.handoverDate).toISOString().split('T')[0] : null;
+       // FIX: Assign null if data.id is undefined
+       currentId.value = data.id ?? null; 
+       // Populate formData directly, handling types explicitly
+       formData.doc_name = data.doc_name ?? '';
+       formData.submitter = data.submitter ?? '';
+       formData.receiver = data.receiver ?? '';
+       formData.signer = data.signer ?? null;
+       formData.storageLocation = data.storageLocation ?? null;
+       formData.handoverDate = data.handoverDate ?? null;
        formData.remarks = data.remarks ?? '';
+       
+       // Parse IDs into explicitly typed temporary variables, using type assertion
+       // (Keeping the assertion as it seemed necessary before, though might be redundant now)
+       const parsedDocTypeId: number | null = parseId(data.docTypeId) as number | null;
+       const parsedSourceDepartmentId: number | null = parseId(data.sourceDepartmentId) as number | null;
 
-       // Reset IDs - they will only be set if user selects a new value
-       formData.docTypeId = null;
-       formData.sourceDepartmentId = null;
+       // Assign from temporary variables
+       formData.docTypeId = parsedDocTypeId;
+       formData.sourceDepartmentId = parsedSourceDepartmentId;
+       
+       formData.docTypeName = data.docTypeName ?? null;
+       // Use departmentName from the list data
+       formData.sourceDepartmentName = data.departmentName ?? null; 
 
-       console.log('[Dialog - open] FormData populated for edit/view:', JSON.parse(JSON.stringify(formData))); // <<< Log 4: Final formData
-     } else if (type === 'add') {
-         // Ensure names and IDs are null/empty for add mode
-         formData.docTypeName = null;
-         formData.sourceDepartmentName = null;
-         formData.docTypeId = null;
-         formData.sourceDepartmentId = null;
-         // Enter editing state immediately for add mode
-         isEditingDocType.value = true; 
-         isEditingDepartment.value = true;
+       console.log('[Dialog] FormData after population:', JSON.parse(JSON.stringify(formData)));
+
+       // Checks related to tree data (ensure IDs passed are numbers or null)
+       const docTypeIdForCheck = parseId(data.docTypeId);
+       const deptIdForCheck = parseId(data.sourceDepartmentId);
+
+       const typeNodeExists = props.docTypeTreeData?.some(node => checkNodeExists(node, docTypeIdForCheck));
+       const deptNodeExists = props.departmentTreeData?.some(node => checkNodeExists(node, deptIdForCheck));
+       console.log(`[Dialog] Node exists check in docTypeTreeData for ID ${data.docTypeId}?`, typeNodeExists);
+       console.log(`[Dialog] Node exists check in departmentTreeData for ID ${data.sourceDepartmentId}?`, deptNodeExists);
+
      }
   });
+};
+
+// 辅助函数：递归检查树中是否存在某个 ID
+const checkNodeExists = (node: any, targetId: number | null | undefined): boolean => {
+    if (!node || targetId === null || targetId === undefined) return false;
+    if (node.id === targetId) return true;
+    if (node.children && node.children.length > 0) {
+        return node.children.some((child: any) => checkNodeExists(child, targetId));
+    }
+    return false;
 };
 
 // --- TreeSelect Change 事件处理：更新 ID 和 Name ---
@@ -296,35 +325,36 @@ const handleSubmit = async () => {
     await formRef.value.validate();
     loading.value = true;
 
-    // Prepare data for submission
-    const submitData: Partial<CreateDocumentRequest | UpdateDocumentRequest> = {
-        // Include all potentially changed fields
-        docName: formData.docName,
-        submitter: formData.submitter,
-        receiver: formData.receiver,
-        signer: formData.signer,
-        storageLocation: formData.storageLocation,
-        handoverDate: formData.handoverDate,
-        remarks: formData.remarks,
-        // Include IDs - backend will use these if present to update names
-        docTypeId: formData.docTypeId, 
-        sourceDepartmentId: formData.sourceDepartmentId,
-        // Optionally include names too, depending on backend implementation
-        // docTypeName: formData.docTypeName, 
-        // sourceDepartmentName: formData.sourceDepartmentName,
+    // Build payload based on mode
+    let payload: Partial<CreateDocumentRequest | UpdateDocumentRequest> = {
+      docName: formData.doc_name,
+      submitter: formData.submitter,
+      receiver: formData.receiver,
+      signer: formData.signer ?? undefined,
+      storageLocation: formData.storageLocation ?? undefined,
+      handoverDate: formData.handoverDate,
+      remarks: formData.remarks,
+      // Use names based on updated document.ts type definitions (Keep these if backend uses them)
+      // docTypeName: formData.docTypeName ?? undefined, 
+      // sourceDepartmentName: formData.sourceDepartmentName ?? undefined, 
+      // Ensure IDs are included for creation/update
+      docTypeId: formData.docTypeId,          // <-- Include docTypeId
+      sourceDepartmentId: formData.sourceDepartmentId // <-- Include sourceDepartmentId
     };
     
-    // Remove null IDs if backend expects undefined or omitted fields for no change
-    if (submitData.docTypeId === null) delete submitData.docTypeId;
-    if (submitData.sourceDepartmentId === null) delete submitData.sourceDepartmentId;
+    // Remove properties that are explicitly null or empty string if backend prefers omission
+    // Example (adjust based on backend needs):
+    // if (submitData.signer === null) delete submitData.signer;
+    // if (submitData.storageLocation === null) delete submitData.storageLocation;
 
-    console.log('[Dialog] Submitting data:', submitData);
+    console.log('[Dialog] Submitting data:', payload);
 
     if (mode.value === 'add') {
-      await createDocument(submitData as CreateDocumentRequest);
+      await createDocument(payload as CreateDocumentRequest);
       ElMessage.success('文档新增成功');
     } else if (mode.value === 'edit' && currentId.value) {
-      await updateDocument(currentId.value, submitData as UpdateDocumentRequest);
+      // Pass currentId.value safely, although it should be number here
+      await updateDocument(currentId.value, payload as UpdateDocumentRequest);
       ElMessage.success('文档更新成功');
     }
 

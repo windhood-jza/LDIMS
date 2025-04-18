@@ -49,7 +49,7 @@
               <span>部门信息</span>
               <div>
                 <el-button
-                  :icon="RefreshLeft" 
+                  :icon="RefreshLeft"
                   @click="resetForm"
                   :disabled="!selectedDepartment"
                 >
@@ -58,17 +58,17 @@
                 <el-button
                   type="danger"
                   :icon="Delete"
-                  @click="handleDelete(selectedDepartment!)" 
+                  @click="handleDelete(selectedDepartment!)"
                   :disabled="!selectedDepartment || !selectedDepartment.id"
                   style="margin-left: 10px;"
                 >
                   删除
                 </el-button>
-                <el-button 
-                  type="primary" 
-                  :icon="Check" 
-                  @click="handleSave" 
-                  :loading="formLoading" 
+                <el-button
+                  type="primary"
+                  :icon="Check"
+                  @click="handleSave"
+                  :loading="formLoading"
                   :disabled="!selectedDepartment || !selectedDepartment.id"
                   style="margin-left: 10px;"
                 >
@@ -138,11 +138,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed } from 'vue';
+// Re-added 'nextTick' import below (was line 141)
+import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'; 
 import { ElTree, ElCard, ElRow, ElCol, ElButton, ElInput, ElForm, ElFormItem, ElEmpty, ElTreeSelect, ElInputNumber, ElDialog, ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Delete, RefreshLeft, Check } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
-import type Node from 'element-plus/es/components/tree/src/model/node'; // 类型
+// import type Node from 'element-plus/es/components/tree/src/model/node'; 
 import { getDepartmentTree, createDepartment, updateDepartment, deleteDepartment } from '@/services/api/department';
 import type { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '@backend-types/department';
 import { format, parseISO } from 'date-fns';
@@ -188,41 +189,65 @@ const dialogTitle = computed(() => dialogMode.value === 'addTopLevel' ? '新增�
 // 简单的将树转为TreeSelect需要的数据，并标记自身及子孙不可选 (编辑时)
 const treeSelectData = computed(() => {
     const disableNodes = (nodes: DepartmentInfo[], nodeToDisableId: number | undefined): any[] => {
-        if (!nodeToDisableId) return nodes; // 新增顶级时不禁
+        if (!nodes) return []; // Handle case where nodes might be undefined initially
         return nodes.map(node => {
             let disabled = false;
             if (node.id === nodeToDisableId) {
                  disabled = true;
             }
             const children = node.children ? disableNodes(node.children, nodeToDisableId) : undefined;
-            // 如果父节点被禁用，则所有子节点也应被禁用 (虽然check-strictly允许选择)
-            if (children?.some(c => c.disabled || c.id === nodeToDisableId)) {
-               // Simplified check - a more robust check would traverse up
-               // In check-strictly mode, disabling parent doesn't automatically disable children selection
-               // We disable direct selection of self
-            }
 
-             // Disable self
-            if (node.id === departmentForm.id) {
+            // Recursive check to disable children if any ancestor is the node being edited
+            const isDescendantOfDisabled = (currentNode: DepartmentInfo, targetId: number | undefined): boolean => {
+                if (!targetId) return false;
+                if (currentNode.parentId === targetId) return true;
+                if (currentNode.parentId === null || currentNode.parentId === undefined) return false;
+
+                const parentNode = findNodeById(departmentTree.value, currentNode.parentId);
+                if (parentNode) {
+                    return isDescendantOfDisabled(parentNode, targetId);
+                }
+                return false;
+            };
+
+            // Disable self and all descendants
+            if (node.id === departmentForm.id || isDescendantOfDisabled(node, departmentForm.id)) {
                 disabled = true;
             }
 
-            return { ...node, children, disabled };
+            return { ...node, id: node.id, name: node.name, children, disabled }; // Ensure basic properties exist
         });
     };
+
+    // Helper to find node by ID in the original tree (needed for ancestor check)
+    const findNodeById = (nodes: DepartmentInfo[] | undefined, id: number): DepartmentInfo | null => {
+        if (!nodes) return null;
+        for (const node of nodes) {
+            if (node.id === id) return node;
+            if (node.children) {
+                const found = findNodeById(node.children, id);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
     // 在编辑模式下，禁用当前节点及其所有子节点作为父节点
     return disableNodes(departmentTree.value, departmentForm.id);
 });
 
 // 是否正在编辑部门且试图将其父级设为自身或子级 (简化判断)
 const isEditingSelfOrChild = computed(() => {
-  return !!departmentForm.id; // 简化：编辑时总是禁用 TreeSelect 的自身节点
+  // This computation is now handled within treeSelectData by disabling nodes.
+  // Keeping the computed property might be useful for other logic if needed.
+  return !!departmentForm.id;
 });
 
 
 // --- Form Rules ---
 const formRules = reactive<FormRules>({
   name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }],
+  // parentId might need validation if required, but typically null means top-level
 });
 const dialogFormRules = reactive<FormRules>({
     name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }],
@@ -230,12 +255,15 @@ const dialogFormRules = reactive<FormRules>({
 
 // --- Methods ---
 // 格式化日期时间
-const formatDateTime = (dateTimeString?: string) => {
+const formatDateTime = (dateTimeString?: string | null) => { // Allow null
   if (!dateTimeString) return 'N/A';
   try {
+    // Removed instanceof check (was line 264)
+    // Attempt to parse ISO string directly
     return format(parseISO(dateTimeString), 'yyyy-MM-dd HH:mm:ss');
   } catch (e) {
-    return dateTimeString;
+     console.error("Error parsing date:", dateTimeString, e); // Log error
+    return dateTimeString; // Return original string if parsing fails
   }
 };
 
@@ -244,74 +272,142 @@ const fetchTree = async () => {
   treeLoading.value = true;
   try {
     departmentTree.value = await getDepartmentTree();
+    console.log("Fetched department tree:", JSON.stringify(departmentTree.value, null, 2)); // Log fetched data
     // 如果有选中的节点，更新选中节点的信息
-    if (selectedDepartment.value) {
+    if (selectedDepartment.value && selectedDepartment.value.id !== undefined) {
       updateSelectedDepartmentInfo(selectedDepartment.value.id);
+    } else {
+        selectedDepartment.value = null; // Clear selection if previous selection is invalid
+        resetForm(); // Reset form if no valid selection
     }
   } catch (error) {
-    ElMessage.error('加载部门树失败');
-    console.error(error);
+      console.error("加载部门树失败:", error);
+      ElMessage.error("加载部门树失败");
+      departmentTree.value = []; // Clear tree on error
   } finally {
     treeLoading.value = false;
   }
 };
 
-// 过滤树节点
-const filterNode = (value: string, data: DepartmentInfo) => {
-  if (!value) return true;
-  return data.name.includes(value);
-};
-
-// 监听过滤文本变化
-watch(filterText, (val) => {
-  treeRef.value?.filter(val);
-});
-
-// 更新右侧表单数据
-const updateForm = (data: DepartmentInfo | null) => {
-    selectedDepartment.value = data;
-    if (data) {
-        departmentForm.id = data.id;
-        departmentForm.name = data.name;
-        departmentForm.parentId = data.parentId;
-        departmentForm.sortOrder = data.sortOrder ?? 0;
-    } else {
-        departmentForm.id = undefined;
-        departmentForm.name = '';
-        departmentForm.parentId = null;
-        departmentForm.sortOrder = 0;
-        formRef.value?.resetFields(); // 清除校验
-    }
-};
-
-// 树节点点击
-const handleNodeClick = (data: DepartmentInfo) => {
-  updateForm(data);
-};
-
-// 更新选中部门的信息 (在树刷新后保持选中状态和表单数据)
+// 根据 ID 查找并更新右侧表单的选中部门信息
 const updateSelectedDepartmentInfo = (id: number) => {
-    const findNode = (nodes: DepartmentInfo[]): DepartmentInfo | null => {
+    const findNode = (nodes: DepartmentInfo[], targetId: number): DepartmentInfo | null => {
         for (const node of nodes) {
-            if (node.id === id) return node;
+            if (node.id === targetId) {
+                return node;
+            }
             if (node.children) {
-                const found = findNode(node.children);
+                const found = findNode(node.children, targetId);
                 if (found) return found;
             }
         }
         return null;
     };
-    const nodeData = findNode(departmentTree.value);
-    updateForm(nodeData);
-     if (nodeData) {
-        treeRef.value?.setCurrentKey(id); // 保持高亮
+    const node = findNode(departmentTree.value, id);
+    if (node) {
+        selectedDepartment.value = { ...node }; // Use spread to avoid reactivity issues
+        // Update form data reactively
+        departmentForm.id = node.id;
+        departmentForm.name = node.name;
+        departmentForm.parentId = node.parentId;
+        departmentForm.sortOrder = node.sortOrder;
+        // Add console log here
+        console.log(`[DepartmentManagement] Assigned value to departmentForm.sortOrder: ${departmentForm.sortOrder}`);
+        // Clear validation state after updating form
+        nextTick(() => { // Use nextTick
+           formRef.value?.clearValidate();
+        });
+    } else {
+        // Node not found after fetch (e.g., deleted), clear selection
+        selectedDepartment.value = null;
+        resetForm();
     }
 };
 
 
-// --- CRUD Operations ---
+// 监听过滤文本变化
+watch(filterText, (val) => {
+  treeRef.value!.filter(val);
+});
 
-// 重置对话框表单
+// 过滤节点方法
+// Changed 'data' type to 'any' below (was line 342)
+const filterNode = (value: string, data: any): boolean => { 
+  if (!value) return true;
+  // Assume data has a 'name' property for filtering
+  return data.name?.includes(value); 
+};
+
+// 节点点击事件
+const handleNodeClick = (data: DepartmentInfo) => { // Use DepartmentInfo
+  console.log("Node clicked:", data);
+  selectedDepartment.value = { ...data }; // Use spread operator
+  // Update form data
+  departmentForm.id = data.id;
+  departmentForm.name = data.name;
+  departmentForm.parentId = data.parentId;
+  departmentForm.sortOrder = data.sortOrder;
+   // Clear validation state when node changes
+   nextTick(() => { // Use nextTick
+      formRef.value?.clearValidate();
+   });
+};
+
+// 重置表单
+const resetForm = () => {
+  if (selectedDepartment.value) {
+    // Reset form to selected department's data
+    departmentForm.id = selectedDepartment.value.id;
+    departmentForm.name = selectedDepartment.value.name;
+    departmentForm.parentId = selectedDepartment.value.parentId;
+    departmentForm.sortOrder = selectedDepartment.value.sortOrder;
+     // Clear validation state after resetting
+     nextTick(() => { // Use nextTick
+        formRef.value?.clearValidate();
+     });
+  } else {
+     // Clear form if nothing is selected
+     departmentForm.id = undefined;
+     departmentForm.name = '';
+     departmentForm.parentId = null;
+     departmentForm.sortOrder = 0;
+     formRef.value?.resetFields(); // Also call resetFields for initial state
+  }
+};
+
+
+// 保存部门信息
+const handleSave = async () => {
+  if (!formRef.value || !selectedDepartment.value || departmentForm.id === undefined) return;
+
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      formLoading.value = true;
+      try {
+        const updateData: UpdateDepartmentRequest = {
+          name: departmentForm.name,
+          parentId: departmentForm.parentId,
+          sortOrder: departmentForm.sortOrder ?? 0, // Provide default if possibly undefined
+        };
+        await updateDepartment(departmentForm.id!, updateData); // Assert non-null ID
+        ElMessage.success('部门信息保存成功');
+        await fetchTree(); // 重新加载树以更新信息
+        // Keep the node selected after save if needed
+        // updateSelectedDepartmentInfo(departmentForm.id!); // Re-fetch potentially updated data
+      } catch (error: any) {
+         console.error("保存部门信息失败:", error);
+         ElMessage.error(error.message || '保存失败');
+      } finally {
+        formLoading.value = false;
+      }
+    }
+  });
+};
+
+
+// --- 新增/删除相关方法 ---
+
+// 重置新增对话框表单
 const resetDialogForm = () => {
     dialogForm.name = '';
     dialogForm.parentId = null;
@@ -321,118 +417,100 @@ const resetDialogForm = () => {
 
 // 打开新增顶级部门对话框
 const handleAddTopLevel = () => {
+    resetDialogForm();
     dialogMode.value = 'addTopLevel';
     dialogParentId.value = null;
     dialogParentName.value = '无 (顶级部门)';
-    resetDialogForm();
     dialogVisible.value = true;
 };
 
 // 打开新增子部门对话框
 const handleAddChild = (data: DepartmentInfo) => {
-    dialogMode.value = 'addChild';
-    dialogParentId.value = data.id;
-    dialogParentName.value = data.name;
     resetDialogForm();
-    dialogForm.parentId = data.id; // 设置父ID
+    dialogMode.value = 'addChild';
+    dialogParentId.value = data.id ?? null; // Use null if id is somehow undefined
+    dialogParentName.value = data.name;
+    dialogForm.parentId = data.id ?? null; // Pre-fill parentId
     dialogVisible.value = true;
 };
 
 
-// 处理对话框提交 (新增)
+// 处理新增对话框提交
 const handleDialogSubmit = async () => {
-    if (!dialogFormRef.value) return;
-    await dialogFormRef.value.validate(async (valid) => {
-        if (valid) {
-            dialogLoading.value = true;
-             dialogForm.parentId = dialogParentId.value; // 确认父ID
-            try {
-                await createDepartment(dialogForm);
-                ElMessage.success('部门创建成功');
-                dialogVisible.value = false;
-                await fetchTree(); // 刷新树
-            } catch (error: any) {
-                 ElMessage.error(error.message || '部门创建失败');
-                 console.error(error);
-            } finally {
-                dialogLoading.value = false;
-            }
-        }
-    });
+     if (!dialogFormRef.value) return;
+
+     await dialogFormRef.value.validate(async (valid) => {
+         if (valid) {
+             dialogLoading.value = true;
+             try {
+                 const createData: CreateDepartmentRequest = {
+                     name: dialogForm.name,
+                     parentId: dialogParentId.value, // Use the stored parent ID
+                     sortOrder: dialogForm.sortOrder ?? 0,
+                 };
+                 console.log('[DepartmentManagement] Creating department with data:', JSON.stringify(createData)); 
+                 await createDepartment(createData);
+                 ElMessage.success('部门创建成功');
+                 dialogVisible.value = false;
+                 await fetchTree(); // 重新加载树
+                 // Optionally select the newly created node? Requires getting its ID back.
+             } catch (error: any) {
+                 console.error("创建部门失败:", error);
+                 ElMessage.error(error.message || '创建失败');
+             } finally {
+                 dialogLoading.value = false;
+             }
+         }
+     });
 };
 
-
-// 保存表单 (更新)
-const handleSave = async () => {
-  if (!formRef.value || !selectedDepartment.value) return;
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      formLoading.value = true;
-      const updateData: UpdateDepartmentRequest = {
-          name: departmentForm.name,
-          parentId: departmentForm.parentId,
-          sortOrder: departmentForm.sortOrder
-      };
-      try {
-        await updateDepartment(selectedDepartment.value!.id, updateData);
-        ElMessage.success('部门信息更新成功');
-        // 保存后需要刷新树，因为 parentName 可能改变
-        const currentSelectedId = selectedDepartment.value!.id; // 保存当前ID
-        await fetchTree();
-        // 刷新后重新选中并更新表单
-        updateSelectedDepartmentInfo(currentSelectedId);
-
-      } catch (error: any) {
-          ElMessage.error(error.message || '部门信息更新失败');
-          console.error(error);
-      } finally {
-        formLoading.value = false;
-      }
-    }
-  });
-};
 
 // 删除部门
-const handleDelete = (data: DepartmentInfo) => {
-    ElMessageBox.confirm(
-        `确定要删除部门 "${data.name}" 吗？其子部门（如有）不会被删除，请先处理。`,
-        '警告',
-        {
-            confirmButtonText: '确定删除',
-            cancelButtonText: '取消',
-            type: 'warning',
-        }
-    ).then(async () => {
-        treeLoading.value = true; // 使用树的加载状态
-        try {
-            await deleteDepartment(data.id);
-            ElMessage.success('部门删除成功');
-             // 如果删除的是当前选中的部门，则清空表单
-            if (selectedDepartment.value && selectedDepartment.value.id === data.id) {
-                 updateForm(null);
-            }
-            await fetchTree(); // 刷新树
-        } catch (error: any) {
-             ElMessage.error(error.message || '删除部门失败');
-             console.error(error);
-        } finally {
-             treeLoading.value = false;
-        }
-    }).catch(() => {
-        ElMessage.info('已取消删除');
-    });
-};
+const handleDelete = async (data: DepartmentInfo) => {
+  if (!data || data.id === undefined) {
+      ElMessage.warning('无法删除：部门数据无效');
+      return;
+  }
+  // 检查是否有子部门
+  if (data.children && data.children.length > 0) {
+    ElMessage.warning('该部门下有子部门，请先删除子部门');
+    return;
+  }
 
-// 重置右侧表单为其原始选中状态
-const resetForm = () => {
-  if (selectedDepartment.value) {
-    updateForm(selectedDepartment.value);
-    formRef.value?.clearValidate(); // 清除可能的验证错误提示
-    ElMessage.info('表单已重置');
-  } else {
-     ElMessage.warning('请先选择一个部门');
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除部门 "${data.name}" 吗？此操作不可恢复。`,
+      '警告',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    formLoading.value = true; // Indicate loading state
+    await deleteDepartment(data.id);
+    ElMessage.success(`部门 "${data.name}" 删除成功`);
+
+    // 如果删除的是当前选中的部门，则清空右侧表单
+    if (selectedDepartment.value && selectedDepartment.value.id === data.id) {
+      selectedDepartment.value = null;
+      resetForm();
+    }
+
+    await fetchTree(); // 重新加载树
+
+  } catch (error: any) {
+    // Handle cancellation ('cancel') or actual error
+    if (error !== 'cancel') {
+       console.error("删除部门失败:", error);
+       ElMessage.error(error.message || '删除失败');
+    }
+  } finally {
+      formLoading.value = false;
   }
 };
+
 
 // --- Lifecycle ---
 onMounted(() => {
@@ -443,14 +521,25 @@ onMounted(() => {
 
 <style scoped>
 .department-management-page {
-  /* padding: 20px; */ /* Padding is on main-content now */
-  height: 100%; /* 让页面容器占满父容器高度 */
+  padding: 0;
 }
 
-/* 让 Row 和 Col 也占满高度 */
-.el-row,
-.el-col {
-  height: 100%;
+.el-card {
+  height: calc(100vh - 100px); /* Adjust based on layout */
+  display: flex;
+  flex-direction: column;
+}
+
+.el-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #ebeef5;
+  box-sizing: border-box;
+}
+
+.el-card :deep(.el-card__body) {
+   flex-grow: 1;
+   overflow-y: auto;
+   padding: 20px;
 }
 
 .card-header {
@@ -467,45 +556,35 @@ onMounted(() => {
   font-size: 14px;
   padding-right: 8px;
 }
-/* 控制按钮只在 hover 时显示 */
+
 .custom-tree-node span:last-child {
-    /* display: none; */ /* 改为一直显示可能更好操作 */
-    /* opacity: 0; */
-    /* transition: opacity 0.2s ease-in-out; */
+  margin-left: 10px;
+  display: none; /* Initially hide buttons */
 }
+
+/* Show buttons on hover */
 .el-tree-node__content:hover .custom-tree-node span:last-child {
-    /* display: inline-block; */
-    /* opacity: 1; */
+  display: inline-block;
 }
 
 .form-content {
-    /* margin-top: 20px; */ /* Card header 有 padding */
+    padding-top: 10px;
 }
 
-.el-form {
-    max-width: 95%; /* 稍微留点边距 */
-    /* max-width: 600px; */ /* Maybe too restrictive */
-}
-
-.el-card {
-    height: 100%; /* 让卡片占满 Col 高度 */
+.el-empty {
+    height: 100%;
     display: flex;
-    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
-:deep(.el-card__body) {
-    flex: 1; /* 让 body 填充剩余空间 */
-    overflow-y: auto; /* 内容超出时内部滚动 */
-    padding: 20px; /* 确保 body 有内边距 */
+/* Ensure TreeSelect dropdown is wide enough */
+:deep(.el-tree-select__popper) {
+    min-width: fit-content; /* Adjust as needed */
 }
 
-/* 隐藏滚动条但保留滚动功能 (适用于 Webkit 内核浏览器) */
-:deep(.el-card__body)::-webkit-scrollbar {
-  display: none;
+/* Dialog style */
+.dialog-footer {
+  text-align: right;
 }
-:deep(.el-card__body) {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-</style> 
+</style>

@@ -7,7 +7,6 @@ import type {
   UploadResponse,
   ImportRequestParams
 } from '@/types/export'
-import type { ApiResponse } from '@/types/api'
 
 /**
  * @description 上传 Excel 文件
@@ -37,10 +36,10 @@ export const requestImport = (params: ImportRequestParams): Promise<{ taskId: nu
 /**
  * @description 请求创建文档导出任务
  * @param params
- * @returns Promise<ApiResponse<{ taskId: number }>>
+ * @returns Promise<{ taskId: number }>
  */
-export function requestExport(params: DocumentExportRequestParams): Promise<ApiResponse<{ taskId: number }>> {
-  return request.post('/documents/export', params)
+export function requestExport(params: DocumentExportRequestParams): Promise<{ taskId: number }> {
+  return request.post<{ taskId: number }>('/documents/export', params)
 }
 
 /**

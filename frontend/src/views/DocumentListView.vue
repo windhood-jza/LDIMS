@@ -167,8 +167,8 @@
 
     <!-- 新增/编辑弹窗组件 -->
     <DocumentFormDialog
-      ref="documentFormDialogRef" 
-      :doc-type-tree-data="docTypeTree" 
+      ref="documentFormDialogRef"
+      :doc-type-tree-data="docTypeTree"
       :department-tree-data="departmentTree"
       @success="fetchData"
      />
@@ -183,7 +183,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue';
+// Removed nextTick from import
+import { ref, reactive, onMounted } from 'vue';
 import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect } from 'element-plus';
 import {
     Search,
@@ -194,14 +195,14 @@ import {
     Edit,
     Delete,
     View,
-    RefreshRight
+    // Removed RefreshRight icon
 } from '@element-plus/icons-vue';
 import type { DocumentInfo, DocumentListQuery } from '@/types/document';
 import type { TreeNode } from '@/types/common';
 import { getDocuments, deleteDocument } from '@/services/api/document';
 import { getDocTypeTree } from '@/services/api/doctype';
 import { getDepartmentTree } from '@/services/api/department';
-import { requestExport } from '@/services/api/task';
+// Removed requestExport import
 import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
 import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
 import ImportDialog from '@/components/ImportDialog.vue';
@@ -271,7 +272,7 @@ const fetchData = async (sortOptions?: Sort) => {
 
     // 调用 API
     const result = await getDocuments(params);
-    
+
     // --- 新增日志：打印最原始的 result ---
     console.log('[DocumentListView] Raw response from getDocuments service:', result);
 
@@ -352,11 +353,13 @@ const handleSortChange = (sort: Sort) => {
     }
 };
 
-const handleSizeChange = (val: number) => {
+// Prefixed val with underscore
+const handleSizeChange = (_val: number) => {
   fetchData();
 };
 
-const handleCurrentChange = (val: number) => {
+// Prefixed val with underscore
+const handleCurrentChange = (_val: number) => {
   fetchData();
 };
 
@@ -372,9 +375,6 @@ const openAddDialog = () => {
 
 const openEditDialog = (row: DocumentInfo) => {
   if (documentFormDialogRef.value) {
-      // 添加日志：检查传递给对话框的树数据
-      console.log('[ListView] Before opening edit dialog - docTypeTree:', JSON.stringify(docTypeTree.value));
-      console.log('[ListView] Before opening edit dialog - departmentTree:', JSON.stringify(departmentTree.value));
       documentFormDialogRef.value.open('edit', row);
   } else {
       console.error('DocumentFormDialog reference is null');
@@ -384,9 +384,6 @@ const openEditDialog = (row: DocumentInfo) => {
 
 const openViewDialog = (row: DocumentInfo) => {
   if (documentFormDialogRef.value) {
-      // 添加日志：检查传递给对话框的树数据
-      console.log('[ListView] Before opening view dialog - docTypeTree:', JSON.stringify(docTypeTree.value));
-      console.log('[ListView] Before opening view dialog - departmentTree:', JSON.stringify(departmentTree.value));
       documentFormDialogRef.value.open('view', row);
   } else {
       console.error('DocumentFormDialog reference is null');
@@ -395,15 +392,19 @@ const openViewDialog = (row: DocumentInfo) => {
 };
 
 const handleDelete = async (row: DocumentInfo) => {
+  if (typeof row.id !== 'number') {
+    ElMessage.error('无法删除：文档 ID 无效');
+    return;
+  }
   try {
-    await ElMessageBox.confirm(`确定要删除文档 "${row.docName}" 吗?`, '提示', {
+    await ElMessageBox.confirm(`确定要删除文档 "${row.docName || '未知名称'}" 吗?`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     });
     loading.value = true;
     await deleteDocument(row.id);
-    ElMessage.success(`删除文档 "${row.docName}" 成功`);
+    ElMessage.success(`删除文档 "${row.docName || '未知名称'}" 成功`);
     fetchData();
   } catch (error) {
     if (error !== 'cancel') {
@@ -416,13 +417,17 @@ const handleDelete = async (row: DocumentInfo) => {
 };
 
 const handleSelectionChange = (selection: DocumentInfo[]) => {
-  selectedDocumentIds.value = selection.map(item => item.id);
+  selectedDocumentIds.value = selection
+    .map(item => item.id)
+    .filter((id): id is number => typeof id === 'number');
   console.log('[Debug] DocumentListView: Selection changed, selected IDs:', selectedDocumentIds.value);
 };
 
 const handleExport = () => {
   if (exportOptionsDialogRef.value) {
-    const currentPageIds = tableData.value.map((item: DocumentInfo) => item.id);
+    const currentPageIds = tableData.value
+      .map((item: DocumentInfo) => item.id)
+      .filter((id): id is number => typeof id === 'number');
 
     exportOptionsDialogRef.value.open(
       searchForm,
@@ -517,7 +522,7 @@ const handleDepartmentNameInput = (value: string) => {
 .search-card {
   margin-bottom: 5px;
   :deep(.el-card__body) {
-    padding: 15px 15px 0 15px; 
+    padding: 15px 15px 0 15px;
   }
   border: none;
   box-shadow: none;
@@ -576,8 +581,8 @@ const handleDepartmentNameInput = (value: string) => {
 
 .filter-group {
   display: flex;
-  align-items: center; 
-  gap: 5px; 
+  align-items: center;
+  gap: 5px;
 }
 
 /* 移除之前可能干扰布局的 el-form-item__content 样式 */
@@ -597,4 +602,4 @@ const handleDepartmentNameInput = (value: string) => {
     align-items: center; /* 尝试垂直居中对齐 */
 }
 
-</style> 
+</style>

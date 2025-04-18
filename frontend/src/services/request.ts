@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ElMessage } from 'element-plus'; // 引入 Element Plus 消息提示
 
 // 读取环境变量，如果未定义则回退到默认值
@@ -39,7 +39,7 @@ instance.interceptors.request.use(
 
 // 响应拦截器 (用于统一处理错误)
 instance.interceptors.response.use(
-  (response) => {
+  (response: AxiosResponse) => {
     // API 响应的 data 部分
     const res = response.data;
 
@@ -67,8 +67,8 @@ instance.interceptors.response.use(
       } else {
           // 理论上不应进入这里，因为 HTTP 错误会在下面的 error 处理函数捕获
           // 但作为保险，还是 reject
-           ElMessage.error('收到意外的响应格式');
-           return Promise.reject(new Error('Unexpected response format'));
+           ElMessage.error('收到意外的响应格式或状态');
+           return Promise.reject(new Error('Unexpected response format or status'));
       }
     }
   },
@@ -111,4 +111,56 @@ instance.interceptors.response.use(
   }
 );
 
-export default instance; 
+// --- Start: Wrapper Implementation ---
+
+// Define a type for the functions we want to expose
+interface RequestFunction {
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+}
+
+// Create the wrapped request object
+const wrappedRequest: RequestFunction = {
+  /**
+   * Performs a GET request.
+   * The type parameter T represents the expected type *after* the response interceptor.
+   */
+  get: <T = any>(url: string, config?: AxiosRequestConfig) => 
+    instance.get<any, T>(url, config), // Axios generic is <ReqData, ResDataInterceptorHandled>
+
+  /**
+   * Performs a POST request.
+   * The type parameter T represents the expected type *after* the response interceptor.
+   */
+  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
+    instance.post<any, T>(url, data, config),
+
+  /**
+   * Performs a PUT request.
+   * The type parameter T represents the expected type *after* the response interceptor.
+   */
+  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
+    instance.put<any, T>(url, data, config),
+
+  /**
+   * Performs a DELETE request.
+   * The type parameter T represents the expected type *after* the response interceptor (often void).
+   */
+  delete: <T = any>(url: string, config?: AxiosRequestConfig) => 
+    instance.delete<any, T>(url, config),
+
+  /**
+   * Performs a PATCH request.
+   * The type parameter T represents the expected type *after* the response interceptor.
+   */
+  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
+    instance.patch<any, T>(url, data, config),
+};
+
+// Export the wrapped object instead of the raw instance
+export default wrappedRequest;
+
+// --- End: Wrapper Implementation --- 

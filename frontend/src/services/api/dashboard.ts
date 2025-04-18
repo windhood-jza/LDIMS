@@ -1,6 +1,6 @@
 import request from '../request';
 // 导入仪表盘数据类型 (确保路径或别名正确)
-import type { DashboardSummaryData } from '@backend-types/types/dashboard'; // 假设后端类型在 types 目录下
+import type { DashboardSummaryData } from '@backend-types/dashboard'; // 指向后端 dashboard 类型
 
 /**
  * @description 获取仪表盘汇总数据

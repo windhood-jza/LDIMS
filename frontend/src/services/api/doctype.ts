@@ -1,30 +1,47 @@
 import request from '../request';
+import { ElMessage } from 'element-plus';
 import type { DocTypeInfo, CreateDocTypeRequest, UpdateDocTypeRequest } from '@backend-types/doctype';
 // import type { ApiResponse } from '../request';
 
-// 假设树节点的接口定义
-interface TreeNode {
-    id: number;
-    name: string;
-    children?: TreeNode[];
-    // 可能包含其他属性
-}
+/**
+ * 递归映射树数据到 DocTypeInfo 结构
+ * @param nodes 原始树节点数组
+ * @returns DocTypeInfo[] 结构数组
+ */
+const mapTreeDataToDocTypeInfo = (nodes: any[]): DocTypeInfo[] => {
+  if (!nodes || !Array.isArray(nodes)) {
+    return [];
+  }
+  return nodes.map(node => ({
+    // 必需属性 (基于错误日志和通用假设)
+    id: node.id,
+    name: node.name,
+    parentId: node.parentId === undefined ? null : node.parentId,
+    sort: node.sortOrder ?? node.sort ?? 0, // 假设后端可能叫 sortOrder 或 sort
+    // 可选属性 (如果后端返回)
+    level: node.level,
+    description: node.description,
+    createdBy: node.createdBy,
+    // 必需的时间戳 (需要提供默认值以防后端不返回)
+    createdAt: node.createdAt || new Date().toISOString(),
+    updatedAt: node.updatedAt || new Date().toISOString(),
+    // 递归处理子节点
+    children: mapTreeDataToDocTypeInfo(node.children),
+  }));
+};
 
 /**
  * 获取文档类型树
- * @returns Promise 包含文档类型树数组
+ * @returns Promise 包含 DocTypeInfo 结构的文档类型树数组
  */
-export const getDocTypeTree = async (): Promise<TreeNode[]> => {
+export const getDocTypeTree = async (): Promise<DocTypeInfo[]> => {
     try {
-        // 假设 request 直接返回需要的数据结构 (数组)
-        const response: TreeNode[] = await request({
-            url: '/doctypes/tree',
-            method: 'get',
-        });
-        return response || [];
+        // 使用 wrappedRequest.get<T>，T 是期望拦截器处理后返回的类型 (any[] 在这里是合理的，因为需要映射)
+        const responseData = await request.get<any[]>('/doctypes/tree');
+        // responseData 现在直接是拦截器返回的树形数据数组
+        return mapTreeDataToDocTypeInfo(responseData || []); 
     } catch (error) {
         console.error("API Error fetching doctype tree:", error);
-        // 返回空数组，让界面能正常渲染，并通过 ElMessage 提示用户
         ElMessage.error('获取文档类型树失败');
         return [];
     }

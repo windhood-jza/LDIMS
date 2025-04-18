@@ -272,20 +272,16 @@ const renderDocTypeChart = (data: DashboardSummaryData['charts']['docsByType']) 
           series: [{
             type: 'treemap',
             data: treeData,
-            width: '95%',
-            height: '95%',
-            top: '2.5%',
-            left: '2.5%',
-            // 配置圆角和间距
+            width: '90%',
+            height: '85%',
+            top: 'center',
+            left: 'center',
             breadcrumb: { show: false },
             roam: false,
             nodeClick: false,
-            squareRatio: 0.8, // 控制矩形比例
-            gap: 3, // 设置矩形间距
             itemStyle: {
-              borderRadius: 4,
+              borderColor: '#fff',
               borderWidth: 1,
-              gapWidth: 2
             },
             label: {
               show: true,
@@ -301,15 +297,13 @@ const renderDocTypeChart = (data: DashboardSummaryData['charts']['docsByType']) 
             levels: [
               {
                 itemStyle: {
-                  borderWidth: 0,
-                  gapWidth: 4
+                  borderColor: '#fff',
+                  borderWidth: 2,
                 }
               },
               {
                 itemStyle: {
-                  borderRadius: 5,
-                  borderWidth: 2,
-                  gapWidth: 4
+                  borderColorSaturation: 0.6
                 }
               }
             ]
@@ -512,20 +506,16 @@ const renderDepartmentChart = (data: DashboardSummaryData['charts']['docsByDepar
           series: [{
             type: 'treemap',
             data: treeData,
-            width: '95%',
-            height: '95%',
-            top: '2.5%',
-            left: '2.5%',
-            // 配置圆角和间距
+            width: '90%',
+            height: '85%',
+            top: 'center',
+            left: 'center',
             breadcrumb: { show: false },
             roam: false,
             nodeClick: false,
-            squareRatio: 0.8, // 控制矩形比例
-            gap: 3, // 设置矩形间距
             itemStyle: {
-              borderRadius: 4,
+              borderColor: '#fff',
               borderWidth: 1,
-              gapWidth: 2
             },
             label: {
               show: true,
@@ -541,15 +531,13 @@ const renderDepartmentChart = (data: DashboardSummaryData['charts']['docsByDepar
             levels: [
               {
                 itemStyle: {
-                  borderWidth: 0,
-                  gapWidth: 4
+                  borderColor: '#fff',
+                  borderWidth: 2,
                 }
               },
               {
                 itemStyle: {
-                  borderRadius: 5,
-                  borderWidth: 2,
-                  gapWidth: 4
+                  borderColorSaturation: 0.6
                 }
               }
             ]

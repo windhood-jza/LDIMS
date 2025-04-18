@@ -173,9 +173,11 @@ const fetchUsers = async () => {
       return acc;
     }, {});
 
-    const data = await getUsers(filteredParams);
-    tableData.value = data.list;
-    total.value = data.total;
+    // getUsers now returns PageResult<UserInfo> directly
+    const responseData = await getUsers(filteredParams);
+    // Access list and total directly from the responseData
+    tableData.value = responseData?.list || []; 
+    total.value = responseData?.total || 0;
   } catch (error: any) {
     console.error('获取用户列表失败:', error);
     ElMessage.error(error.message || '获取用户列表失败');

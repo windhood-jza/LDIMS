@@ -1,30 +1,46 @@
 import request from '../request'; // 引入封装好的 axios 实例
+import { ElMessage } from 'element-plus'; // 导入 ElMessage
 import type { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '@backend-types/department'; // 引入后端类型
 // import type { ApiResponse } from '../request';
 
-// 假设树节点的接口定义
-interface TreeNode {
-    id: number;
-    name: string;
-    parentName?: string; // 部门树可能包含 parentName
-    children?: TreeNode[];
-    // 可能包含其他属性
-}
+/**
+ * 递归映射树数据到 DepartmentInfo 结构
+ * @param nodes 原始树节点数组
+ * @returns DepartmentInfo[] 结构数组
+ */
+const mapTreeDataToDepartmentInfo = (nodes: any[]): DepartmentInfo[] => {
+  if (!nodes || !Array.isArray(nodes)) {
+    return [];
+  }
+  return nodes.map(node => ({
+    // 必需属性 (假设后端返回这些)
+    id: node.id,
+    name: node.name,
+    parentId: node.parentId === undefined ? null : node.parentId, // 假设后端可能不返回或返回 undefined，统一处理为 null
+    // 其他 DepartmentInfo 中可能存在的属性 (可选映射)
+    code: node.code,
+    level: node.level,
+    sortOrder: node.sortOrder,
+    status: node.status,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    // 递归处理子节点
+    children: mapTreeDataToDepartmentInfo(node.children),
+  }));
+};
 
 /**
  * 获取部门树
- * @returns Promise 包含部门树数组
+ * @returns Promise 包含 DepartmentInfo 结构的部门树数组
  */
-export const getDepartmentTree = async (): Promise<TreeNode[]> => {
+export const getDepartmentTree = async (): Promise<DepartmentInfo[]> => {
     try {
-        const response: TreeNode[] = await request({
-            url: '/departments/tree', // 假设获取树的接口路径是 /departments/tree
-            method: 'get',
-        });
-        return response || [];
+        // 使用 wrappedRequest.get<T>，T 是期望拦截器处理后返回的类型 (any[] 在这里是合理的，因为需要映射)
+        const responseData = await request.get<any[]>('/departments/tree');
+        // responseData 现在直接是拦截器返回的树形数据数组
+        return mapTreeDataToDepartmentInfo(responseData || []); 
     } catch (error) {
         console.error("API Error fetching department tree:", error);
-        // 返回空数组并提示用户
         ElMessage.error('获取部门树失败');
         return [];
     }

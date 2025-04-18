@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, defineExpose, nextTick } from 'vue';
+// Removed 'watch' from import below (was line 2)
+import { ref, computed, defineExpose, nextTick } from 'vue'; 
 import { ElDialog, ElUpload, ElButton, ElMessage, ElIcon } from 'element-plus';
-import { Upload, FolderOpened, UploadFilled } from '@element-plus/icons-vue';
+// Removed 'Upload', 'FolderOpened' from import below (was line 4)
+import { UploadFilled } from '@element-plus/icons-vue'; 
 import type { UploadProps, UploadFile, UploadFiles, UploadRawFile } from 'element-plus';
 import { requestImport } from '@/services/api/task'; // 导入请求导入 API
 import type { ImportRequestParams } from '@/types/export'; // 导入相关类型
@@ -29,12 +31,12 @@ const dialogVisible = ref(false); // Keep internal dialogVisible
 //   }
 // });
 
-// --- Refs ---
+// --- Refs ---\r
 const uploadRef = ref<InstanceType<typeof ElUpload> | null>(null);
 const fileToUpload = ref<UploadFile | null>(null);
 const isUploading = ref(false); // 防止重复点击
 
-// --- Computed Properties ---
+// --- Computed Properties ---\r
 // 上传 URL (与之前 ListView 相同逻辑)
 const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const uploadUrl = `${VITE_API_BASE_URL}/upload/excel`;
@@ -46,7 +48,7 @@ const uploadHeaders = computed(() => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 });
 
-// --- Methods ---
+// --- Methods ---\r
 /**
  * @description 打开对话框的方法，由父组件调用
  */
@@ -148,7 +150,8 @@ const handleManualUpload = () => {
 /**
  * @description 文件上传成功钩子
  */
-const handleUploadSuccess: UploadProps['onSuccess'] = (response: any, uploadFile: UploadFile, uploadFiles: UploadFiles) => {
+ // Prefixed unused params below (was line 151)
+const handleUploadSuccess: UploadProps['onSuccess'] = (response: any, _uploadFile: UploadFile, _uploadFiles: UploadFiles) => { 
   console.log('[ImportDialog Upload Success] Response:', response);
   isUploading.value = false; // 上传结束
 
@@ -190,7 +193,8 @@ const handleUploadSuccess: UploadProps['onSuccess'] = (response: any, uploadFile
 /**
  * @description 文件上传失败钩子
  */
-const handleUploadError: UploadProps['onError'] = (error: any, uploadFile: UploadFile, uploadFiles: UploadFiles) => {
+ // Prefixed unused params below (was line 193)
+const handleUploadError: UploadProps['onError'] = (error: any, _uploadFile: UploadFile, _uploadFiles: UploadFiles) => { 
   console.error('[ImportDialog Upload Error] Raw Error:', error);
   isUploading.value = false; // 上传结束
   let message = '文件上传失败';
@@ -249,11 +253,12 @@ defineExpose({
       >
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
         <div class="el-upload__text">
-          将文件拖到此处，或 <em>点击上传</em>
+          将 Excel 文件拖到此处，或<em>点击选择</em>
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            请上传 .xls 或 .xlsx 格式的 Excel 文件，大小不超过 50MB。
+            请上传 .xls 或 .xlsx 格式的 Excel 文件，大小不超过 50MB。<br/>
+            文件需要包含以下列：文档名称, 提交人, 接收人, [可选列: 文档类型, 来源部门, 签收人, 交接日期, 存放位置, 备注]
           </div>
         </template>
       </el-upload>
@@ -261,22 +266,33 @@ defineExpose({
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="handleClose" :disabled="isUploading">取消</el-button>
-        <el-button type="primary" @click="handleManualUpload" :loading="isUploading" :disabled="!fileToUpload">
-          确认导入
+        <el-button type="primary" @click="handleManualUpload" :loading="isUploading">
+          {{ isUploading ? '上传中...' : '确定上传并导入' }}
         </el-button>
       </span>
     </template>
   </el-dialog>
 </template>
 
+
 <style scoped>
 .import-dialog-content {
   padding: 20px;
-}
-/* 可以根据需要添加 .upload-importer 的样式 */
-.el-upload__tip {
   text-align: center;
+}
+
+.upload-importer {
+  margin-bottom: 20px;
+}
+
+.el-upload__tip {
+  text-align: left;
   margin-top: 10px;
+  line-height: 1.5;
   color: #909399;
 }
-</style> 
+
+.dialog-footer {
+  text-align: right;
+}
+</style>

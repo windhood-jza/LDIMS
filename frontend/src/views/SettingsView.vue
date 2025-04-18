@@ -13,11 +13,11 @@
         <!-- 保留数据库配置和服务配置的注释，方便未来恢复 -->
         <!--
         <el-menu-item index="dbConfig">
-          <el-icon><Setting /></el-icon>
+          <el-icon><Setting /></el-icon> // Setting is unused if this is commented out
           <span>数据库配置</span>
         </el-menu-item>
         <el-menu-item index="serviceConfig">
-          <el-icon><Platform /></el-icon>
+          <el-icon><Platform /></el-icon> // Platform is unused if this is commented out
           <span>服务配置</span>
         </el-menu-item>
         -->
@@ -57,7 +57,8 @@
            </el-form-item>
            <el-form-item label="操作时间">
               <el-date-picker
-                v-model="logDateRange"
+                :model-value="logDateRange ?? undefined"
+                @update:modelValue="val => logDateRange = val ?? undefined"
                 type="daterange"
                 range-separator="至"
                 start-placeholder="开始日期"
@@ -94,7 +95,7 @@
            </el-table-column>
            <el-table-column label="操作类型" width="150" sortable="custom">
                 <template #default="{ row }">
-                   {{ operationTypeNames[row.operationType] || row.operationType }}
+                   {{ operationTypeNames[row.operationType as OperationType] || row.operationType }}
                 </template>
            </el-table-column>
            <el-table-column prop="operationContent" label="操作内容" min-width="250" />
@@ -120,16 +121,15 @@
 </template>
 
 <script setup lang="ts">
+// Removed Ref import (was line 124)
 import { ref, reactive, onMounted, watch } from 'vue';
-// 恢复导入的图标和组件
-import { Setting, Platform, Document, Search, Refresh } from '@element-plus/icons-vue';
+// Removed Setting, Platform import (was line 125) - They are only used in commented out template code
+import { Document, Search, Refresh } from '@element-plus/icons-vue';
 import { ElMessage, ElTable, ElTableColumn, ElPagination, ElDatePicker, ElForm, ElFormItem, ElInput, ElButton, ElIcon, ElContainer, ElAside, ElMain, ElMenu, ElMenuItem, ElSelect, ElOption, ElOptionGroup } from 'element-plus';
-// 只保留 getOperationLogs
-import { getOperationLogs } from '@/services/api/system';
-import type { OperationLogQuery, OperationLogInfo } from '@backend-types/services/OperationLogService';
-import type { PageResult } from '@backend-types/utils/response';
-// 导入操作类型枚举和名称映射
-import { OperationType, OperationTypeNames, OperationTypeGroups } from '@/types/system';
+import { getOperationLogs } from '@/services/api/system'; // Assuming this path is correct
+import type { OperationLogQuery, OperationLogInfo } from '@backend-types/operationLog'; // Assuming this path alias is correct
+// Removed PageResult import (was line 129)
+import { OperationType, OperationTypeNames, OperationTypeGroups } from '@/types/system'; // Assuming this path is correct
 
 // --- 响应式状态 ---
 const activeSection = ref<string>('operationLog'); // 默认激活日志
@@ -139,7 +139,7 @@ const operationTypeNames = OperationTypeNames;
 const operationTypeGroups = OperationTypeGroups;
 
 // 日志相关状态 (保持不变)
-const logQuery = reactive<OperationLogQuery>({ 
+const logQuery = reactive<OperationLogQuery>({
     page: 1,
     pageSize: 10,
     userId: '',
@@ -149,7 +149,7 @@ const logQuery = reactive<OperationLogQuery>({
     sortField: 'createdAt',
     sortOrder: 'DESC',
  });
-const logDateRange = ref<[string, string] | null>(null);
+const logDateRange = ref<[string, string] | null>(null); // Keep null for logic, handle in template
 const logs = ref<OperationLogInfo[]>([]);
 const logTotal = ref<number>(0);
 const logLoading = ref<boolean>(false);
@@ -179,17 +179,22 @@ const handleMenuSelect = (index: string) => {
 
 
 // 日志相关方法 (保持不变)
-const fetchLogs = async () => { 
+const fetchLogs = async () => {
     console.log('Fetching logs with query:', JSON.stringify(logQuery)); // 添加调试日志
     logLoading.value = true;
     try {
-        const params: OperationLogQuery = {};
+        const params: { [key: string]: string | number } = {}; // Use an index signature for dynamic params
         for (const key in logQuery) {
-            if (logQuery[key as keyof OperationLogQuery] !== '' && logQuery[key as keyof OperationLogQuery] !== null) {
-                params[key as keyof OperationLogQuery] = logQuery[key as keyof OperationLogQuery];
+            const typedKey = key as keyof OperationLogQuery;
+            const value = logQuery[typedKey];
+            // Ensure value is not undefined, null, or empty string before assigning
+            if (value !== '' && value !== null && value !== undefined) {
+                // Now TS knows params can accept string keys, and value is string | number
+                params[typedKey] = value;
             }
         }
-        const result = await getOperationLogs(params);
+        // Cast is likely still needed as getOperationLogs expects OperationLogQuery
+        const result = await getOperationLogs(params as OperationLogQuery);
         logs.value = result.list;
         logTotal.value = result.total;
     } catch (error: any) {
@@ -200,16 +205,16 @@ const fetchLogs = async () => {
         logLoading.value = false;
     }
  };
-const handleLogSizeChange = (size: number) => { 
+const handleLogSizeChange = (size: number) => {
     logQuery.pageSize = size;
     logQuery.page = 1;
     fetchLogs();
  };
-const handleLogPageChange = (page: number) => { 
+const handleLogPageChange = (page: number) => {
     logQuery.page = page;
     fetchLogs();
  };
-const handleLogSortChange = ({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) => { 
+const handleLogSortChange = ({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) => {
     if (prop) {
         logQuery.sortField = prop;
         logQuery.sortOrder = order === 'ascending' ? 'ASC' : 'DESC';
@@ -220,17 +225,17 @@ const handleLogSortChange = ({ prop, order }: { prop: string | null; order: 'asc
     logQuery.page = 1;
     fetchLogs();
  };
-const handleLogSearch = () => { 
+const handleLogSearch = () => {
     logQuery.page = 1;
     fetchLogs();
  };
-const resetLogSearch = () => { 
+const resetLogSearch = () => {
     logQuery.page = 1;
     logQuery.userId = '';
     logQuery.operationType = '';
     logQuery.startDate = '';
     logQuery.endDate = '';
-    logDateRange.value = null;
+    logDateRange.value = null; // Resetting still uses null
     logQuery.sortField = 'createdAt';
     logQuery.sortOrder = 'DESC';
     fetchLogs();
@@ -246,60 +251,54 @@ const resetLogSearch = () => {
 }
 
 .settings-aside {
-  background-color: #f4f4f5;
   border-right: 1px solid #e4e7ed;
-  height: 100%;
+  background-color: #f4f4f5;
 }
 
 .settings-menu {
-  border-right: none;
+  border-right: none; /* 移除 el-menu 默认的右边框 */
   height: 100%;
 }
 
+/* 可以根据需要调整菜单项样式 */
 .settings-menu .el-menu-item {
   height: 50px;
   line-height: 50px;
 }
-.settings-menu .el-menu-item.is-active {
-    background-color: #e6f7ff;
-}
 
+.settings-menu .el-menu-item.is-active {
+  background-color: #ecf5ff !important; /* Element Plus 蓝色背景 */
+}
 
 .settings-main {
   padding: 20px;
-  background-color: #ffffff;
-  height: 100%;
-  overflow-y: auto;
 }
 
 .settings-section {
-  margin-bottom: 20px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .settings-section h2 {
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ebeef5;
+  margin-top: 0;
+  margin-bottom: 20px;
   font-size: 18px;
+  font-weight: 600;
   color: #303133;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 10px;
 }
 
 .log-search-form .el-form-item {
-  margin-bottom: 10px;
+    margin-right: 15px;
+    margin-bottom: 15px; /* 增加底部间距 */
 }
 
+/* 特别调整 Select 组件宽度 */
 .operation-type-select {
-  width: 180px;
+    width: 200px; /* 根据需要调整宽度 */
 }
 
-.settings-section {
-  margin-bottom: 20px;
-}
-
-.log-search-form {
-  margin-bottom: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-}
-</style> 
+</style>

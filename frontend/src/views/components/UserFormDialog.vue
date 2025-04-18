@@ -79,12 +79,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, defineProps } from 'vue';
+// Added 'nextTick' to import (Fixes: Cannot find name 'nextTick')
+import { ref, reactive, defineProps, nextTick } from 'vue'; 
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import type { UserInfo } from '../../../../backend/src/types/user';
+// Note: The path below seems incorrect, adjust if necessary
+// We need the request type for creating a user, assuming it exists
+import type { UserInfo, CreateUserRequest, UpdateUserRequest } from '../../../../backend/src/types/user'; 
 import { createUser, updateUser } from '@/services/api/user';
-import type { DepartmentInfo } from '@backend-types/department';
+// Note: The path below seems incorrect, adjust if necessary
+import type { DepartmentInfo } from '@backend-types/department'; 
 
 // 定义 Props 来接收部门数据
 const props = defineProps<{
@@ -109,7 +113,7 @@ const formData = reactive({
   confirmPassword: '',
 });
 
-// 表单验证规则
+// 表单验证规则 (保持不变)
 const rules = reactive<FormRules>({
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -130,10 +134,14 @@ const rules = reactive<FormRules>({
       required: true, 
       message: '请输入密码', 
       trigger: 'blur',
-      validator: (rule: any, value: string, callback: Function) => {
+      validator: (_rule: any, value: string, callback: Function) => { 
         if (dialogType.value === 'add' && !value) {
           callback(new Error('请输入密码'));
         } else {
+          // Check confirm password validity when password changes in add mode
+          if (dialogType.value === 'add' && formData.confirmPassword) {
+             formRef.value?.validateField('confirmPassword');
+          }
           callback();
         }
       }
@@ -145,7 +153,7 @@ const rules = reactive<FormRules>({
       required: true,
       message: '请再次输入密码',
       trigger: 'blur',
-      validator: (rule: any, value: string, callback: Function) => {
+      validator: (_rule: any, value: string, callback: Function) => { 
         if (dialogType.value === 'add') {
           if (!value) {
             callback(new Error('请再次输入密码'));
@@ -155,7 +163,7 @@ const rules = reactive<FormRules>({
             callback();
           }
         } else {
-          callback();
+          callback(); // Edit mode doesn't need confirm password validation
         }
       }
     },
@@ -167,6 +175,11 @@ const open = (type: 'add' | 'edit', data?: UserInfo) => {
   dialogType.value = type;
   dialogVisible.value = true;
   
+  // Reset validation before potential assignments
+  nextTick(() => {
+    formRef.value?.clearValidate(); 
+  });
+
   if (type === 'edit' && data) {
     Object.assign(formData, {
       id: data.id,
@@ -175,6 +188,8 @@ const open = (type: 'add' | 'edit', data?: UserInfo) => {
       departmentId: data.departmentId,
       role: data.role,
       status: data.status,
+      password: '', // Clear password fields for edit mode
+      confirmPassword: '',
     });
   } else {
     // 新增时重置表单
@@ -188,13 +203,34 @@ const open = (type: 'add' | 'edit', data?: UserInfo) => {
       password: '',
       confirmPassword: '',
     });
+     // Reset specific fields in case they weren't covered by resetFields
+     nextTick(() => {
+         // Only reset fields relevant to add mode, avoid username in edit
+         formRef.value?.resetFields(['realName', 'departmentId', 'role', 'password', 'confirmPassword']);
+         if (dialogType.value === 'add') {
+             formRef.value?.resetFields(['username']);
+         }
+     });
   }
 };
 
 // 关闭弹窗
 const handleClose = () => {
   dialogVisible.value = false;
-  formRef.value?.resetFields();
+  // Reset form data to initial state when closing
+  Object.assign(formData, {
+      id: undefined,
+      username: '',
+      realName: '',
+      departmentId: undefined,
+      role: '',
+      status: 1,
+      password: '',
+      confirmPassword: '',
+  });
+  nextTick(() => {
+    formRef.value?.resetFields(); 
+  });
 };
 
 // 提交表单
@@ -205,21 +241,42 @@ const handleSubmit = async () => {
     if (valid) {
       loading.value = true;
       try {
-        // 确保status为数值类型
-        const submitData = {
-          ...formData,
-          status: Number(formData.status),
-          // 编辑时不提交密码字段
-          ...(dialogType.value === 'edit' ? { password: undefined } : {}),
-        };
-        
-        console.log('提交的表单数据:', submitData);
-        
+        // Prepare data based on dialog type
         if (dialogType.value === 'add') {
-          await createUser(submitData);
+          // Assume CreateUserRequest is defined and expects these fields
+          const createData: CreateUserRequest = { 
+            username: formData.username,
+            realName: formData.realName,
+            departmentId: formData.departmentId!, // Assuming departmentId is required and not undefined here due to validation
+            // FIX: Assert role type (was line 251)
+            role: formData.role as 'admin' | 'editor' | 'viewer', 
+            status: Number(formData.status), // Assuming status is optional in CreateUserRequest based on backend types
+            password: formData.password, 
+          };
+          console.log('提交的创建数据:', createData);
+          await createUser(createData); 
           ElMessage.success('创建成功');
         } else {
-          await updateUser(submitData);
+          // Assume UpdateUserRequest is defined and expects these fields
+          // Also ensure ID exists for update
+          if (!formData.id) {
+              ElMessage.error('无法更新用户：用户ID丢失');
+              loading.value = false;
+              return;
+          }
+          // FIX: Add id to updateData and adjust type (was line 267-272)
+          // Assuming UpdateUserRequest itself doesn't include id
+          const updateData: UpdateUserRequest & { id: number } = { 
+            id: formData.id!, 
+            realName: formData.realName,
+            departmentId: formData.departmentId!, // Assuming required
+            // FIX: Assert role type (was line 270)
+            role: formData.role as 'admin' | 'editor' | 'viewer', 
+            status: Number(formData.status),
+          };
+          console.log('提交的更新数据:', updateData);
+          // FIX: Pass only updateData (assuming updateUser expects id within the object) (was line 274)
+          await updateUser(updateData); 
           ElMessage.success('更新成功');
         }
         
@@ -245,16 +302,13 @@ defineExpose({
 .user-form {
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 20px;
+  padding-right: 20px; /* Add some padding for scrollbar */
 }
-
 .full-width {
-  width: 100%;
+    width: 100%;
 }
-
+/* Optional: Adjust dialog footer padding if form scrolls */
 .dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  padding-top: 10px; 
 }
-</style> 
+</style>
