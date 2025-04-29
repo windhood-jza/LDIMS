@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件详情对话框演示 (直接文件访问)</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f5f7fa; }
+        .dialog-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .dialog-box { background-color: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); width: 70%; max-width: 800px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+        .dialog-header { padding: 15px 20px; border-bottom: 1px solid #ebeef5; display: flex; justify-content: space-between; align-items: center; }
+        .dialog-header h3 { margin: 0; font-size: 18px; color: #303133; }
+        .dialog-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #909399; }
+        .dialog-content { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .tabs { display: flex; border-bottom: 1px solid #ebeef5; margin-bottom: 15px; }
+        .tab-button { padding: 10px 15px; border: none; background: none; cursor: pointer; font-size: 14px; color: #909399; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .tab-button.active { color: #409eff; border-bottom-color: #409eff; }
+        .tab-pane { padding-top: 10px; }
+        .file-meta { font-size: 13px; color: #606266; margin-bottom: 15px; line-height: 1.6; }
+        .file-meta strong { color: #303133; }
+        .download-button, .open-button {
+            padding: 5px 10px;
+            font-size: 12px;
+            background-color: #ecf5ff;
+            color: #409eff;
+            border: 1px solid #b3d8ff;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            text-decoration: none; /* For link-like buttons */
+            display: inline-block; /* Ensure proper spacing */
+        }
+        .file-preview-area {
+            background-color: #f9f9f9;
+            border: 1px solid #ebeef5;
+            padding: 15px;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #909399;
+            margin-top: 10px;
+        }
+        .file-preview-area img {
+            max-width: 100%;
+            max-height: 200px; /* Limit preview image height */
+            display: block;
+            cursor: pointer; /* Simulate clickable image */
+        }
+        .dialog-footer { padding: 10px 20px; border-top: 1px solid #ebeef5; text-align: right; }
+        .dialog-footer button { padding: 8px 15px; background-color: #409eff; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="dialog-overlay">
+        <div class="dialog-box">
+            <div class="dialog-header">
+                <h3>文档详情：项目交付材料 (ID: 102)</h3>
+                <button class="dialog-close-btn" title="关闭">×</button>
+            </div>
+            <div class="dialog-content">
+                <div class="tabs">
+                    <button class="tab-button active">需求文档.pdf</button>
+                    <button class="tab-button">设计图_主界面.png</button>
+                    <button class="tab-button">用户手册草稿.docx</button>
+                </div>
+                <div class="tab-content">
+                    <!-- Tab Pane 1: PDF (Active) -->
+                    <div class="tab-pane" id="file-pdf">
+                        <div class="file-meta">
+                            <strong>文件名:</strong> 需求文档.pdf 
+                            <button class="download-button">下载</button>
+                            <a href="#" target="_blank" class="open-button">打开 PDF</a><br> 
+                            <strong>文件类型:</strong> application/pdf <br>
+                            <strong>文件大小:</strong> 2.5 MB <br>
+                            <strong>处理状态:</strong> <span style="color: #e6a23c;">处理中 (用于LLM)</span> 
+                        </div>
+                        <div class="file-preview-area">
+                            <!-- PDF preview often requires embedding or a library -->
+                            <p>PDF 预览区 (或提示用户点击上方按钮打开)</p>
+                             <!-- Example using embed (might not work well cross-browser without actual PDF) -->
+                             <!-- <embed src="#" type="application/pdf" width="100%" height="300px" /> -->
+                        </div>
+                    </div>
+                    <!-- Tab Pane 2: Image (Inactive in demo) -->
+                    <div class="tab-pane" id="file-image" style="display: none;">
+                         <div class="file-meta">
+                            <strong>文件名:</strong> 设计图_主界面.png 
+                            <button class="download-button">下载</button><br>
+                            <strong>文件类型:</strong> image/png <br>
+                            <strong>文件大小:</strong> 850 KB <br>
+                            <strong>处理状态:</strong> <span style="color: #67c23a;">处理完成 (用于LLM)</span>
+                        </div>
+                        <div class="file-preview-area">
+                            <!-- Placeholder for image -->
+                            <img src="" alt="设计图预览 (占位符 - 点击放大)" title="点击放大 (模拟)">
+                        </div>
+                    </div>
+                     <!-- Tab Pane 3: Word Doc (Inactive in demo) -->
+                    <div class="tab-pane" id="file-word" style="display: none;">
+                         <div class="file-meta">
+                            <strong>文件名:</strong> 用户手册草稿.docx 
+                            <button class="download-button">下载</button><br>
+                            <strong>文件类型:</strong> application/vnd.openxmlformats-officedocument.wordprocessingml.document <br>
+                            <strong>文件大小:</strong> 420 KB <br>
+                            <strong>处理状态:</strong> <span style="color: #f56c6c;">处理失败 (用于LLM)</span>
+                        </div>
+                        <div class="file-preview-area">
+                            <p>Word 文档无法直接预览，请下载文件查看。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button>关闭</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

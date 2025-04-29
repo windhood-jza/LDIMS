@@ -15,6 +15,8 @@
  * @property {string | null} updatedBy - 更新人姓名
  * @property {Date} createdAt - 创建时间
  * @property {Date} updatedAt - 更新时间
+ * @property {SimplifiedDocumentFile[]} files - 关联的文件列表 (可选)
+ * @property {number} fileCount - 关联文件的数量 (可选, 用于列表页)
  */
 export interface DocumentInfo {
   id: number;
@@ -31,6 +33,8 @@ export interface DocumentInfo {
   updatedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
+  files?: SimplifiedDocumentFile[];
+  fileCount?: number;
 }
 
 /**
@@ -106,9 +110,37 @@ export interface DocumentListQuery {
   page?: number;
   pageSize?: number;
   sortField?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  sortOrder?: "ASC" | "DESC";
   sourceDepartmentId?: number;
   docTypeId?: number;
   docTypeNameFilter?: string;
   sourceDepartmentNameFilter?: string;
-} 
+}
+
+/**
+ * @interface SimplifiedDocumentFile
+ * @description 用于在文档信息中展示的简化文件信息类型
+ * @property {number} id - 文件 ID
+ * @property {string} fileName - 原始文件名
+ * @property {string} fileType - 文件类型
+ * @property {number} fileSize - 文件大小
+ * @property {number} sequence - 序列号
+ * @property {string} processingStatus - 处理状态
+ * @property {Date | undefined} createdAt - 创建时间
+ * @property {Date | undefined} updatedAt - 更新时间
+ */
+export interface SimplifiedDocumentFile {
+  id: number;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  sequence: number;
+  processingStatus:
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "ocr_fallback";
+  createdAt?: Date;
+  updatedAt?: Date;
+}

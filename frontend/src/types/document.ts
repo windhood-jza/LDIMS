@@ -1,6 +1,18 @@
 // frontend/src/types/document.ts
 // Add necessary document-related types here.
 
+// **新增：用于展示的简化文件信息类型**
+export interface SimplifiedDocumentFile {
+  id: number;
+  fileName: string; // 原始文件名
+  fileType: string;
+  fileSize: number;
+  sequence: number;
+  processingStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'ocr_fallback';
+  createdAt?: string; // 前端通常处理字符串日期
+  updatedAt?: string;
+}
+
 export interface DocumentInfo {
   // Define properties based on backend model or usage
   id?: number;
@@ -19,6 +31,8 @@ export interface DocumentInfo {
   updatedAt?: string;
   docTypeId?: number | string;
   sourceDepartmentId?: number | string;
+  files?: SimplifiedDocumentFile[]; // **新增**: 关联的文件列表
+  fileCount?: number; // **新增**: 关联文件数量
   [key: string]: any;
 }
 

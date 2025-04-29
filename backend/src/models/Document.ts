@@ -1,5 +1,6 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import sequelize from '../config/database';
+import { DataTypes, Model, Optional, Association } from "sequelize";
+import sequelize from "../config/database";
+import DocumentFile from "./DocumentFile";
 
 // 定义 Document 模型的属性接口
 interface DocumentAttributes {
@@ -18,13 +19,35 @@ interface DocumentAttributes {
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date | null;
+
+  // 添加关联属性 (可选但推荐)
+  documentFiles?: DocumentFile[];
 }
 
 // 定义创建 Document 时可选的属性
-interface DocumentCreationAttributes extends Optional<DocumentAttributes, 'id' | 'signer' | 'storageLocation' | 'remarks' | 'handoverDate' | 'createdBy' | 'updatedBy' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'docTypeName' | 'sourceDepartmentName'> {}
+interface DocumentCreationAttributes
+  extends Optional<
+    DocumentAttributes,
+    | "id"
+    | "signer"
+    | "storageLocation"
+    | "remarks"
+    | "handoverDate"
+    | "createdBy"
+    | "updatedBy"
+    | "createdAt"
+    | "updatedAt"
+    | "deletedAt"
+    | "docTypeName"
+    | "sourceDepartmentName"
+    | "documentFiles"
+  > {}
 
 // 定义 Document 模型类
-class Document extends Model<DocumentAttributes, DocumentCreationAttributes> implements DocumentAttributes {
+class Document
+  extends Model<DocumentAttributes, DocumentCreationAttributes>
+  implements DocumentAttributes
+{
   public id!: number;
   public docName!: string;
   public docTypeName!: string | null;
@@ -42,6 +65,25 @@ class Document extends Model<DocumentAttributes, DocumentCreationAttributes> imp
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public readonly deletedAt!: Date | null;
+
+  // 关联对象 (Eager loading 时填充)
+  public readonly documentFiles?: DocumentFile[];
+
+  // 定义关联的静态属性
+  public static associations: {
+    documentFiles: Association<Document, DocumentFile>;
+  };
+
+  // 定义关联的方法 (Sequelize CLI 风格)
+  static associate(models: any) {
+    // Document has many DocumentFiles
+    Document.hasMany(models.DocumentFile, {
+      foreignKey: "documentId",
+      as: "documentFiles",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    });
+  }
 }
 
 // 初始化 Document 模型
@@ -55,98 +97,101 @@ Document.init(
     docName: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      field: 'doc_name',
-      comment: '文档名称',
+      field: "doc_name",
+      comment: "文档名称",
     },
     docTypeName: {
       type: DataTypes.STRING(255),
       allowNull: true,
-      field: 'doc_type_name',
-      comment: '文档类型名称',
+      field: "doc_type_name",
+      comment: "文档类型名称",
     },
     sourceDepartmentName: {
       type: DataTypes.STRING(255),
       allowNull: true,
-      field: 'source_department_name',
-      comment: '来源部门名称',
+      field: "source_department_name",
+      comment: "来源部门名称",
     },
     submitter: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      comment: '提交人',
+      comment: "提交人",
     },
     receiver: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      comment: '接收人',
+      comment: "接收人",
     },
     signer: {
       type: DataTypes.STRING(50),
       allowNull: true,
-      comment: '落款人, 允许为空',
+      comment: "落款人, 允许为空",
     },
     storageLocation: {
       type: DataTypes.STRING(100),
       allowNull: true,
-      field: 'storage_location',
-      comment: '保管位置',
+      field: "storage_location",
+      comment: "保管位置",
     },
     remarks: {
       type: DataTypes.TEXT,
       allowNull: true,
-      comment: '备注说明',
+      comment: "备注说明",
     },
     handoverDate: {
       type: DataTypes.DATEONLY,
       allowNull: true,
-      field: 'handover_date',
-      comment: '交接日期, 允许为空',
+      field: "handover_date",
+      comment: "交接日期, 允许为空",
     },
     createdBy: {
       type: DataTypes.STRING(50),
       allowNull: true,
-      field: 'created_by',
-      comment: '创建人姓名, 允许为空',
+      field: "created_by",
+      comment: "创建人姓名, 允许为空",
     },
     updatedBy: {
       type: DataTypes.STRING(50),
       allowNull: true,
-      field: 'updated_by',
-      comment: '最后修改人姓名, 允许为空',
+      field: "updated_by",
+      comment: "最后修改人姓名, 允许为空",
     },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      field: 'created_at',
+      field: "created_at",
     },
     updatedAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
-      field: 'updated_at',
+      field: "updated_at",
     },
     deletedAt: {
       type: DataTypes.DATE,
       allowNull: true,
-      field: 'deletedAt'
-    }
+      field: "deletedAt",
+    },
   },
   {
     sequelize,
-    tableName: 'documents',
+    tableName: "documents",
     timestamps: true,
-    underscored: false,
-    comment: '文档信息表',
+    underscored: true,
+    comment: "文档信息表",
     indexes: [
-      { fields: ['handover_date'], name: 'idx_handover_date' },
-      { fields: ['doc_name'], name: 'idx_doc_name' },
-      { fields: ['doc_type_name'], name: 'idx_doc_type_name' },
-      { fields: ['source_department_name'], name: 'idx_source_department_name' },
+      { fields: ["handover_date"], name: "idx_handover_date" },
+      { fields: ["doc_name"], name: "idx_doc_name" },
+      { fields: ["doc_type_name"], name: "idx_doc_type_name" },
+      {
+        fields: ["source_department_name"],
+        name: "idx_source_department_name",
+      },
     ],
     paranoid: true,
-    deletedAt: 'deletedAt'
+    deletedAt: "deletedAt",
   }
 );
 
-export default Document; 
+export default Document;
