@@ -2,7 +2,12 @@
   <div class="document-list-view">
     <!-- 搜索区域 -->
     <el-card class="search-card" shadow="never">
-      <el-form :model="searchForm" ref="searchFormRef" label-width="70px" class="search-form">
+      <el-form
+        :model="searchForm"
+        ref="searchFormRef"
+        label-width="70px"
+        class="search-form"
+      >
         <el-form-item label="文档名称" prop="docName">
           <el-input
             v-model="searchForm.docName"
@@ -38,16 +43,20 @@
               :render-after-expand="false"
               clearable
               :loading="treeLoading"
-              style="width: 180px;"
+              style="width: 180px"
               @change="handleDocTypeSelect"
             />
             <el-input
               v-model="searchForm.docTypeNameFilter"
               placeholder="或输入模糊类型"
               clearable
-              style="width: 150px;"
+              style="width: 150px"
               @input="handleDocTypeNameInput"
-              @clear="() => { searchForm.docTypeNameFilter = '' }"
+              @clear="
+                () => {
+                  searchForm.docTypeNameFilter = '';
+                }
+              "
             />
           </div>
         </el-form-item>
@@ -62,26 +71,30 @@
               :render-after-expand="false"
               clearable
               :loading="treeLoading"
-              style="width: 180px;"
+              style="width: 180px"
               @change="handleDepartmentSelect"
             />
             <el-input
               v-model="searchForm.sourceDepartmentNameFilter"
               placeholder="或输入模糊部门"
               clearable
-              style="width: 150px;"
+              style="width: 150px"
               @input="handleDepartmentNameInput"
-              @clear="() => { searchForm.sourceDepartmentNameFilter = '' }"
+              @clear="
+                () => {
+                  searchForm.sourceDepartmentNameFilter = '';
+                }
+              "
             />
           </div>
         </el-form-item>
         <el-form-item label="签章人" prop="signer">
-           <el-input
-             v-model="searchForm.signer"
-             placeholder="签章人"
-             clearable
-             style="width: 120px"
-           />
+          <el-input
+            v-model="searchForm.signer"
+            placeholder="签章人"
+            clearable
+            style="width: 120px"
+          />
         </el-form-item>
         <el-form-item label="交接日期" prop="handoverDateRange">
           <el-date-picker
@@ -95,7 +108,9 @@
           />
         </el-form-item>
         <el-form-item label="" class="search-buttons">
-          <el-button type="primary" @click="handleSearch" :icon="Search">搜索</el-button>
+          <el-button type="primary" @click="handleSearch" :icon="Search"
+            >搜索</el-button
+          >
           <el-button @click="resetSearch" :icon="Refresh">重置</el-button>
         </el-form-item>
       </el-form>
@@ -103,13 +118,26 @@
 
     <!-- 工具栏和列表区域 -->
     <el-card class="table-card" shadow="never">
-       <div class="toolbar">
-         <div class="toolbar-buttons">
-            <el-button type="primary" @click="openAddDialog" :icon="Plus">新增文档</el-button>
-            <el-button type="success" @click="handleImportClick" :icon="UploadFilled">批量导入</el-button>
-            <el-button type="warning" @click="handleExport" :icon="Download" style="margin-left: 10px;">批量导出</el-button>
-         </div>
-       </div>
+      <div class="toolbar">
+        <div class="toolbar-buttons">
+          <el-button type="primary" @click="openAddDialog" :icon="Plus"
+            >新增文档</el-button
+          >
+          <el-button
+            type="success"
+            @click="handleImportClick"
+            :icon="UploadFilled"
+            >批量导入</el-button
+          >
+          <el-button
+            type="warning"
+            @click="handleExport"
+            :icon="Download"
+            style="margin-left: 10px"
+            >批量导出</el-button
+          >
+        </div>
+      </div>
 
       <!-- 数据表格 -->
       <el-table
@@ -124,30 +152,91 @@
         @selection-change="handleSelectionChange"
         row-key="id"
       >
-        <el-table-column type="selection" width="55" :reserve-selection="true" />
-        <el-table-column prop="id" label="ID" width="80" sortable />
-        <el-table-column prop="docName" label="文档名称" min-width="200" show-overflow-tooltip sortable="custom" />
-        <el-table-column prop="docTypeName" label="文档类型" width="150" />
-        <el-table-column prop="departmentName" label="来源部门" width="150" />
-        <el-table-column prop="submitter" label="提交人" width="120" sortable="custom" />
-        <el-table-column prop="receiver" label="接收人" width="120" />
-        <el-table-column prop="signer" label="签章人" width="120" sortable="custom" />
-        <el-table-column prop="handoverDate" label="交接日期" width="120" align="center" sortable="custom">
+        <el-table-column
+          type="selection"
+          width="45"
+          :reserve-selection="true"
+        />
+        <el-table-column prop="id" label="ID" width="70" sortable />
+        <el-table-column
+          prop="docName"
+          label="文档名称"
+          width="355"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="docTypeName"
+          label="文档类型"
+          width="120"
+          show-overflow-tooltip
+        />
+        <el-table-column
+          prop="departmentName"
+          label="来源部门"
+          width="120"
+          show-overflow-tooltip
+        />
+        <el-table-column prop="submitter" label="提交人" width="90" />
+        <el-table-column prop="receiver" label="接收人" width="90" />
+        <el-table-column prop="signer" label="签章人" width="90" />
+        <el-table-column
+          prop="handoverDate"
+          label="交接日期"
+          width="110"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
             {{ formatDate(row.handoverDate) }}
           </template>
         </el-table-column>
-         <el-table-column prop="createdBy" label="创建人" width="120" />
-         <el-table-column prop="createdAt" label="创建时间" width="160" align="center" sortable="custom">
-             <template #default="{ row }">
-                 {{ formatDateTime(row.createdAt) }}
-             </template>
-         </el-table-column>
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column prop="createdBy" label="创建人" width="90" />
+        <el-table-column
+          prop="createdAt"
+          label="创建时间"
+          width="200"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
-            <el-button type="primary" link size="small" :icon="View" @click="openViewDialog(row)">查看</el-button>
-            <el-button type="primary" link size="small" :icon="Edit" @click="openEditDialog(row)">编辑</el-button>
-            <el-button type="danger" link size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            {{ formatDateTime(row.createdAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              type="primary"
+              link
+              size="small"
+              :icon="View"
+              @click="handleViewDocumentInfo(row)"
+              >查看</el-button
+            >
+            <el-button
+              type="primary"
+              link
+              size="small"
+              :icon="Edit"
+              @click="handleEdit(row)"
+              >编辑</el-button
+            >
+            <el-button
+              type="success"
+              link
+              size="small"
+              :icon="FolderOpened"
+              @click="handlePreviewFiles(row)"
+              :disabled="!row.fileCount || row.fileCount === 0"
+              >预览文件</el-button
+            >
+            <el-button
+              type="danger"
+              link
+              size="small"
+              :icon="Delete"
+              @click="handleDelete(row)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -171,60 +260,86 @@
       :doc-type-tree-data="docTypeTree"
       :department-tree-data="departmentTree"
       @success="fetchData"
-     />
+    />
+
+    <!-- 文件查看弹窗组件 -->
+    <DocumentFileViewDialog ref="documentFileViewDialogRef" />
 
     <!-- 导出选项弹窗 -->
     <ExportOptionsDialog ref="exportOptionsDialogRef" />
 
     <!-- 导入对话框组件 -->
     <ImportDialog ref="importDialogRef" />
-
   </div>
 </template>
 
 <script setup lang="ts">
 // Removed nextTick from import
-import { ref, reactive, onMounted } from 'vue';
-import { ElTable, ElPagination, ElMessage, ElMessageBox, ElForm, FormInstance, Sort, ElInput, ElTreeSelect } from 'element-plus';
+import { ref, reactive, onMounted } from "vue";
 import {
-    Search,
-    Refresh,
-    Plus,
-    UploadFilled,
-    Download,
-    Edit,
-    Delete,
-    View,
-    // Removed RefreshRight icon
-} from '@element-plus/icons-vue';
-import type { DocumentInfo, DocumentListQuery } from '@/types/document';
-import type { TreeNode } from '@/types/common';
-import { getDocuments, deleteDocument } from '@/services/api/document';
-import { getDocTypeTree } from '@/services/api/doctype';
-import { getDepartmentTree } from '@/services/api/department';
+  ElTable,
+  ElPagination,
+  ElMessage,
+  ElMessageBox,
+  ElForm,
+  FormInstance,
+  Sort,
+  ElInput,
+  ElTreeSelect,
+} from "element-plus";
+import {
+  Search,
+  Refresh,
+  Plus,
+  UploadFilled,
+  Download,
+  Edit,
+  Delete,
+  View,
+  FolderOpened,
+} from "@element-plus/icons-vue";
+import type { DocumentInfo, DocumentListQuery } from "@/types/document";
+import type { TreeNode } from "@/types/common";
+import { getDocuments, deleteDocument } from "@/services/api/document";
+import { getDocTypeTree } from "@/services/api/doctype";
+import { getDepartmentTree } from "@/services/api/department";
 // Removed requestExport import
-import DocumentFormDialog from '@/components/DocumentFormDialog.vue';
-import ExportOptionsDialog from '@/components/ExportOptionsDialog.vue';
-import ImportDialog from '@/components/ImportDialog.vue';
+import DocumentFormDialog from "@/components/DocumentFormDialog.vue";
+import DocumentFileViewDialog from "@/components/DocumentFileViewDialog.vue";
+import ExportOptionsDialog from "@/components/ExportOptionsDialog.vue";
+import ImportDialog from "@/components/ImportDialog.vue";
 
 // --- ref 定义 ---
 const searchFormRef = ref<FormInstance>();
-const documentFormDialogRef = ref<InstanceType<typeof DocumentFormDialog> | null>(null);
-const exportOptionsDialogRef = ref<InstanceType<typeof ExportOptionsDialog> | null>(null);
+const documentFormDialogRef = ref<InstanceType<
+  typeof DocumentFormDialog
+> | null>(null);
+const documentFileViewDialogRef = ref<InstanceType<
+  typeof DocumentFileViewDialog
+> | null>(null);
+const exportOptionsDialogRef = ref<InstanceType<
+  typeof ExportOptionsDialog
+> | null>(null);
 const importDialogRef = ref<InstanceType<typeof ImportDialog> | null>(null);
 const tableRef = ref();
 const selectedDocumentIds = ref<number[]>([]);
 
 // --- 状态定义 ---
-const searchForm = reactive<Partial<DocumentListQuery> & { handoverDateRange: [string, string] | null, docTypeNameFilter?: string, sourceDepartmentNameFilter?: string }>({
-  docName: '',
-  submitter: '',
-  receiver: '',
+const searchForm = reactive<
+  Partial<DocumentListQuery> & {
+    handoverDateRange: [string, string] | null;
+    docTypeNameFilter?: string;
+    sourceDepartmentNameFilter?: string;
+  }
+>({
+  docName: "",
+  submitter: "",
+  receiver: "",
   docTypeId: null,
   sourceDepartmentId: null,
-  docTypeNameFilter: '',
-  sourceDepartmentNameFilter: '',
-  signer: '',
+  docTypeNameFilter: "",
+  sourceDepartmentNameFilter: "",
+  signer: "",
   handoverDateRange: null,
   page: 1,
   pageSize: 10,
@@ -241,7 +356,7 @@ const pagination = reactive({
 
 const docTypeTree = ref<TreeNode[]>([]);
 const departmentTree = ref<TreeNode[]>([]);
-const treeProps = { value: 'id', label: 'name', children: 'children' };
+const treeProps = { value: "id", label: "name", children: "children" };
 
 // --- API 调用与数据处理 ---
 const fetchData = async (sortOptions?: Sort) => {
@@ -254,43 +369,64 @@ const fetchData = async (sortOptions?: Sort) => {
       submitter: searchForm.submitter || undefined,
       receiver: searchForm.receiver || undefined,
       docTypeId: searchForm.docTypeId ?? undefined,
-      docTypeNameFilter: searchForm.docTypeId ? undefined : (searchForm.docTypeNameFilter || undefined),
+      docTypeNameFilter: searchForm.docTypeId
+        ? undefined
+        : searchForm.docTypeNameFilter || undefined,
       sourceDepartmentId: searchForm.sourceDepartmentId ?? undefined,
-      sourceDepartmentNameFilter: searchForm.sourceDepartmentId ? undefined : (searchForm.sourceDepartmentNameFilter || undefined),
+      sourceDepartmentNameFilter: searchForm.sourceDepartmentId
+        ? undefined
+        : searchForm.sourceDepartmentNameFilter || undefined,
       signer: searchForm.signer || undefined,
       handoverDateStart: searchForm.handoverDateRange?.[0] || undefined,
       handoverDateEnd: searchForm.handoverDateRange?.[1] || undefined,
       sortField: sortOptions?.prop,
-      sortOrder: sortOptions?.order === 'descending' ? 'DESC' : (sortOptions?.order === 'ascending' ? 'ASC' : undefined),
+      sortOrder:
+        sortOptions?.order === "descending"
+          ? "DESC"
+          : sortOptions?.order === "ascending"
+          ? "ASC"
+          : undefined,
     };
-    Object.keys(params).forEach(key => {
-        const k = key as keyof DocumentListQuery;
-        if (params[k] === undefined || params[k] === null || params[k] === '') {
-            delete params[k];
-        }
+    Object.keys(params).forEach((key) => {
+      const k = key as keyof DocumentListQuery;
+      if (params[k] === undefined || params[k] === null || params[k] === "") {
+        delete params[k];
+      }
     });
 
     // 调用 API
     const result = await getDocuments(params);
 
     // --- 新增日志：打印最原始的 result ---
-    console.log('[DocumentListView] Raw response from getDocuments service:', result);
+    console.log(
+      "[DocumentListView] Raw response from getDocuments service:",
+      result
+    );
 
     // --- 检查返回的数据结构 ---
-    if (result && Array.isArray(result.list) && typeof result.total === 'number') {
-        console.log('[DocumentListView] Trying to extract from result directly');
-        tableData.value = result.list;
-        pagination.total = result.total;
+    if (
+      result &&
+      Array.isArray(result.list) &&
+      typeof result.total === "number"
+    ) {
+      console.log("[DocumentListView] Trying to extract from result directly");
+      tableData.value = result.list;
+      pagination.total = result.total;
     } else {
-        console.error('Invalid data structure received from getDocuments:', result);
-        ElMessage.error('获取文档列表失败：数据格式错误');
-        tableData.value = [];
-        pagination.total = 0;
+      console.error(
+        "Invalid data structure received from getDocuments:",
+        result
+      );
+      ElMessage.error("获取文档列表失败：数据格式错误");
+      tableData.value = [];
+      pagination.total = 0;
     }
-
   } catch (error: any) {
-    console.error("Fetch documents error:", error)
-    const message = error?.response?.data?.message || error?.message || '获取文档列表时发生错误';
+    console.error("Fetch documents error:", error);
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "获取文档列表时发生错误";
     ElMessage.error(message);
     tableData.value = [];
     pagination.total = 0;
@@ -305,7 +441,7 @@ const fetchDocTypeTree = async () => {
     docTypeTree.value = await getDocTypeTree();
   } catch (error) {
     console.error("Error fetching document type tree:", error);
-    ElMessage.error('获取文档类型失败');
+    ElMessage.error("获取文档类型失败");
   } finally {
     treeLoading.value = false;
   }
@@ -317,7 +453,7 @@ const fetchDepartmentTree = async () => {
     departmentTree.value = await getDepartmentTree();
   } catch (error) {
     console.error("Error fetching department tree:", error);
-    ElMessage.error('获取部门失败');
+    ElMessage.error("获取部门失败");
   } finally {
     treeLoading.value = false;
   }
@@ -333,24 +469,24 @@ const resetSearch = () => {
   searchFormRef.value?.resetFields();
   searchForm.docTypeId = null;
   searchForm.sourceDepartmentId = null;
-  searchForm.docTypeNameFilter = '';
-  searchForm.sourceDepartmentNameFilter = '';
+  searchForm.docTypeNameFilter = "";
+  searchForm.sourceDepartmentNameFilter = "";
   searchForm.handoverDateRange = null;
-  searchForm.docName = '';
-  searchForm.submitter = '';
-  searchForm.receiver = '';
-  searchForm.signer = '';
+  searchForm.docName = "";
+  searchForm.submitter = "";
+  searchForm.receiver = "";
+  searchForm.signer = "";
   handleSearch();
 };
 
 const handleSortChange = (sort: Sort) => {
-    const { prop, order } = sort;
-    if (prop && order) {
-        fetchData({ prop, order });
-    } else {
-        // 清除排序条件，可以重新获取默认排序的数据
-        fetchData();
-    }
+  const { prop, order } = sort;
+  if (prop && order) {
+    fetchData({ prop, order });
+  } else {
+    // 清除排序条件，可以重新获取默认排序的数据
+    fetchData();
+  }
 };
 
 // Prefixed val with underscore
@@ -365,69 +501,63 @@ const handleCurrentChange = (_val: number) => {
 
 // --- CRUD 实现 ---
 const openAddDialog = () => {
-  if (documentFormDialogRef.value) {
-      documentFormDialogRef.value.open('add');
-  } else {
-      console.error('DocumentFormDialog reference is null');
-      ElMessage.error('无法打开新增对话框，请刷新重试');
-  }
+  documentFormDialogRef.value?.open("add");
 };
 
-const openEditDialog = (row: DocumentInfo) => {
-  if (documentFormDialogRef.value) {
-      documentFormDialogRef.value.open('edit', row);
-  } else {
-      console.error('DocumentFormDialog reference is null');
-      ElMessage.error('无法打开编辑对话框，请刷新重试');
-  }
+const handleViewDocumentInfo = (row: DocumentInfo) => {
+  documentFormDialogRef.value?.open("view", row);
 };
 
-const openViewDialog = (row: DocumentInfo) => {
-  if (documentFormDialogRef.value) {
-      documentFormDialogRef.value.open('view', row);
-  } else {
-      console.error('DocumentFormDialog reference is null');
-      ElMessage.error('无法打开查看对话框，请刷新重试');
-  }
+const handleEdit = (row: DocumentInfo) => {
+  documentFormDialogRef.value?.open("edit", row);
 };
 
 const handleDelete = async (row: DocumentInfo) => {
-  if (typeof row.id !== 'number') {
-    ElMessage.error('无法删除：文档 ID 无效');
+  if (typeof row.id !== "number") {
+    ElMessage.error("无法删除：文档 ID 无效");
     return;
   }
   try {
-    await ElMessageBox.confirm(`确定要删除文档 "${row.docName || '未知名称'}" 吗?`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    });
+    await ElMessageBox.confirm(
+      `确定要删除文档 "${row.docName || "未知名称"}" 吗?`,
+      "提示",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
     loading.value = true;
     await deleteDocument(row.id);
-    ElMessage.success(`删除文档 "${row.docName || '未知名称'}" 成功`);
+    ElMessage.success(`删除文档 "${row.docName || "未知名称"}" 成功`);
     fetchData();
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除文档失败:', error);
-      ElMessage.error(`删除文档失败: ${(error as Error)?.message || '未知错误'}`);
+    if (error !== "cancel") {
+      console.error("删除文档失败:", error);
+      ElMessage.error(
+        `删除文档失败: ${(error as Error)?.message || "未知错误"}`
+      );
     }
   } finally {
-      loading.value = false;
+    loading.value = false;
   }
 };
 
 const handleSelectionChange = (selection: DocumentInfo[]) => {
   selectedDocumentIds.value = selection
-    .map(item => item.id)
-    .filter((id): id is number => typeof id === 'number');
-  console.log('[Debug] DocumentListView: Selection changed, selected IDs:', selectedDocumentIds.value);
+    .map((item) => item.id)
+    .filter((id): id is number => typeof id === "number");
+  console.log(
+    "[Debug] DocumentListView: Selection changed, selected IDs:",
+    selectedDocumentIds.value
+  );
 };
 
 const handleExport = () => {
   if (exportOptionsDialogRef.value) {
     const currentPageIds = tableData.value
       .map((item: DocumentInfo) => item.id)
-      .filter((id): id is number => typeof id === 'number');
+      .filter((id): id is number => typeof id === "number");
 
     exportOptionsDialogRef.value.open(
       searchForm,
@@ -439,39 +569,42 @@ const handleExport = () => {
 
 // --- 新增：批量导入处理函数 ---
 const handleImportClick = async () => {
-  console.log('[DocumentListView] handleImportClick called');
+  console.log("[DocumentListView] handleImportClick called");
   if (!importDialogRef.value) {
-    console.error('[DocumentListView] Import dialog reference is null');
-    ElMessage.error('导入对话框组件未正确加载，请刷新页面重试');
+    console.error("[DocumentListView] Import dialog reference is null");
+    ElMessage.error("导入对话框组件未正确加载，请刷新页面重试");
     return;
   }
   try {
-    console.log('[DocumentListView] Opening import dialog...');
+    console.log("[DocumentListView] Opening import dialog...");
     await importDialogRef.value.open();
-    console.log('[DocumentListView] Import dialog opened successfully.');
+    console.log("[DocumentListView] Import dialog opened successfully.");
   } catch (error) {
-    console.error('[DocumentListView] Error opening import dialog:', error);
-    ElMessage.error('打开导入对话框时发生错误，请刷新页面重试');
+    console.error("[DocumentListView] Error opening import dialog:", error);
+    ElMessage.error("打开导入对话框时发生错误，请刷新页面重试");
   }
 };
 
 // --- 工具函数 ---
-const formatDisplayDate = (dateInput: string | number | Date | undefined | null, onlyDate: boolean = false): string => {
-  if (!dateInput) return '-';
+const formatDisplayDate = (
+  dateInput: string | number | Date | undefined | null,
+  onlyDate: boolean = false
+): string => {
+  if (!dateInput) return "-";
   try {
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '-';
+    if (isNaN(date.getTime())) return "-";
     const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
     if (onlyDate) return `${year}-${month}-${day}`;
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const seconds = date.getSeconds().toString().padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   } catch (error) {
-    console.error('Error formatting date:', dateInput, error);
-    return '-';
+    console.error("Error formatting date:", dateInput, error);
+    return "-";
   }
 };
 
@@ -485,7 +618,7 @@ const formatDateTime = (date: Date | string | null): string => {
 
 // --- 生命周期钩子 ---
 onMounted(() => {
-  console.log('[DocumentListView] onMounted STARTING...');
+  console.log("[DocumentListView] onMounted STARTING...");
   fetchDocTypeTree();
   fetchDepartmentTree();
   fetchData();
@@ -493,7 +626,7 @@ onMounted(() => {
 
 const handleDocTypeSelect = (value: number | null) => {
   if (value !== null) {
-    searchForm.docTypeNameFilter = '';
+    searchForm.docTypeNameFilter = "";
   }
 };
 const handleDocTypeNameInput = (value: string) => {
@@ -503,7 +636,7 @@ const handleDocTypeNameInput = (value: string) => {
 };
 const handleDepartmentSelect = (value: number | null) => {
   if (value !== null) {
-    searchForm.sourceDepartmentNameFilter = '';
+    searchForm.sourceDepartmentNameFilter = "";
   }
 };
 const handleDepartmentNameInput = (value: string) => {
@@ -512,6 +645,13 @@ const handleDepartmentNameInput = (value: string) => {
   }
 };
 
+const handlePreviewFiles = (row: DocumentInfo) => {
+  if (row.id) {
+    documentFileViewDialogRef.value?.open(row.id);
+  } else {
+    ElMessage.error("无法预览附件：无效的文档ID。");
+  }
+};
 </script>
 
 <style scoped>
@@ -530,28 +670,28 @@ const handleDepartmentNameInput = (value: string) => {
 }
 
 .search-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: flex-start;
 }
 .search-form .el-form-item {
-    margin-bottom: 15px;
-    margin-right: 0;
+  margin-bottom: 15px;
+  margin-right: 0;
 }
 .search-buttons {
-    margin-left: auto;
-    display: flex;
-    gap: 8px;
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
 }
 
 .table-card {
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    :deep(.el-card__body) {
-        padding: 15px;
-    }
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  :deep(.el-card__body) {
+    padding: 15px;
+  }
 }
 
 .toolbar {
@@ -572,11 +712,11 @@ const handleDepartmentNameInput = (value: string) => {
 }
 
 .el-table .el-button + .el-button {
-    margin-left: 8px;
+  margin-left: 8px;
 }
 
 :deep(.el-tree-select__popper) {
-    min-width: fit-content;
+  min-width: fit-content;
 }
 
 .filter-group {
@@ -592,14 +732,13 @@ const handleDepartmentNameInput = (value: string) => {
 
 /* 确保 el-upload 内的按钮样式正常 */
 .el-upload {
-    display: inline-block; /* 使其与旁边的按钮对齐 */
-    margin-right: 10px; /* 可以调整与其他按钮的间距 */
+  display: inline-block; /* 使其与旁边的按钮对齐 */
+  margin-right: 10px; /* 可以调整与其他按钮的间距 */
 }
 
 /* 可能需要调整 toolbar 内按钮的垂直对齐方式 */
 .toolbar-buttons {
-    display: flex;
-    align-items: center; /* 尝试垂直居中对齐 */
+  display: flex;
+  align-items: center; /* 尝试垂直居中对齐 */
 }
-
 </style>
