@@ -1,7 +1,7 @@
 // LDIMS/frontend/src/services/api/system.ts
 import request from '../request'; // 导入封装的 axios 实例
 // 导入需要的类型 (假设后端类型已通过别名配置或相对路径导入)
-import type { SystemConfigMap } from '@/types/api'; // 从前端 types/api 导入
+import type { SystemConfigMap } from '@/types/system'; // 假设类型定义在此
 import type { OperationLogQuery, OperationLogInfo } from '@backend-types/operationLog'; // 指向后端 operationLog 类型
 import type { PageResult } from '@/types/common'; // 从前端 types/common 导入
 
@@ -10,7 +10,7 @@ import type { PageResult } from '@/types/common'; // 从前端 types/common 导�
  * @returns {Promise<SystemConfigMap>} 返回键值对形式的配置
  */
 export const getSystemConfigs = (): Promise<SystemConfigMap> => {
-    return request.get('/system/config');
+    return request.get<SystemConfigMap>('/system/config');
 };
 
 /**
@@ -18,8 +18,8 @@ export const getSystemConfigs = (): Promise<SystemConfigMap> => {
  * @param {SystemConfigMap} data - 需要更新的配置键值对
  * @returns {Promise<null>} 后端成功时不返回 data
  */
-export const updateSystemConfigs = (data: SystemConfigMap): Promise<null> => {
-    return request.put('/system/config', data);
+export const updateSystemConfigs = (data: Partial<SystemConfigMap>): Promise<void> => {
+    return request.put<void>('/system/config', data);
 };
 
 /**

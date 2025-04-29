@@ -20,7 +20,7 @@ export const validateUpdateDocument = [
     param('id').isInt({ gt: 0 }).withMessage('路由参数 ID 必须是正整数'),
     body('docName').optional().notEmpty().withMessage('文档名称不能为空').trim().isLength({ max: 255 }).withMessage('文档名称过长'),
     body('docTypeId').optional({ nullable: true }).isInt({ gt: 0 }).withMessage('无效的文档类型 ID'),
-    body('sourceDepartmentId').optional().isInt({ gt: 0 }).withMessage('无效的所属部门 ID'),
+    body('sourceDepartmentId').optional({ nullable: true }).isInt({ gt: 0 }).withMessage('无效的所属部门 ID'),
     body('submitter').optional().notEmpty().withMessage('提交人不能为空').trim().isLength({ max: 50 }).withMessage('提交人名称过长'),
     body('receiver').optional().notEmpty().withMessage('接收人不能为空').trim().isLength({ max: 50 }).withMessage('接收人名称过长'),
     body('handoverDate').optional({ nullable: true }).isISO8601().toDate().withMessage('无效的交接日期格式 (YYYY-MM-DD)'),
