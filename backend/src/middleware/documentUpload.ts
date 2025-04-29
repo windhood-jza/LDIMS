@@ -11,6 +11,7 @@ const ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
   "image/png",
+  "image/bmp",
   "application/msword", // .doc
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   // 可以根据需要添加更多类型，例如:
