@@ -65,6 +65,7 @@ export const executePythonScript = (
       pythonProcess = spawn(pythonExecutable, [scriptPath, ...args], {
         timeout: timeout,
         stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
       });
 
       // 捕获标准输出
