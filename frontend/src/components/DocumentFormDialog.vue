@@ -203,18 +203,6 @@
         </el-table-column>
       </el-table>
 
-      <div
-        v-if="mode === 'add' && !isMetadataSaved"
-        class="metadata-not-saved-tip"
-      >
-        <el-alert
-          title="请先保存基本信息才能上传文件"
-          type="info"
-          :closable="false"
-          show-icon
-        />
-      </div>
-
       <div style="margin-top: 20px">
         <el-upload
           ref="uploadRef"
@@ -224,20 +212,21 @@
           multiple
           :limit="10"
           :on-exceed="handleUploadExceed"
-          :disabled="mode === 'add' && !isMetadataSaved"
           :headers="uploadHeaders"
+          :http-request="() => undefined"
+          :before-upload="() => !loading"
+          :disabled="loading"
         >
           <template #trigger>
-            <el-button
-              type="primary"
-              :disabled="mode === 'add' && !isMetadataSaved"
-              >选择文件</el-button
-            >
+            <el-button type="primary" :disabled="loading">选择文件</el-button>
           </template>
           <template #tip>
             <div class="el-upload__tip">
               支持 PDF, Word, JPG, PNG 等格式，最多上传 10 个文件。
-              <span style="color: red; margin-left: 10px"
+              <span style="color: #e6a23c; margin-left: 5px"
+                >注意：PDF、JPG、PNG 可直接预览，其他格式需下载后查看。</span
+              >
+              <span v-if="mode === 'edit'" style="color: red; margin-left: 10px"
                 >注意：上传新文件将替换所有现有文件！</span
               >
             </div>
@@ -249,19 +238,15 @@
         <el-button
           type="danger"
           @click="handleClearAllFiles"
-          :disabled="
-            associatedFiles.length === 0 || (mode === 'add' && !isMetadataSaved)
-          "
+          :disabled="associatedFiles.length === 0 || loading"
           :loading="loading"
         >
           清空文件
         </el-button>
         <el-button
           type="success"
-          @click="handleUploadFiles"
-          :disabled="
-            filesToUpload.length === 0 || (mode === 'add' && !isMetadataSaved)
-          "
+          @click="() => handleUploadFiles()"
+          :disabled="filesToUpload.length === 0 || loading || mode === 'add'"
           :loading="loading"
         >
           上传选中文件
@@ -375,6 +360,9 @@ const currentId = ref<number | null>(null);
 const isEditingDocType = ref(false);
 const isEditingDepartment = ref(false);
 
+const userModifiedDocType = ref(false);
+const userModifiedDepartment = ref(false);
+
 const getInitialFormData = () => ({
   doc_name: "",
   docTypeId: null as number | null,
@@ -466,6 +454,9 @@ const open = (type: "add" | "edit" | "view", data?: DocumentInfo) => {
 
   isEditingDocType.value = type === "add";
   isEditingDepartment.value = type === "add";
+
+  userModifiedDocType.value = false;
+  userModifiedDepartment.value = false;
 
   const parseId = (id: number | string | undefined | null): number | null => {
     if (id === undefined || id === null || id === "") return null;
@@ -566,8 +557,9 @@ const handleDocTypeChange = (selectedId: number | null) => {
   };
   const selectedNode = findNodeById(props.docTypeTreeData, selectedId);
   formData.docTypeName = selectedNode ? selectedNode.name : null;
+  userModifiedDocType.value = true;
   console.log(
-    `[Dialog] DocType changed. Selected ID: ${selectedId}, Updated Name: ${formData.docTypeName}`
+    `[Dialog] DocType changed. Selected ID: ${selectedId}, Updated Name: ${formData.docTypeName}, User Modified: ${userModifiedDocType.value}`
   );
 };
 
@@ -589,8 +581,9 @@ const handleDepartmentChange = (selectedId: number | null) => {
   };
   const selectedNode = findNodeById(props.departmentTreeData, selectedId);
   formData.sourceDepartmentName = selectedNode ? selectedNode.name : null;
+  userModifiedDepartment.value = true;
   console.log(
-    `[Dialog] Department changed. Selected ID: ${selectedId}, Updated Name: ${formData.sourceDepartmentName}`
+    `[Dialog] Department changed. Selected ID: ${selectedId}, Updated Name: ${formData.sourceDepartmentName}, User Modified: ${userModifiedDepartment.value}`
   );
 };
 
@@ -609,10 +602,18 @@ const handleSubmit = async () => {
       storageLocation: formData.storageLocation ?? undefined,
       handoverDate: formData.handoverDate,
       remarks: formData.remarks,
-      docTypeId: formData.docTypeId,
-      sourceDepartmentId: formData.sourceDepartmentId,
     };
+
+    if (userModifiedDocType.value) {
+      payload.docTypeId = formData.docTypeId;
+    }
+
+    if (userModifiedDepartment.value) {
+      payload.sourceDepartmentId = formData.sourceDepartmentId;
+    }
+
     let savedDocumentId: number | null = null;
+    let isNewDocument = false;
 
     console.log("[Dialog] Submitting data:", payload);
 
@@ -623,6 +624,7 @@ const handleSubmit = async () => {
       if (newDocument && newDocument.id) {
         savedDocumentId = newDocument.id;
         currentId.value = savedDocumentId;
+        isNewDocument = true;
         ElMessage.success("文档新增成功");
       } else {
         throw new Error("创建文档后未能获取到有效的文档 ID");
@@ -633,9 +635,22 @@ const handleSubmit = async () => {
       ElMessage.success("文档更新成功");
     }
 
-    if (savedDocumentId && canStartProcessing.value) {
+    if (savedDocumentId && filesToUpload.value.length > 0) {
       console.log(
-        `[handleSubmit] Document ${savedDocumentId} saved/updated. Checking for pending files...`
+        `[handleSubmit] Document ${mode.value} successful (ID: ${savedDocumentId}). Uploading ${filesToUpload.value.length} selected files.`
+      );
+      try {
+        await handleUploadFiles(savedDocumentId);
+      } catch (uploadError) {
+        console.error(
+          "[handleSubmit] Uploading files after save failed:",
+          uploadError
+        );
+        ElMessage.error("文档信息已保存，但文件上传失败。");
+      }
+    } else if (savedDocumentId && isNewDocument && canStartProcessing.value) {
+      console.log(
+        `[handleSubmit] Document ${savedDocumentId} saved. Checking for pending files...`
       );
       console.log(
         `[handleSubmit] Pending files detected (canStartProcessing=${canStartProcessing.value}). Attempting to automatically start processing.`
@@ -649,9 +664,9 @@ const handleSubmit = async () => {
         );
         ElMessage.error("文档已保存，但自动触发文件处理失败。");
       }
-    } else {
+    } else if (savedDocumentId) {
       console.log(
-        `[handleSubmit] Document ${savedDocumentId} saved/updated. No pending files found (canStartProcessing=${canStartProcessing.value}).`
+        `[handleSubmit] Document ${savedDocumentId} ${mode.value} successful. No files selected for upload or no pending processing needed.`
       );
     }
 
@@ -710,8 +725,9 @@ const handleClearAllFiles = async () => {
   }
 };
 
-const handleUploadFiles = async () => {
-  if (!currentId.value || filesToUpload.value.length === 0) return;
+const handleUploadFiles = async (docIdParam?: number) => {
+  const targetDocId = docIdParam ?? currentId.value;
+  if (!targetDocId || filesToUpload.value.length === 0) return;
 
   const formDataInstance = new FormData();
   filesToUpload.value.forEach((file) => {
@@ -722,18 +738,25 @@ const handleUploadFiles = async () => {
 
   loading.value = true;
   try {
-    const res = await apiUploadFiles(currentId.value!, formDataInstance);
+    const res = await apiUploadFiles(targetDocId, formDataInstance);
     ElMessage.success("文件上传成功");
     associatedFiles.value = res.files || [];
     console.log(
-      "[Upload Success] Associated files updated (check fileName):",
+      "[Upload Success] Associated files updated:",
       JSON.parse(JSON.stringify(associatedFiles.value))
     );
     filesToUpload.value = [];
     uploadRef.value?.clearFiles();
+    if (!docIdParam && canStartProcessing.value) {
+      console.log(
+        "[handleUploadFiles] Standalone upload successful. Triggering processing."
+      );
+      await handleStartProcessing();
+    }
   } catch (error: any) {
     console.error("Upload files error:", error);
     ElMessage.error(error.message || "文件上传失败");
+    throw error;
   } finally {
     loading.value = false;
   }

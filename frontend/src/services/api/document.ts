@@ -159,7 +159,7 @@ export const downloadFile = async (
   try {
     // 请求下载接口，期望返回 Blob 数据
     const response = await wrappedRequest.get<Blob>(
-      `/files/${fileId}/download`,
+      `/documents/files/${fileId}/download`,
       {
         responseType: "blob", // 关键：告诉 axios 期望接收 Blob 数据
       }
