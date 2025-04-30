@@ -127,28 +127,70 @@
             </div>
           </div>
 
-          <!-- PDF -->
+          <!-- PDF Preview -->
           <div
             v-else-if="selectedFile && isPdfType(selectedFile.fileType)"
-            class="file-action-card"
+            class="pdf-preview-container"
           >
-            <div class="icon-container">
-              <el-icon :size="32"><Document /></el-icon>
-            </div>
-            <div class="action-info">
-              <div class="file-type">
-                {{ getFriendlyFileType(selectedFile.fileType) }}
-              </div>
-              <el-link
-                :href="`/api/v1/documents/files/${selectedFile.id}/download`"
+            <div class="pdf-toolbar">
+              <el-button-group>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  @click="prevPage"
+                  :disabled="currentPage <= 1"
+                >
+                  <el-icon><ArrowLeft /></el-icon> 上一页
+                </el-button>
+                <el-button type="primary" plain size="small">
+                  {{ currentPage }} / {{ totalPages }}
+                </el-button>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  @click="nextPage"
+                  :disabled="currentPage >= totalPages"
+                >
+                  下一页 <el-icon><ArrowRight /></el-icon>
+                </el-button>
+              </el-button-group>
+              <el-button-group>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  @click="zoomOut"
+                  :disabled="scale <= 0.5"
+                >
+                  <el-icon><ZoomOut /></el-icon>
+                </el-button>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  @click="zoomIn"
+                  :disabled="scale >= 2.0"
+                >
+                  <el-icon><ZoomIn /></el-icon>
+                </el-button>
+              </el-button-group>
+              <el-button
                 type="primary"
-                target="_blank"
-                :underline="false"
-                class="action-link"
+                link
+                size="small"
+                @click="handleDownloadFile(selectedFile)"
               >
-                在新标签页中打开
-                <el-icon class="el-icon--right"><View /></el-icon>
-              </el-link>
+                <el-icon><Download /></el-icon> 下载PDF
+              </el-button>
+            </div>
+            <div class="pdf-container">
+              <canvas ref="pdfCanvas" class="pdf-canvas"></canvas>
+            </div>
+            <div v-if="pdfLoading" class="pdf-loading-overlay">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>加载PDF中...</span>
             </div>
           </div>
 
@@ -187,7 +229,7 @@
 
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="handleClose">关闭</el-button>
+        <el-button @click="() => handleClose()">关闭</el-button>
       </span>
     </template>
   </el-dialog>
@@ -202,6 +244,8 @@ import {
   onBeforeUnmount,
   watch,
   onMounted,
+  shallowRef,
+  toRaw,
 } from "vue";
 import {
   ElDialog,
@@ -217,6 +261,7 @@ import {
   ElLink,
   ElImageViewer,
   ElDivider,
+  ElButtonGroup,
 } from "element-plus";
 import type { SimplifiedDocumentFile as DocumentFile } from "@/types/document";
 import {
@@ -230,10 +275,17 @@ import {
   View,
   Download,
   ZoomIn,
+  ZoomOut,
   ArrowLeft,
   ArrowRight,
   Paperclip,
-} from "@element-plus/icons-vue"; // Added Paperclip
+  Loading,
+} from "@element-plus/icons-vue";
+// 移除全局PDF.js导入，改为在需要时动态加载
+import type {
+  PDFDocumentProxy,
+  RenderTask,
+} from "pdfjs-dist/types/src/display/api";
 
 const dialogVisible = ref(false);
 const loading = ref(false);
@@ -254,6 +306,18 @@ const imageFiles = computed(() =>
 );
 const hasImageFiles = computed(() => imageFiles.value.length > 0);
 
+// PDF related state
+const pdfCanvas = ref<HTMLCanvasElement | null>(null);
+const pdfLoading = ref(false);
+const pdfDocument = shallowRef<PDFDocumentProxy | null>(null);
+const currentPage = ref(1);
+const totalPages = ref(0);
+const scale = ref(1.0);
+const currentRenderTask = ref<RenderTask | null>(null);
+
+// 添加变量标记PDF.js是否已加载
+const pdfJsLoaded = ref(false);
+
 // Gallery scroll related state
 const galleryRef = ref<HTMLElement | null>(null);
 const hasScrollableGallery = ref(false);
@@ -267,6 +331,12 @@ const open = async (documentId: number) => {
   associatedFiles.value = [];
   selectedFile.value = null;
   fileImageUrls.value = {}; // Reset image URLs
+
+  // Reset PDF state
+  pdfDocument.value = null;
+  currentPage.value = 1;
+  totalPages.value = 0;
+  scale.value = 1.0;
 
   try {
     const fullData = await getDocumentInfo(documentId);
@@ -291,13 +361,27 @@ const open = async (documentId: number) => {
   }
 };
 
-const handleClose = () => {
+const handleClose = (done?: () => void) => {
   // Clean up object URLs
   Object.values(fileImageUrls.value).forEach((url) => {
     if (url) URL.revokeObjectURL(url);
   });
   fileImageUrls.value = {};
+
+  // Clean up PDF document
+  if (pdfDocument.value) {
+    pdfDocument.value.destroy();
+    pdfDocument.value = null;
+  }
+
+  // 取消可能正在进行的渲染任务
+  if (currentRenderTask.value) {
+    currentRenderTask.value.cancel();
+    currentRenderTask.value = null;
+  }
+
   dialogVisible.value = false;
+  if (done) done();
 };
 
 const handleDownloadFile = async (file: DocumentFile) => {
@@ -383,6 +467,17 @@ const isPdfType = (mimeType: string): boolean => {
 
 const selectFileForView = (file: DocumentFile) => {
   selectedFile.value = file;
+
+  // 如果是PDF文件，加载PDF预览
+  if (isPdfType(file.fileType)) {
+    loadPdfPreview(file.id);
+  } else {
+    // 清理PDF资源
+    if (pdfDocument.value) {
+      pdfDocument.value.destroy();
+      pdfDocument.value = null;
+    }
+  }
 };
 
 const preloadImagePreviews = (files: DocumentFile[]) => {
@@ -405,6 +500,164 @@ const loadImagePreview = async (fileId: number) => {
     // Optionally set a placeholder or error state for this specific image
   } finally {
     imageLoading.value = false; // Hide loading indicator
+  }
+};
+
+// 动态加载PDF.js库并初始化
+const loadPdfJs = async () => {
+  // 如果已经加载，直接返回之前加载的模块
+  if (pdfJsLoaded.value) {
+    // 确保返回的是Promise，以便调用者可以用await
+    return Promise.resolve(await import("pdfjs-dist"));
+  }
+
+  try {
+    pdfLoading.value = true;
+    // 动态导入PDF.js
+    const pdfjsModule = await import("pdfjs-dist");
+
+    // --- 配置 workerSrc 指向 public 目录下的 .mjs 文件 ---
+    pdfjsModule.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    // ------------------------------------------------------
+
+    pdfJsLoaded.value = true;
+    return pdfjsModule; // 返回加载的模块
+  } catch (error) {
+    console.error("Failed to load PDF.js:", error);
+    ElMessage.error("PDF预览组件加载失败");
+    throw error; // 重新抛出错误，让调用者知道失败了
+  } finally {
+    pdfLoading.value = false;
+  }
+};
+
+// PDF预览相关函数
+const loadPdfPreview = async (fileId: number) => {
+  if (!fileId) return;
+
+  // 重置PDF状态
+  currentPage.value = 1;
+  totalPages.value = 0;
+  scale.value = 1.0;
+
+  if (pdfDocument.value) {
+    pdfDocument.value.destroy();
+    pdfDocument.value = null;
+  }
+
+  pdfLoading.value = true;
+
+  try {
+    // 动态加载PDF.js
+    const pdfjsModule = await loadPdfJs();
+    if (!pdfjsModule) {
+      throw new Error("PDF.js加载失败");
+    }
+
+    const blob = await getFilePreviewBlob(fileId);
+    const arrayBuffer = await blob.arrayBuffer();
+
+    // 使用动态导入的pdfjsLib
+    const pdf = await pdfjsModule.getDocument({ data: arrayBuffer }).promise;
+
+    pdfDocument.value = pdf;
+    totalPages.value = pdf.numPages;
+
+    // 渲染第一页
+    renderPage();
+  } catch (error) {
+    console.error(`Failed to load PDF preview for file ${fileId}:`, error);
+    ElMessage.error(
+      "PDF预览加载失败: " +
+        (error instanceof Error ? error.message : String(error))
+    );
+  } finally {
+    pdfLoading.value = false;
+  }
+};
+
+const renderPage = async () => {
+  // --- 先取消任务 ---
+  if (currentRenderTask.value) {
+    currentRenderTask.value.cancel();
+    currentRenderTask.value = null;
+  }
+  // ----------------
+
+  // 确保 pdfDocument 和 canvas 都已准备好
+  const doc = pdfDocument.value; // 使用局部变量简化访问
+  const canvas = pdfCanvas.value;
+  if (!doc || !canvas) return;
+
+  try {
+    pdfLoading.value = true;
+    const pageProxy = await doc.getPage(currentPage.value);
+
+    // --- 使用 toRaw 获取原始 page 对象 ---
+    const page = toRaw(pageProxy);
+    // ------------------------------------
+
+    const viewport = page.getViewport({ scale: scale.value });
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("无法获取canvas上下文");
+    }
+
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+
+    const renderContext = {
+      canvasContext: context,
+      viewport: viewport,
+    };
+
+    const renderTask = page.render(renderContext);
+    currentRenderTask.value = renderTask;
+
+    await renderTask.promise;
+    currentRenderTask.value = null;
+  } catch (error: any) {
+    if (error && error.name !== "RenderingCancelledException") {
+      console.error("渲染PDF页面失败:", error);
+      // 避免重复显示渲染错误，因为 cancel 也会触发 error
+      // ElMessage.error('PDF页面渲染失败');
+    }
+    currentRenderTask.value = null;
+  } finally {
+    pdfLoading.value = false;
+  }
+};
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    // 注意：currentPage 的变化会触发 watch，watch 里会调用 renderPage
+    // 所以这里不需要直接调用 renderPage()
+  }
+};
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    // 注意：currentPage 的变化会触发 watch，watch 里会调用 renderPage
+    // 所以这里不需要直接调用 renderPage()
+  }
+};
+
+const zoomIn = () => {
+  if (scale.value < 2.0) {
+    scale.value += 0.25;
+    // 注意：scale 的变化会触发 watch，watch 里会调用 renderPage
+    // 所以这里不需要直接调用 renderPage()
+  }
+};
+
+const zoomOut = () => {
+  if (scale.value > 0.5) {
+    scale.value -= 0.25;
+    // 注意：scale 的变化会触发 watch，watch 里会调用 renderPage
+    // 所以这里不需要直接调用 renderPage()
   }
 };
 
@@ -441,6 +694,40 @@ const scrollGallery = (direction: "left" | "right") => {
   setTimeout(() => checkGalleryScrollable(), 300);
 };
 
+// 监听PDF相关状态变化 (currentPage, scale)
+watch([currentPage, scale], () => {
+  // --- 在 watch 回调开始时取消任务 ---
+  if (currentRenderTask.value) {
+    currentRenderTask.value.cancel();
+    currentRenderTask.value = null;
+  }
+  // -----------------------------------
+  if (pdfDocument.value) {
+    renderPage();
+  }
+});
+
+// 监听selectedFile变化，确保在PDF文件被选中时渲染PDF
+watch(selectedFile, (newFile) => {
+  // --- 在 watch 回调开始时取消任务 ---
+  if (currentRenderTask.value) {
+    currentRenderTask.value.cancel();
+    currentRenderTask.value = null;
+  }
+  // -----------------------------------
+  if (newFile && isPdfType(newFile.fileType)) {
+    nextTick(() => {
+      if (pdfDocument.value) {
+        // 如果文档对象已存在 (切换回已加载的 PDF)
+        renderPage();
+      } else {
+        // 如果文档对象不存在 (首次加载或切换到新 PDF)
+        loadPdfPreview(newFile.id);
+      }
+    });
+  }
+});
+
 // Watchers and Lifecycle hooks for gallery
 watch(
   imageFiles,
@@ -459,6 +746,18 @@ onMounted(() => {
       window.addEventListener("resize", checkGalleryScrollable);
     }
   });
+
+  // 创建隐藏的<script>标签并加载worker文件到public目录
+  // 这是为了确保worker文件可用，但不会阻塞页面加载
+  if (!document.getElementById("pdf-worker-loader")) {
+    const script = document.createElement("script");
+    script.id = "pdf-worker-loader";
+    script.setAttribute("data-pdfjs-src", "/pdf.worker.min.js");
+    script.setAttribute("type", "text/javascript");
+    script.setAttribute("async", "true");
+    script.setAttribute("defer", "true");
+    document.head.appendChild(script);
+  }
 });
 
 onBeforeUnmount(() => {
@@ -470,6 +769,18 @@ onBeforeUnmount(() => {
   Object.values(fileImageUrls.value).forEach((url) => {
     if (url) URL.revokeObjectURL(url);
   });
+
+  // 取消可能正在进行的渲染任务
+  if (currentRenderTask.value) {
+    currentRenderTask.value.cancel();
+    currentRenderTask.value = null;
+  }
+
+  // 清理PDF资源
+  if (pdfDocument.value) {
+    pdfDocument.value.destroy();
+    pdfDocument.value = null;
+  }
 });
 
 // Expose the open method
@@ -723,6 +1034,65 @@ defineExpose({ open });
   align-items: center;
   font-size: 14px;
 }
+
+/* PDF预览相关样式 */
+.pdf-preview-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.pdf-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 1px;
+}
+
+.pdf-container {
+  position: relative;
+  background-color: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 0 0 4px 4px;
+  min-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: auto;
+  padding: 10px;
+}
+
+.pdf-canvas {
+  max-width: 100%;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.pdf-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.pdf-loading-overlay .el-icon {
+  font-size: 32px;
+  color: #409eff;
+  margin-bottom: 10px;
+}
+
 .dialog-footer {
   text-align: right;
 }

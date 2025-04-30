@@ -181,7 +181,7 @@ export const getFilePreviewBlob = async (fileId: number): Promise<Blob> => {
     const responseBlob = await request.get<Blob>( // 指定期望的返回类型为 Blob
       `/documents/files/${fileId}/download`,
       {
-        responseType: 'blob', // 关键：指定响应类型为 blob
+        responseType: "blob", // 关键：指定响应类型为 blob
         // 注意：响应拦截器可能仍然尝试解析 JSON，我们需要确保它能正确处理 Blob
         // 查看 request.ts 的响应拦截器逻辑，确保 Blob 能直接返回
       }
@@ -189,14 +189,17 @@ export const getFilePreviewBlob = async (fileId: number): Promise<Blob> => {
 
     // 由于响应拦截器可能会处理数据，确认返回的是否是 Blob
     if (responseBlob instanceof Blob) {
-       return responseBlob;
+      return responseBlob;
     } else {
-       // 如果拦截器修改了响应，可能需要错误处理
-       console.error("Expected Blob but received:", responseBlob);
-       throw new Error('无法获取文件 Blob 数据，响应类型不匹配');
+      // 如果拦截器修改了响应，可能需要错误处理
+      console.error("Expected Blob but received:", responseBlob);
+      throw new Error("无法获取文件 Blob 数据，响应类型不匹配");
     }
   } catch (error) {
-    console.error(`Error fetching file blob for preview (ID: ${fileId}):`, error);
-    throw new Error('获取文件预览失败');
+    console.error(
+      `Error fetching file blob for preview (ID: ${fileId}):`,
+      error
+    );
+    throw new Error("获取文件预览失败");
   }
 };
