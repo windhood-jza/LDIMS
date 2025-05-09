@@ -1,7 +1,7 @@
 // @/services/api/document.ts
 import wrappedRequest from "../request"; // Use the wrapped request object
 // Removed unused ApiResponse import
-// import type { ApiResponse } from '@/types/api';
+// import type { ApiResponse } from '@/types/api'; 
 import type {
   DocumentListQuery,
   DocumentInfo,
@@ -33,12 +33,12 @@ export const getDocuments = async (
     "[api/document.ts:getDocuments] Entry. Received params:",
     JSON.stringify(params, null, 2)
   );
-  try {
+    try {
     console.log(
       "[api/document.ts:getDocuments] Params BEFORE passing to request util:",
       JSON.stringify(params, null, 2)
     );
-    // Use wrappedRequest.get, expecting PageResult directly after interceptor
+        // Use wrappedRequest.get, expecting PageResult directly after interceptor
     const response = await wrappedRequest.get<PageResult<DocumentInfo>>(
       "/documents",
       { params }
@@ -47,11 +47,11 @@ export const getDocuments = async (
       "[api/document.ts] Response from wrappedRequest.get (should be PageResult):",
       response
     );
-    return response || { list: [], total: 0 }; // Return PageResult directly
-  } catch (error: any) {
+        return response || { list: [], total: 0 }; // Return PageResult directly
+    } catch (error: any) {
     console.error("[api/document.ts] Error in getDocuments:", error);
-    return { list: [], total: 0 };
-  }
+        return { list: [], total: 0 }; 
+    }
 };
 
 /**
@@ -63,7 +63,7 @@ export const getDocuments = async (
 export const createDocument = async (
   data: CreateDocumentRequest
 ): Promise<DocumentInfo> => {
-  // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
+    // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
   return await wrappedRequest.post<DocumentInfo>("/documents", data);
 };
 
@@ -78,8 +78,8 @@ export const updateDocument = async (
   id: number,
   data: UpdateDocumentRequest
 ): Promise<DocumentInfo> => {
-  // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
-  return await wrappedRequest.put<DocumentInfo>(`/documents/${id}`, data);
+    // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
+    return await wrappedRequest.put<DocumentInfo>(`/documents/${id}`, data);
 };
 
 /**
@@ -89,7 +89,7 @@ export const updateDocument = async (
  * @returns Promise<void>
  */
 export const deleteDocument = async (id: number): Promise<void> => {
-  await wrappedRequest.delete<void>(`/documents/${id}`);
+    await wrappedRequest.delete<void>(`/documents/${id}`);
 };
 
 /**
@@ -99,9 +99,9 @@ export const deleteDocument = async (id: number): Promise<void> => {
  * @returns Promise 包含文档详情
  */
 export const getDocumentInfo = async (id: number): Promise<DocumentInfo> => {
-  // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
-  return await wrappedRequest.get<DocumentInfo>(`/documents/${id}`);
-};
+    // Interceptor handles unwrapping ApiResponse, we expect DocumentInfo
+    return await wrappedRequest.get<DocumentInfo>(`/documents/${id}`);
+}; 
 
 /**
  * 上传/替换文档关联文件

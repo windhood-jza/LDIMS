@@ -98,3 +98,4 @@ export const clearCachedStoragePaths = (): void => {
   documentSubPath = null;
   console.info("Cleared cached storage paths.");
 };
+ 

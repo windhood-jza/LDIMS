@@ -129,6 +129,31 @@ export class OperationLogService {
      * @returns {OperationLogInfo}
      */
     private formatLogInfo(log: OperationLog): OperationLogInfo {
+        // --- BEGIN DEBUGGING --- 
+        console.log(`[DEBUG OperationLogService] Formatting log ID: ${log.id}`);
+        console.log(`[DEBUG OperationLogService] Raw log.operationContent:`, log.operationContent);
+        if (log.operationContent && typeof log.operationContent === 'string') {
+            const rawContentBuffer = Buffer.from(log.operationContent, 'utf8'); // Assume it SHOULD be utf8
+            console.log(`[DEBUG OperationLogService] log.operationContent as UTF8 Buffer (hex):`, rawContentBuffer.toString('hex'));
+
+            // Attempt to see if it was mis-interpreted as latin1 when it was actually utf8
+            const fromLatin1ToUtf8 = Buffer.from(log.operationContent, 'latin1').toString('utf8');
+            console.log(`[DEBUG OperationLogService] log.operationContent (interpreted as latin1 then to utf8):`, fromLatin1ToUtf8);
+            
+            // Attempt to see if it's double encoded (e.g. UTF8 bytes interpreted as a string, then that string re-encoded to UTF8)
+            // This is less common for this specific乱码 pattern but good to check.
+            // First, assume log.operationContent is a string that *represents* UTF-8 bytes that were mis-read as (e.g.) latin1
+            // So, get the presumed original bytes by treating the string as latin1
+            const presumedOriginalUtf8Bytes = Buffer.from(log.operationContent, 'latin1');
+            // Then, try to interpret those bytes as a UTF-8 string
+            const interpretAsUtf8 = presumedOriginalUtf8Bytes.toString('utf8');
+            console.log(`[DEBUG OperationLogService] log.operationContent (Buffer from latin1 -> toString utf8):`, interpretAsUtf8);
+
+        } else {
+            console.log(`[DEBUG OperationLogService] log.operationContent is null or not a string.`);
+        }
+        // --- END DEBUGGING --- 
+
         return {
             id: log.id,
             userId: log.userId,

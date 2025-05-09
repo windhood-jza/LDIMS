@@ -7,6 +7,8 @@ import DocumentFile from "../models/DocumentFile"; // 引入 DocumentFile 模型
 import { getStoragePath } from "../config/storage"; // 引入获取存储路径的函数
 import path from "path"; // 引入 path 模块
 import fs from "fs/promises"; // 引入 fs.promises 检查文件是否存在
+import { OperationLogService } from "../services/OperationLogService"; // 新增导入
+import { OperationType } from "../types/operationLog"; // 新增导入
 
 const documentService = new DocumentService(); // Create an instance
 
@@ -282,6 +284,29 @@ class DocumentController {
         `[uploadDocumentFiles] Successfully uploaded ${uploadedFileRecords.length} files for document ID ${documentId}.`
       );
 
+      // --- 新增：操作日志记录 ---
+      try {
+        const fileNames = files.map((f) => f.originalname);
+        const operationContent = `文档ID ${documentId} 上传了 ${
+          fileNames.length
+        } 个文件: ${fileNames.join(", ")}`;
+        await OperationLogService.logFromRequest(
+          req,
+          OperationType.ATTACHMENT_UPLOAD,
+          operationContent
+        );
+        console.log(
+          `[uploadDocumentFiles] Operation log created for document ID ${documentId} attachment upload.`
+        );
+      } catch (logError) {
+        console.error(
+          `[uploadDocumentFiles] Failed to create operation log for document ID ${documentId} attachment upload:`,
+          logError
+        );
+        // 日志记录失败不应中断主流程
+      }
+      // --- 操作日志记录结束 ---
+
       // 4. 返回成功响应 (包含新创建的文件记录信息)
       return res.json(
         success({ files: uploadedFileRecords }, "文件上传并替换成功")
@@ -290,7 +315,7 @@ class DocumentController {
       // 捕获来自 Service 层的错误 (包括文件系统、数据库错误等)
       // Multer 自身的错误 (如文件过大) 通常由 Multer 或全局错误处理中间件处理
       console.error(
-        `[uploadDocumentFiles] Error processing file upload for document ID ${req.params.id}:`,
+        `[uploadDocumentFiles] Error uploading files for document ID ${req.params.id}:`,
         error
       );
       // 将错误传递给全局错误处理中间件
@@ -324,6 +349,26 @@ class DocumentController {
       console.log(
         `[deleteAllDocumentFiles] Successfully deleted all files for document ID ${documentId}.`
       );
+
+      // --- 新增：操作日志记录 ---
+      try {
+        const operationContent = `清空了文档ID ${documentId} 的所有附件`;
+        await OperationLogService.logFromRequest(
+          req,
+          OperationType.ATTACHMENT_CLEAR,
+          operationContent
+        );
+        console.log(
+          `[deleteAllDocumentFiles] Operation log created for document ID ${documentId} attachment clear.`
+        );
+      } catch (logError) {
+        console.error(
+          `[deleteAllDocumentFiles] Failed to create operation log for document ID ${documentId} attachment clear:`,
+          logError
+        );
+        // 日志记录失败不应中断主流程
+      }
+      // --- 操作日志记录结束 ---
 
       // 3. 返回成功响应
       // 通常对于 DELETE 操作，成功时返回 204 No Content 或 200 OK

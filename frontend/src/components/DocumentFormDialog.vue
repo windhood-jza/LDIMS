@@ -33,7 +33,7 @@
               disabled
               placeholder="---"
             />
-            <template v-else-if="!isEditingDocType">
+             <template v-else-if="!isEditingDocType">
               <el-input
                 :model-value="formData.docTypeName"
                 disabled
@@ -43,19 +43,19 @@
               <el-button @click="isEditingDocType = true" :disabled="isViewMode"
                 >更改</el-button
               >
-            </template>
-            <el-tree-select
-              v-else
-              :model-value="formData.docTypeId"
-              @update:modelValue="handleDocTypeChange"
-              placeholder="请选择新文档类型"
-              :data="props.docTypeTreeData"
-              :props="treeProps"
-              check-strictly
-              :render-after-expand="false"
-              clearable
-              style="width: 100%"
-            />
+             </template>
+             <el-tree-select
+               v-else
+               :model-value="formData.docTypeId"
+               @update:modelValue="handleDocTypeChange"
+               placeholder="请选择新文档类型"
+               :data="props.docTypeTreeData"
+               :props="treeProps"
+               check-strictly
+               :render-after-expand="false"
+               clearable
+               style="width: 100%"
+             />
           </el-form-item>
         </el-col>
       </el-row>
@@ -68,7 +68,7 @@
               disabled
               placeholder="---"
             />
-            <template v-else-if="!isEditingDepartment">
+             <template v-else-if="!isEditingDepartment">
               <el-input
                 :model-value="formData.sourceDepartmentName"
                 disabled
@@ -80,74 +80,74 @@
                 :disabled="isViewMode"
                 >更改</el-button
               >
-            </template>
-            <el-tree-select
-              v-else
-              :model-value="formData.sourceDepartmentId"
-              @update:modelValue="handleDepartmentChange"
-              placeholder="请选择新来源部门"
-              :data="props.departmentTreeData"
-              :props="treeProps"
-              check-strictly
-              :render-after-expand="false"
-              clearable
-              style="width: 100%"
-            />
+             </template>
+             <el-tree-select
+               v-else
+               :model-value="formData.sourceDepartmentId"
+               @update:modelValue="handleDepartmentChange"
+               placeholder="请选择新来源部门"
+               :data="props.departmentTreeData"
+               :props="treeProps"
+               check-strictly
+               :render-after-expand="false"
+               clearable
+               style="width: 100%"
+             />
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="交接日期" prop="handoverDate">
-            <el-date-picker
-              v-model="formData.handoverDate"
-              type="date"
-              placeholder="选择交接日期"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-              :disabled="isViewMode"
-            />
+           <el-form-item label="交接日期" prop="handoverDate">
+             <el-date-picker
+               v-model="formData.handoverDate"
+               type="date"
+               placeholder="选择交接日期"
+               value-format="YYYY-MM-DD"
+               style="width: 100%"
+               :disabled="isViewMode"
+             />
           </el-form-item>
         </el-col>
       </el-row>
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="提交人" prop="submitter">
+       <el-row :gutter="20">
+         <el-col :span="12">
+           <el-form-item label="提交人" prop="submitter">
             <el-input
               v-model="formData.submitter"
               placeholder="请输入提交人"
               :disabled="isViewMode"
             />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="接收人" prop="receiver">
+           </el-form-item>
+         </el-col>
+         <el-col :span="12">
+           <el-form-item label="接收人" prop="receiver">
             <el-input
               v-model="formData.receiver"
               placeholder="请输入接收人"
               :disabled="isViewMode"
             />
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="签署人" prop="signer">
+           </el-form-item>
+         </el-col>
+       </el-row>
+       <el-row :gutter="20">
+         <el-col :span="12">
+           <el-form-item label="签署人" prop="signer">
             <el-input
               v-model="formData.signer"
               placeholder="请输入签署人 (可选)"
               :disabled="isViewMode"
             />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="存放位置" prop="storageLocation">
+           </el-form-item>
+         </el-col>
+         <el-col :span="12">
+           <el-form-item label="存放位置" prop="storageLocation">
             <el-input
               v-model="formData.storageLocation"
               placeholder="请输入存放位置 (可选)"
               :disabled="isViewMode"
             />
-          </el-form-item>
-        </el-col>
-      </el-row>
+           </el-form-item>
+         </el-col>
+       </el-row>
       <el-form-item label="备注" prop="remarks">
         <el-input
           v-model="formData.remarks"
@@ -466,8 +466,8 @@ const open = (type: "add" | "edit" | "view", data?: DocumentInfo) => {
   };
 
   nextTick(async () => {
-    formRef.value?.resetFields();
-    Object.assign(formData, getInitialFormData());
+     formRef.value?.resetFields();
+     Object.assign(formData, getInitialFormData());
 
     if ((type === "edit" || type === "view") && data && data.id) {
       const docId = data.id;
@@ -523,7 +523,7 @@ const open = (type: "add" | "edit" | "view", data?: DocumentInfo) => {
       }
     } else if (type === "add") {
       isMetadataSaved.value = false;
-    }
+     }
   });
 };
 
@@ -531,12 +531,12 @@ const checkNodeExists = (
   node: any,
   targetId: number | null | undefined
 ): boolean => {
-  if (!node || targetId === null || targetId === undefined) return false;
-  if (node.id === targetId) return true;
-  if (node.children && node.children.length > 0) {
-    return node.children.some((child: any) => checkNodeExists(child, targetId));
-  }
-  return false;
+    if (!node || targetId === null || targetId === undefined) return false;
+    if (node.id === targetId) return true;
+    if (node.children && node.children.length > 0) {
+        return node.children.some((child: any) => checkNodeExists(child, targetId));
+    }
+    return false;
 };
 
 const handleDocTypeChange = (selectedId: number | null) => {
@@ -545,17 +545,17 @@ const handleDocTypeChange = (selectedId: number | null) => {
     nodes: TreeNode[] | undefined,
     targetId: number | null
   ): TreeNode | null => {
-    if (!nodes || targetId === null) return null;
-    for (const node of nodes) {
-      if (node.id === targetId) return node;
-      if (node.children && node.children.length > 0) {
-        const found = findNodeById(node.children, targetId);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  const selectedNode = findNodeById(props.docTypeTreeData, selectedId);
+        if (!nodes || targetId === null) return null;
+        for (const node of nodes) {
+            if (node.id === targetId) return node;
+            if (node.children && node.children.length > 0) {
+                const found = findNodeById(node.children, targetId);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+    const selectedNode = findNodeById(props.docTypeTreeData, selectedId);
   formData.docTypeName = selectedNode ? selectedNode.name : null;
   userModifiedDocType.value = true;
   console.log(
@@ -569,17 +569,17 @@ const handleDepartmentChange = (selectedId: number | null) => {
     nodes: TreeNode[] | undefined,
     targetId: number | null
   ): TreeNode | null => {
-    if (!nodes || targetId === null) return null;
-    for (const node of nodes) {
-      if (node.id === targetId) return node;
-      if (node.children && node.children.length > 0) {
-        const found = findNodeById(node.children, targetId);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  const selectedNode = findNodeById(props.departmentTreeData, selectedId);
+        if (!nodes || targetId === null) return null;
+        for (const node of nodes) {
+            if (node.id === targetId) return node;
+            if (node.children && node.children.length > 0) {
+                const found = findNodeById(node.children, targetId);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+    const selectedNode = findNodeById(props.departmentTreeData, selectedId);
   formData.sourceDepartmentName = selectedNode ? selectedNode.name : null;
   userModifiedDepartment.value = true;
   console.log(
@@ -873,4 +873,4 @@ defineExpose({
   color: #606266;
   margin-top: 7px;
 }
-</style>
+</style> 

@@ -1,5 +1,5 @@
-import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
+import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
 
 // 加载环境变量
 dotenv.config();
@@ -9,13 +9,13 @@ export let isConnected = false;
 
 // 数据库配置
 const config = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  database: process.env.DB_NAME || 'LDIMS_DB',
-  username: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  dialect: 'mysql' as const,
-  logging: process.env.NODE_ENV !== 'production' ? console.log : false
+  host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "3306", 10),
+  database: process.env.DB_NAME || "LDIMS_DB",
+  username: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  dialect: "mysql" as const,
+  logging: process.env.NODE_ENV !== "production" ? console.log : false,
 };
 
 // 创建Sequelize实例
@@ -32,8 +32,15 @@ const sequelize = new Sequelize(
       max: 5,
       min: 0,
       acquire: 30000,
-      idle: 10000
-    }
+      idle: 10000,
+    },
+    dialectOptions: {
+      options: {
+        charset: "utf8mb4",
+        supportBigNumbers: true,
+        bigNumberStrings: true,
+      },
+    },
   }
 );
 
@@ -42,18 +49,18 @@ export const testConnection = async () => {
   try {
     await sequelize.authenticate();
     isConnected = true;
-    console.log('数据库连接成功');
+    console.log("数据库连接成功");
     return true;
   } catch (error) {
     isConnected = false;
-    console.error('数据库连接失败:', error);
+    console.error("数据库连接失败:", error);
     return false;
   }
 };
 
 // 即使连接失败也不影响服务启动
-testConnection().catch(err => {
-  console.error('初始数据库连接测试失败，服务仍将继续运行:', err);
+testConnection().catch((err) => {
+  console.error("初始数据库连接测试失败，服务仍将继续运行:", err);
 });
 
-export default sequelize; 
+export default sequelize;
