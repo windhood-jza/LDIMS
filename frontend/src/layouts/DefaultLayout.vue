@@ -22,19 +22,19 @@
             <span>文档管理</span>
           </el-menu-item>
           <el-menu-item index="/doc-types">
-             <el-icon><Collection /></el-icon>
+            <el-icon><Collection /></el-icon>
             <span>文档类型</span>
           </el-menu-item>
           <el-menu-item index="/users">
-             <el-icon><User /></el-icon>
+            <el-icon><User /></el-icon>
             <span>用户管理</span>
           </el-menu-item>
           <el-menu-item index="/departments">
             <el-icon><OfficeBuilding /></el-icon>
             <span>部门管理</span>
           </el-menu-item>
-           <el-menu-item index="/settings">
-             <el-icon><Setting /></el-icon>
+          <el-menu-item index="/settings">
+            <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </el-menu-item>
           <el-menu-item index="/export-tasks">
@@ -54,19 +54,23 @@
           <div class="header-left">
             <el-breadcrumb separator="/">
               <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-              <el-breadcrumb-item v-if="route.meta.title">{{ route.meta.title }}</el-breadcrumb-item>
+              <el-breadcrumb-item v-if="route.meta.title">{{
+                route.meta.title
+              }}</el-breadcrumb-item>
             </el-breadcrumb>
           </div>
           <div class="header-right">
             <el-dropdown @command="handleCommand">
               <span class="el-dropdown-link user-info">
-                <el-avatar :size="30" :src="avatarUrl"/>
+                <el-avatar :size="30" :src="avatarUrl" />
                 <span class="username">{{ displayName }}</span>
                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                  <el-dropdown-item command="logout" divided
+                    >退出登录</el-dropdown-item
+                  >
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -83,12 +87,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 import {
-  ElContainer, ElAside, ElHeader, ElMain, ElMenu, ElMenuItem, ElIcon,
-  ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar,
-  ElBreadcrumb, ElBreadcrumbItem
-} from 'element-plus';
+  ElContainer,
+  ElAside,
+  ElHeader,
+  ElMain,
+  ElMenu,
+  ElMenuItem,
+  ElIcon,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
+  ElAvatar,
+  ElBreadcrumb,
+  ElBreadcrumbItem,
+} from "element-plus";
 import {
   House,
   Files,
@@ -98,9 +112,9 @@ import {
   Setting,
   ArrowDown,
   Download,
-  DataAnalysis // <<< Import the new icon
-} from '@element-plus/icons-vue';
-import { useRoute, useRouter } from 'vue-router';
+  DataAnalysis, // <<< Import the new icon
+} from "@element-plus/icons-vue";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
 const router = useRouter();
@@ -109,25 +123,29 @@ const router = useRouter();
 const activeMenu = computed(() => route.path);
 
 // --- Modified User Info Logic ---
-const userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')!) : null;
+const userInfo = localStorage.getItem("userInfo")
+  ? JSON.parse(localStorage.getItem("userInfo")!)
+  : null;
 // Attempt to display realName, fallback to username, then to '未登录'
-const displayName = computed(() => userInfo ? (userInfo.realName || userInfo.username) : '未登录'); 
+const displayName = computed(() =>
+  userInfo ? userInfo.realName || userInfo.username : "未登录"
+);
 const avatarUrl = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23409eff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E`;
 
 // 处理下拉菜单命令
 const handleCommand = (command: string) => {
-  if (command === 'logout') {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userInfo');
-    router.push('/login');
+  if (command === "logout") {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userInfo");
+    router.push("/login");
   }
 };
-
 </script>
 
 <style scoped>
 /* 基本布局和容器 */
-.common-layout, .layout-container {
+.common-layout,
+.layout-container {
   height: 100vh;
   display: flex;
 }
@@ -166,24 +184,77 @@ const handleCommand = (command: string) => {
   border-right: none;
 }
 
+/* 菜单项样式美化 - 整体放大 */
+.el-menu-item {
+  height: 56px !important; /* 增加菜单项高度 */
+  line-height: 56px !important; /* 行高匹配高度 */
+  padding-left: 20px !important; /* 左侧内边距保持 */
+  font-size: 15px !important; /* 增加字体大小 */
+}
+
 /* 修复菜单项激活时的边框和样式 */
 .el-menu-item.is-active {
-    border-left: 3px solid #409eff;
+  border-left: 3px solid #409eff;
+  padding-left: 17px !important; /* 激活时左边距调整 */
 }
-/* 统一菜单项 padding */
-.el-menu-item {
-    padding-left: 20px !important;
-}
-.el-menu-item.is-active {
-    padding-left: 17px !important;
-}
+
 /* 鼠标悬停时效果 */
 .el-menu-item:hover {
-    background-color: #263445 !important;
+  background-color: #263445 !important;
 }
+
 /* 图标和文字间距 */
 .el-menu-item .el-icon {
-    margin-right: 5px;
+  margin-right: 8px; /* 增加图标和文字的间距 */
+
+  /* 确保图标容器基本可见性和尺寸 */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 1.3em !important; /* 图标再放大一点 */
+  width: 1em !important; /* 基于新的 font-size (即父元素的1.3em) */
+  height: 1em !important; /* 基于新的 font-size */
+  line-height: 1em !important; /* 行高也匹配，有助于垂直对齐 */
+
+  opacity: 1 !important; /* 强制不透明 */
+  visibility: visible !important; /* 强制可见 */
+  overflow: visible !important; /* 防止内容被意外裁剪 */
+  position: relative !important; /* 确保正常的文档流和定位上下文 */
+}
+
+/* 针对图标容器内的 SVG 元素 */
+.el-menu-item .el-icon svg {
+  display: block !important; /* 让 SVG 成为块级元素以填充其父容器 */
+  width: 100% !important; /* SVG 宽度充满其父容器 (父容器是 1em) */
+  height: 100% !important; /* SVG 高度充满其父容器 */
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: static !important; /* 避免奇怪的绝对/相对定位问题 */
+  fill: currentColor !important; /* 确保颜色正确继承 */
+}
+
+/* 为激活状态的菜单项中的图标提供同样的强力覆盖 */
+/* 这确保了即使 Element Plus 对 .is-active 有特定样式，我们的规则也能生效 */
+.el-menu-item.is-active .el-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1em !important;
+  height: 1em !important;
+  line-height: 1em !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+
+.el-menu-item.is-active .el-icon svg {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  fill: currentColor !important;
 }
 
 /* 主容器 */
@@ -259,10 +330,12 @@ const handleCommand = (command: string) => {
 }
 
 /* 隐藏滚动条但保留滚动功能 (适用于 Webkit 内核浏览器) */
-.sidebar::-webkit-scrollbar, .main-content::-webkit-scrollbar {
+.sidebar::-webkit-scrollbar,
+.main-content::-webkit-scrollbar {
   display: none;
 }
-.sidebar, .main-content {
+.sidebar,
+.main-content {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
