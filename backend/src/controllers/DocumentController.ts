@@ -265,6 +265,20 @@ class DocumentController {
           .json(fail("文件上传失败：未检测到上传的文件数组。"));
       }
 
+      // !!! 关键的检查点：记录接收到的原始文件名 !!!
+      if (files && files.length > 0) {
+        files.forEach((file, index) => {
+          console.log(
+            `[uploadDocumentFiles] Received file ${
+              index + 1
+            } for document ID ${documentId}: originalname = '${
+              file.originalname
+            }', mimetype = '${file.mimetype}', size = ${file.size}`
+          );
+        });
+      }
+      // !!! 日志添加结束 !!!
+
       if (files.length === 0) {
         console.log(
           `[uploadDocumentFiles] No files were uploaded for document ID ${documentId}.`
@@ -286,10 +300,14 @@ class DocumentController {
 
       // --- 新增：操作日志记录 ---
       try {
-        const fileNames = files.map((f) => f.originalname);
+        // !!! 修改：使用 uploadedFileRecords 中的最终文件名进行日志记录 !!!
+        const generatedFileNames = uploadedFileRecords.map(
+          (record) => record.fileName
+        );
+
         const operationContent = `文档ID ${documentId} 上传了 ${
-          fileNames.length
-        } 个文件: ${fileNames.join(", ")}`;
+          generatedFileNames.length
+        } 个文件: ${generatedFileNames.join(", ")}`;
         await OperationLogService.logFromRequest(
           req,
           OperationType.ATTACHMENT_UPLOAD,

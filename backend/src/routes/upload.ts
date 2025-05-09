@@ -88,6 +88,9 @@ router.post(
         // 作为保险措施
         return res.status(400).json({ message: '上传处理异常：未找到文件' });
     }
+    // !!! 关键的检查点：记录接收到的原始文件名 !!!
+    console.log(`[/upload/excel] Received file: originalname = '${req.file.originalname}', mimetype = '${req.file.mimetype}', size = ${req.file.size}, generated filename = '${req.file.filename}'`);
+    // !!! 日志添加结束 !!!
     console.log('File uploaded successfully:', req.file);
 
     // 返回上传成功的信息
