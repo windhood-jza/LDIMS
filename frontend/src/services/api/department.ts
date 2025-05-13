@@ -1,6 +1,10 @@
-import request from '../request'; // 引入封装好的 axios 实例
-import { ElMessage } from 'element-plus'; // 导入 ElMessage
-import type { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '@backend-types/department'; // 引入后端类型
+import request from "../request"; // 引入封装好的 axios 实例
+import { ElMessage } from "element-plus"; // 导入 ElMessage
+import type {
+  DepartmentInfo,
+  CreateDepartmentRequest,
+  UpdateDepartmentRequest,
+} from "@ldims/types"; // 引入共享类型
 // import type { ApiResponse } from '../request';
 
 /**
@@ -12,7 +16,7 @@ const mapTreeDataToDepartmentInfo = (nodes: any[]): DepartmentInfo[] => {
   if (!nodes || !Array.isArray(nodes)) {
     return [];
   }
-  return nodes.map(node => ({
+  return nodes.map((node) => ({
     // 必需属性 (假设后端返回这些)
     id: node.id,
     name: node.name,
@@ -34,32 +38,33 @@ const mapTreeDataToDepartmentInfo = (nodes: any[]): DepartmentInfo[] => {
  * @returns Promise 包含 DepartmentInfo 结构的部门树数组
  */
 export const getDepartmentTree = async (): Promise<DepartmentInfo[]> => {
-    try {
-        // 使用 wrappedRequest.get<T>，T 是期望拦截器处理后返回的类型 (any[] 在这里是合理的，因为需要映射)
-        const responseData = await request.get<any[]>('/departments/tree');
-        // responseData 现在直接是拦截器返回的树形数据数组
-        return mapTreeDataToDepartmentInfo(responseData || []); 
-    } catch (error) {
-        console.error("API Error fetching department tree:", error);
-        ElMessage.error('获取部门树失败');
-        return [];
-    }
+  try {
+    // 使用 wrappedRequest.get<T>，T 是期望拦截器处理后返回的类型 (any[] 在这里是合理的，因为需要映射)
+    const responseData = await request.get<any[]>("/departments/tree");
+    // responseData 现在直接是拦截器返回的树形数据数组
+    return mapTreeDataToDepartmentInfo(responseData || []);
+  } catch (error) {
+    console.error("API Error fetching department tree:", error);
+    ElMessage.error("获取部门树失败");
+    return [];
+  }
 };
 
 /**
  * 获取部门扁平列表 (备用，如果需要)
  */
 export const getDepartmentList = (): Promise<DepartmentInfo[]> => {
-    return request.get('/departments');
+  return request.get("/departments");
 };
-
 
 /**
  * 创建新部门
  * @param data 部门数据
  */
-export const createDepartment = (data: CreateDepartmentRequest): Promise<DepartmentInfo> => {
-  return request.post('/departments', data);
+export const createDepartment = (
+  data: CreateDepartmentRequest
+): Promise<DepartmentInfo> => {
+  return request.post("/departments", data);
 };
 
 /**
@@ -67,7 +72,10 @@ export const createDepartment = (data: CreateDepartmentRequest): Promise<Departm
  * @param id 部门 ID
  * @param data 更新数据
  */
-export const updateDepartment = (id: number, data: UpdateDepartmentRequest): Promise<DepartmentInfo> => {
+export const updateDepartment = (
+  id: number,
+  data: UpdateDepartmentRequest
+): Promise<DepartmentInfo> => {
   return request.put(`/departments/${id}`, data);
 };
 
@@ -75,6 +83,7 @@ export const updateDepartment = (id: number, data: UpdateDepartmentRequest): Pro
  * 删除部门
  * @param id 部门 ID
  */
-export const deleteDepartment = (id: number): Promise<null> => { // 删除成功通常不返回具体数据
+export const deleteDepartment = (id: number): Promise<null> => {
+  // 删除成功通常不返回具体数据
   return request.delete(`/departments/${id}`);
-}; 
+};

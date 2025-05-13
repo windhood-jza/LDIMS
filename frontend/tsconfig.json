@@ -25,9 +25,9 @@
     "baseUrl": ".", // 基准目录
     "paths": {
       "@/*": ["src/*"], // 配置 @/ 指向 src/
-      "@backend-types/*": ["../backend/src/types/*"] // 新增：指向后端类型目录
+      "@backend-types/*": ["node_modules/@ldims/types/*"] // 修改：指向 @ldims/types 包
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]
-} 
+}

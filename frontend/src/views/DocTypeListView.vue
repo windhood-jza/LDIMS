@@ -134,7 +134,7 @@ import { Plus, Delete, RefreshLeft, Check } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { getDocTypeTree, createDocType, updateDocType, deleteDocType } from '../services/api/doctype';
 // Assuming backend types use sortOrder in requests, but sort in DocTypeInfo
-import type { DocTypeInfo, CreateDocTypeRequest, UpdateDocTypeRequest } from '@backend-types/doctype'; 
+import type { DocTypeInfo, CreateDocTypeRequest, UpdateDocTypeRequest } from '@ldims/types'; 
 
 console.log('DocTypeManagement script setup executing...');
 

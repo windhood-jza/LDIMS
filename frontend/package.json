@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ldims/types": "file:../packages/types",
     "@types/file-saver": "^2.0.7",
     "@types/pdfjs-dist": "^2.10.378",
     "axios": "^1.8.4",

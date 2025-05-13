@@ -1,6 +1,6 @@
 import request from '../request';
-// 导入仪表盘数据类型 (确保路径或别名正确)
-import type { DashboardSummaryData } from '@backend-types/dashboard'; // 指向后端 dashboard 类型
+// 导入仪表盘数据类型
+import type { DashboardSummaryData } from '@ldims/types'; // 从共享类型包导入
 
 /**
  * @description 获取仪表盘汇总数据

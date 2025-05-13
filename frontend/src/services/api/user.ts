@@ -1,5 +1,5 @@
 import request from '../request';
-import type { UserInfo } from '@backend-types/user';
+import type { UserInfo } from '@ldims/types';
 import type { PageResult } from '@/types/common';
 
 /**

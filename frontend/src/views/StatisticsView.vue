@@ -13,12 +13,14 @@
             value-format="YYYY-MM-DD"
             @change="handleDateRangeChange"
           />
-          <el-button type="primary" @click="applyDateFilter">应用筛选</el-button>
+          <el-button type="primary" @click="applyDateFilter"
+            >应用筛选</el-button
+          >
           <el-button @click="resetDateFilter">重置</el-button>
         </div>
       </el-card>
     </div>
-    
+
     <div class="charts-container">
       <el-row :gutter="20">
         <el-col :span="12">
@@ -47,20 +49,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted} from 'vue';
-import * as echarts from 'echarts/core';
-import { PieChart } from 'echarts/charts';
+import { ref, onMounted } from "vue";
+import * as echarts from "echarts/core";
+import { PieChart } from "echarts/charts";
 import {
   TitleComponent,
   TooltipComponent,
   LegendComponent,
-  ToolboxComponent
-} from 'echarts/components';
-import { LabelLayout } from 'echarts/features';
-import { CanvasRenderer } from 'echarts/renderers';
-import { getStatsByDepartment, getStatsByDocType } from '@/services/api/statistics';
-import type { NameValueData } from '@backend-types/statistics';
-import { ElMessage } from 'element-plus';
+  ToolboxComponent,
+} from "echarts/components";
+import { LabelLayout } from "echarts/features";
+import { CanvasRenderer } from "echarts/renderers";
+import {
+  getStatsByDepartment,
+  getStatsByDocType,
+} from "@/services/api/statistics";
+import type { NameValueData } from "@ldims/types";
+import { ElMessage } from "element-plus";
 
 // 注册需要的组件
 echarts.use([
@@ -70,7 +75,7 @@ echarts.use([
   PieChart,
   CanvasRenderer,
   LabelLayout,
-  ToolboxComponent
+  ToolboxComponent,
 ]);
 
 const departmentChartRef = ref<HTMLElement | null>(null);
@@ -84,16 +89,18 @@ const isLoading = ref(false);
 const fetchDepartmentStats = async () => {
   try {
     isLoading.value = true;
-    const params = dateRange.value ? {
-      startDate: dateRange.value[0],
-      endDate: dateRange.value[1]
-    } : undefined;
-    
+    const params = dateRange.value
+      ? {
+          startDate: dateRange.value[0],
+          endDate: dateRange.value[1],
+        }
+      : undefined;
+
     const data = await getStatsByDepartment(params);
     renderDepartmentChart(data);
   } catch (error) {
-    console.error('获取部门统计数据失败:', error);
-    ElMessage.error('获取部门统计数据失败');
+    console.error("获取部门统计数据失败:", error);
+    ElMessage.error("获取部门统计数据失败");
   } finally {
     isLoading.value = false;
   }
@@ -103,16 +110,18 @@ const fetchDepartmentStats = async () => {
 const fetchDocTypeStats = async () => {
   try {
     isLoading.value = true;
-    const params = dateRange.value ? {
-      startDate: dateRange.value[0],
-      endDate: dateRange.value[1]
-    } : undefined;
-    
+    const params = dateRange.value
+      ? {
+          startDate: dateRange.value[0],
+          endDate: dateRange.value[1],
+        }
+      : undefined;
+
     const data = await getStatsByDocType(params);
     renderDocTypeChart(data);
   } catch (error) {
-    console.error('获取文档类型统计数据失败:', error);
-    ElMessage.error('获取文档类型统计数据失败');
+    console.error("获取文档类型统计数据失败:", error);
+    ElMessage.error("获取文档类型统计数据失败");
   } finally {
     isLoading.value = false;
   }
@@ -121,87 +130,90 @@ const fetchDocTypeStats = async () => {
 // 渲染部门统计图表
 const renderDepartmentChart = (data: NameValueData[]) => {
   if (!departmentChartRef.value) return;
-  
+
   if (!departmentChart.value) {
     departmentChart.value = echarts.init(departmentChartRef.value);
   }
-  
+
   const option = {
     title: {
-      text: '文档按部门分布',
-      left: 'center',
-      subtext: data.length > 0 ? `总数量: ${data.reduce((sum, item) => sum + item.value, 0)}` : '',
+      text: "文档按部门分布",
+      left: "center",
+      subtext:
+        data.length > 0
+          ? `总数量: ${data.reduce((sum, item) => sum + item.value, 0)}`
+          : "",
     },
     tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
+      trigger: "item",
+      formatter: "{a} <br/>{b}: {c} ({d}%)",
     },
     legend: {
-      type: 'scroll',
-      orient: 'vertical',
+      type: "scroll",
+      orient: "vertical",
       right: 10,
       top: 40,
       bottom: 20,
-      selectedMode: true
+      selectedMode: true,
     },
     toolbox: {
       show: true,
       feature: {
-        dataView: { show: true, readOnly: true, title: '查看数据' },
-        saveAsImage: { show: true, title: '保存为图片' },
-        restore: { show: true, title: '还原' }
-      }
+        dataView: { show: true, readOnly: true, title: "查看数据" },
+        saveAsImage: { show: true, title: "保存为图片" },
+        restore: { show: true, title: "还原" },
+      },
     },
     series: [
       {
-        name: '部门文档数',
-        type: 'pie',
-        radius: ['35%', '70%'],
-        center: ['40%', '55%'],
-        roseType: 'radius',
+        name: "部门文档数",
+        type: "pie",
+        radius: ["35%", "70%"],
+        center: ["40%", "55%"],
+        roseType: "radius",
         itemStyle: {
           borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
+          borderColor: "#fff",
+          borderWidth: 2,
         },
         label: {
           show: true,
-          position: 'outside',
-          formatter: '{b}: {c} ({d}%)',
+          position: "outside",
+          formatter: "{b}: {c} ({d}%)",
           fontSize: 12,
-          alignTo: 'labelLine',
-          overflow: 'break',
-          color: '#444'
+          alignTo: "labelLine",
+          overflow: "break",
+          color: "#444",
         },
         emphasis: {
           label: {
             show: true,
             fontSize: 14,
-            fontWeight: 'bold',
-            color: '#222'
+            fontWeight: "bold",
+            color: "#222",
           },
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
+            shadowColor: "rgba(0, 0, 0, 0.5)",
+          },
         },
         labelLine: {
           show: true,
           length: 15,
           length2: 10,
-          smooth: true
+          smooth: true,
         },
         labelLayout: {
-          hideOverlap: true
+          hideOverlap: true,
         },
-        data: data
-      }
-    ]
+        data: data,
+      },
+    ],
   };
-  
+
   departmentChart.value.setOption(option);
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     departmentChart.value?.resize();
   });
 };
@@ -209,87 +221,90 @@ const renderDepartmentChart = (data: NameValueData[]) => {
 // 渲染文档类型统计图表
 const renderDocTypeChart = (data: NameValueData[]) => {
   if (!docTypeChartRef.value) return;
-  
+
   if (!docTypeChart.value) {
     docTypeChart.value = echarts.init(docTypeChartRef.value);
   }
-  
+
   const option = {
     title: {
-      text: '文档按类型分布',
-      left: 'center',
-      subtext: data.length > 0 ? `总数量: ${data.reduce((sum, item) => sum + item.value, 0)}` : '',
+      text: "文档按类型分布",
+      left: "center",
+      subtext:
+        data.length > 0
+          ? `总数量: ${data.reduce((sum, item) => sum + item.value, 0)}`
+          : "",
     },
     tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
+      trigger: "item",
+      formatter: "{a} <br/>{b}: {c} ({d}%)",
     },
     legend: {
-      type: 'scroll',
-      orient: 'vertical',
+      type: "scroll",
+      orient: "vertical",
       right: 10,
       top: 40,
       bottom: 20,
-      selectedMode: true
+      selectedMode: true,
     },
     toolbox: {
       show: true,
       feature: {
-        dataView: { show: true, readOnly: true, title: '查看数据' },
-        saveAsImage: { show: true, title: '保存为图片' },
-        restore: { show: true, title: '还原' }
-      }
+        dataView: { show: true, readOnly: true, title: "查看数据" },
+        saveAsImage: { show: true, title: "保存为图片" },
+        restore: { show: true, title: "还原" },
+      },
     },
     series: [
       {
-        name: '类型文档数',
-        type: 'pie',
-        radius: ['35%', '70%'],
-        center: ['40%', '55%'],
-        roseType: 'radius',
+        name: "类型文档数",
+        type: "pie",
+        radius: ["35%", "70%"],
+        center: ["40%", "55%"],
+        roseType: "radius",
         itemStyle: {
           borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
+          borderColor: "#fff",
+          borderWidth: 2,
         },
         label: {
           show: true,
-          position: 'outside',
-          formatter: '{b}: {c} ({d}%)',
+          position: "outside",
+          formatter: "{b}: {c} ({d}%)",
           fontSize: 12,
-          alignTo: 'labelLine',
-          overflow: 'break',
-          color: '#444'
+          alignTo: "labelLine",
+          overflow: "break",
+          color: "#444",
         },
         emphasis: {
           label: {
             show: true,
             fontSize: 14,
-            fontWeight: 'bold',
-            color: '#222'
+            fontWeight: "bold",
+            color: "#222",
           },
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
+            shadowColor: "rgba(0, 0, 0, 0.5)",
+          },
         },
         labelLine: {
           show: true,
           length: 15,
           length2: 10,
-          smooth: true
+          smooth: true,
         },
         labelLayout: {
-          hideOverlap: true
+          hideOverlap: true,
         },
-        data: data
-      }
-    ]
+        data: data,
+      },
+    ],
   };
-  
+
   docTypeChart.value.setOption(option);
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     docTypeChart.value?.resize();
   });
 };
@@ -361,4 +376,4 @@ onMounted(() => {
 :deep(.el-card__header) {
   padding: 10px;
 }
-</style> 
+</style>

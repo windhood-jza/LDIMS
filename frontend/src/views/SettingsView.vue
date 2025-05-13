@@ -204,7 +204,7 @@ import {
 import type {
   OperationLogQuery,
   OperationLogInfo,
-} from "@backend-types/operationLog";
+} from "@ldims/types";
 import {
   OperationType,
   OperationTypeNames,
