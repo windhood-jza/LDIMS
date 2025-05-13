@@ -542,6 +542,581 @@ PYTHON_EXECUTABLE_PATH=python3
 
 确保你的 Windows 机器上有项目代码的最新副本，以及所有必要的配置文件 (如生产版 `.env`、SSL 证书、数据库初始化脚本等)。
 
+## 7.3. Windows Docker Desktop 环境中的文件存储路径配置
+
+### 7.3.1 文件存储路径问题
+
+根据项目设计，`FILE_STORAGE_PATH` 配置存储在数据库表中而非环境变量。在 Docker 容器化环境（特别是 Windows Docker Desktop）中，这会带来特殊挑战：
+
+1. **路径一致性**：容器内的路径与主机路径不同
+2. **Windows 路径格式**：Windows 使用 `\` 而容器内使用 `/`
+3. **数据持久化**：Docker 重启后需保持数据
+4. **权限问题**：Windows 与容器内的 Linux 用户权限系统不同
+
+**特别注意**：系统中存在两类不同的存储路径需要挂载：
+
+- Excel 导入/导出路径：代码中固定为 `/app/uploads` 和 `/app/exports`
+- 文档附件存储路径：由数据库中的 `FILE_STORAGE_PATH` 配置项决定
+
+### 7.3.2 Docker 卷配置解决方案
+
+在 `docker-compose.yml` 中正确配置卷是解决此问题的关键。以下是包含附件存储路径的推荐卷配置：
+
+```yaml
+services:
+  backend:
+    # ... 现有配置 ...
+    volumes:
+      # Excel导入导出路径
+      - ldims_uploads_prod:/app/uploads
+      - ldims_exports_prod:/app/exports
+      # 文档附件存储路径（假设数据库中配置为/app/document_files）
+      - ldims_document_files_prod:/app/document_files
+      # 如果需要直接访问Windows主机的特定目录，可使用绑定挂载
+      # - /d/LDIMS_DATA:/app/external_data  # 注意：使用Linux路径格式 /d/... 代替 D:\...
+
+  worker:
+    # ... 现有配置 ...
+    volumes:
+      # 确保worker服务也能访问相同的路径
+      - ldims_uploads_prod:/app/uploads
+      - ldims_document_files_prod:/app/document_files
+
+volumes:
+  ldims_uploads_prod:
+    name: ldims_uploads_prod
+    driver: local
+
+  ldims_exports_prod:
+    name: ldims_exports_prod
+    driver: local
+
+  # 新增：文档附件存储卷
+  ldims_document_files_prod:
+    name: ldims_document_files_prod
+    driver: local
+```
+
+### 7.3.3 数据库 FILE_STORAGE_PATH 初始化
+
+确保在数据库初始化脚本（`init.sql`）中设置正确的容器内附件存储路径：
+
+```sql
+-- 在init.sql中确保FILE_STORAGE_PATH使用容器内路径
+UPDATE system_configs SET config_value = '/app/document_files' WHERE config_key = 'FILE_STORAGE_PATH';
+```
+
+**重要**：这里的 `/app/document_files` 路径必须与 `docker-compose.yml` 中为附件存储配置的卷挂载路径一致。
+
+如果数据库已经初始化，需要手动更新此配置：
+
+```bash
+# 连接到数据库容器并更新配置
+docker-compose exec db mysql -u${DB_USER_PROD} -p${DB_PASSWORD_PROD} ${DB_NAME_PROD} -e "UPDATE system_configs SET config_value = '/app/document_files' WHERE config_key = 'FILE_STORAGE_PATH';"
+```
+
+### 7.3.4 卷和路径挂载的详细操作指南
+
+#### A. 使用 Docker 命名卷（推荐生产环境）
+
+这是最简单也是推荐的方法，Docker 会管理卷的创建和维护：
+
+1. **创建所有需要的卷**：
+
+   ```bash
+   docker volume create ldims_uploads_prod
+   docker volume create ldims_exports_prod
+   docker volume create ldims_document_files_prod  # 文档附件存储卷
+   ```
+
+2. **在 `docker-compose.yml` 中使用卷**（上面已示例）。
+
+3. **查看卷信息**：
+
+   ```bash
+   docker volume inspect ldims_document_files_prod
+   ```
+
+4. **在 Windows 中访问卷内容**：
+   Docker Desktop 在 Windows 中使用 WSL2 存储卷数据。可以通过以下路径访问：
+
+   ```
+   \\wsl$\docker-desktop-data\data\docker\volumes\ldims_document_files_prod\_data
+   ```
+
+   您也可以在 Windows 文件资源管理器中输入此路径进行访问，或使用以下命令打开：
+
+   ```bash
+   explorer "\\wsl$\docker-desktop-data\data\docker\volumes\ldims_document_files_prod\_data"
+   ```
+
+#### B. 使用绑定挂载（便于开发或调试）
+
+如果希望直接访问 Windows 主机上的文件夹，可以使用绑定挂载：
+
+1. **在 Windows 主机上创建目录**：
+
+   ```bash
+   mkdir -p D:\LDIMS_DATA\uploads
+   mkdir -p D:\LDIMS_DATA\exports
+   mkdir -p D:\LDIMS_DATA\document_files  # 新增：文档附件目录
+   ```
+
+2. **修改 `docker-compose.yml` 使用绑定挂载**：
+
+   ```yaml
+   services:
+     backend:
+       volumes:
+         - /d/LDIMS_DATA/uploads:/app/uploads
+         - /d/LDIMS_DATA/exports:/app/exports
+         - /d/LDIMS_DATA/document_files:/app/document_files # 文档附件路径
+
+     worker:
+       volumes:
+         - /d/LDIMS_DATA/uploads:/app/uploads
+         - /d/LDIMS_DATA/document_files:/app/document_files # 文档附件路径
+   ```
+
+   **注意**：
+
+   - 使用 `/d/LDIMS_DATA` 格式而非 `D:\LDIMS_DATA`
+   - 这种方式可能导致权限问题，需要确保 Windows 目录有适当权限
+   - **确保数据库中的 `FILE_STORAGE_PATH` 值为 `/app/document_files`**
+
+3. **检查挂载是否成功**：
+
+   ```bash
+   docker-compose exec backend ls -la /app/document_files
+   ```
+
+4. **权限问题处理**：
+   如果遇到权限问题，可以在容器内部执行：
+   ```bash
+   docker-compose exec backend chown -R nodejs:nodejs /app/document_files
+   ```
+
+#### C. 混合策略（生产环境推荐）
+
+对不同类型的数据使用不同的存储策略：
+
+1. **Excel 上传下载**：使用命名卷
+
+   ```yaml
+   volumes:
+     - ldims_uploads_prod:/app/uploads
+     - ldims_exports_prod:/app/exports
+   ```
+
+2. **文档附件存储**：使用绑定挂载以便更好地备份和管理
+   ```yaml
+   volumes:
+     - /d/LDIMS_DATA/document_files:/app/document_files
+   ```
+
+### 7.3.5 路径配置验证
+
+部署完成后，必须执行以下命令验证附件存储路径配置：
+
+```bash
+# 1. 检查数据库中存储的FILE_STORAGE_PATH值
+docker-compose exec db mysql -u${DB_USER_PROD} -p${DB_PASSWORD_PROD} ${DB_NAME_PROD} -e "SELECT config_key, config_value FROM system_configs WHERE config_key = 'FILE_STORAGE_PATH';"
+
+# 2. 确保该路径在容器中存在且有正确权限
+docker-compose exec backend ls -la $(docker-compose exec db mysql -u${DB_USER_PROD} -p${DB_PASSWORD_PROD} ${DB_NAME_PROD} -s -N -e "SELECT config_value FROM system_configs WHERE config_key = 'FILE_STORAGE_PATH';")
+
+# 3. 测试文件写入到附件存储目录
+docker-compose exec backend bash -c "echo 'test' > $(docker-compose exec -T db mysql -u${DB_USER_PROD} -p${DB_PASSWORD_PROD} ${DB_NAME_PROD} -s -N -e \"SELECT config_value FROM system_configs WHERE config_key = 'FILE_STORAGE_PATH';\")/test.txt && cat $(docker-compose exec -T db mysql -u${DB_USER_PROD} -p${DB_PASSWORD_PROD} ${DB_NAME_PROD} -s -N -e \"SELECT config_value FROM system_configs WHERE config_key = 'FILE_STORAGE_PATH';\")/test.txt"
+```
+
+### 7.3.6 常见问题与解决方案
+
+#### 问题 1: 附件上传后找不到文件
+
+**可能原因**: 数据库中的`FILE_STORAGE_PATH`配置与 Docker 卷挂载路径不匹配
+**解决方案**:
+
+1. 检查并确保数据库中的配置值与 docker-compose.yml 中的挂载路径一致
+2. 确认容器内该路径有正确的读写权限
+3. 如使用绑定挂载，检查主机目录是否存在且有适当权限
+
+#### 问题 2: Windows 访问 Docker 卷中的文件困难
+
+**可能原因**: Docker Desktop 使用 WSL2 存储卷数据，Windows 系统无法直接访问
+**解决方案**:
+
+1. 使用绑定挂载代替命名卷
+2. 通过`\\wsl$\docker-desktop-data\...`路径访问
+3. 考虑使用 Docker Desktop GUI 的卷管理界面
+
+#### 问题 3: 容器重启后文件路径权限丢失
+
+**可能原因**: 容器每次启动都以 root 权限创建目录
+**解决方案**:
+
+1. 在 docker-compose.yml 中添加启动脚本，确保目录权限正确
+2. 使用 Docker 健康检查确认目录权限正确后再启动应用
+3. 考虑使用更强大的卷权限管理解决方案，如 Docker 卷插件
+
+## 7.4 Docker 部署优化建议
+
+为了使 LDIMS 在 Docker 环境中运行得更加稳定、高效，特别是在生产环境中，建议考虑以下优化措施：
+
+### 7.4.1 构建优化
+
+1. **多阶段构建优化**
+
+   - 使用 Docker 构建缓存更有效率
+   - 考虑使用`.dockerignore`排除不必要文件
+   - 前端构建时使用 node:alpine 基础镜像减小体积
+
+2. **减小镜像体积**
+   - 删除构建过程中的临时文件和缓存
+   - 使用 alpine 基础镜像
+   - 仅安装生产环境必要的依赖
+
+### 7.4.2 性能优化
+
+1. **资源限制配置**
+
+   - 为每个服务设置适当的 CPU 和内存限制
+   - 监控资源使用情况，根据实际负载调整
+
+2. **网络优化**
+
+   - 使用 Docker 网络隔离
+   - 配置适当的连接池大小
+   - 考虑使用 DNS 缓存
+
+3. **存储性能**
+   - 定期清理和压缩数据
+   - 对经常访问的文件使用内存缓存
+   - 考虑对大文件使用对象存储服务
+
+### 7.4.3 健康检查与自愈
+
+1. **容器健康检查**
+
+   - 为所有服务添加详细的健康检查
+   - 使用自定义脚本验证关键功能
+
+2. **自动重启策略**
+   - 配置适当的重启策略（restart: always/unless-stopped）
+   - 考虑实现优雅退出和状态保存
+
+### 7.4.4 备份策略
+
+1. **自动化备份流程**
+
+   - 定期备份数据库和文件存储
+   - 使用增量备份减少存储空间
+   - 测试备份恢复流程
+
+2. **跨区域/跨设备备份**
+   - 考虑将备份存储在不同物理位置
+   - 使用加密保护备份数据
+
+### 7.4.5 安全加固
+
+1. **容器安全**
+
+   - 使用非 root 用户运行容器
+   - 定期更新基础镜像
+   - 使用只读文件系统
+
+2. **网络安全**
+
+   - 仅暴露必要端口
+   - 使用内部 Docker 网络隔离服务
+   - 考虑实现网络加密
+
+3. **数据安全**
+   - 敏感配置使用 Docker Secrets
+   - 加密存储敏感数据
+   - 实施访问控制和审计日志
+
+这些优化建议可根据项目规模和资源情况选择性实施。在生产环境中，建议首先关注数据安全和备份策略。
+
+## 7.5 一键部署配置方案
+
+为简化 LDIMS 部署流程，建议采用以下一键部署配置方案，实现更统一、更简洁的部署体验。
+
+### 7.5.1 配置管理策略
+
+由于前后端没有公用配置，我们采用以下配置管理策略：
+
+1. **只用于 Docker 部署的环境变量**：
+
+   - 创建`.env.docker.sample`文件，专门用于 Docker 部署时的配置
+   - 这个文件只包含 Docker 编排所需参数：端口映射、容器名称、卷名称等
+
+2. **前后端配置完全分离**：
+
+   - 前端：保留`frontend/.env.production.sample`
+   - 后端：保留`backend/.env.production.sample`
+
+3. **构建过程中传递配置**：
+   - 前端：在构建阶段注入配置
+   - 后端：在运行时通过环境变量提供配置
+
+### 7.5.2 Docker 部署配置示例
+
+创建项目根目录下的`.env.docker.sample`文件：
+
+```env
+# Docker部署配置
+# 仅包含容器编排参数，不涉及应用内部配置
+
+# 端口映射
+HOST_PORT=80
+HOST_SSL_PORT=443
+
+# 容器名称前缀（便于管理多环境）
+CONTAINER_PREFIX=ldims
+
+# 网络配置
+NETWORK_NAME=ldims_network
+
+# 数据库容器配置
+DB_PORT=3306
+DB_VOLUME_NAME=ldims_db_data
+
+# Redis容器配置
+REDIS_PORT=6379
+REDIS_VOLUME_NAME=ldims_redis_data
+
+# 文件存储卷名称
+UPLOADS_VOLUME_NAME=ldims_uploads
+EXPORTS_VOLUME_NAME=ldims_exports
+DOCUMENTS_VOLUME_NAME=ldims_documents
+
+# Nginx配置
+NGINX_CLIENT_MAX_BODY_SIZE=15M
+NGINX_SSL_CERT=fullchain.pem
+NGINX_SSL_KEY=privkey.pem
+HTTPS_ENABLED=false
+```
+
+### 7.5.3 修改 docker-compose.yaml
+
+使用以下示例配置作为统一的 docker-compose.yaml 文件：
+
+```yaml
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # 不传递任何构建参数，使用前端项目内的.env.production
+    container_name: ${CONTAINER_PREFIX:-ldims}_frontend
+    networks:
+      - ldims_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-ldims}_backend
+    volumes:
+      - ${UPLOADS_VOLUME_NAME:-ldims_uploads}:/app/uploads
+      - ${EXPORTS_VOLUME_NAME:-ldims_exports}:/app/exports
+      - ${DOCUMENTS_VOLUME_NAME:-ldims_documents}:/app/document_files
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ldims_network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-ldims}_worker
+    command: npm run start:worker
+    volumes:
+      - ${UPLOADS_VOLUME_NAME:-ldims_uploads}:/app/uploads
+      - ${DOCUMENTS_VOLUME_NAME:-ldims_documents}:/app/document_files
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ldims_network
+
+  db:
+    image: mysql:8.0
+    container_name: ${CONTAINER_PREFIX:-ldims}_db
+    volumes:
+      - ${DB_VOLUME_NAME:-ldims_db_data}:/var/lib/mysql
+      - ./db_sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ldims_network
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    # 数据库凭据通过backend/.env.production中的DB_*变量来配置
+
+  redis:
+    image: redis:6-alpine
+    container_name: ${CONTAINER_PREFIX:-ldims}_redis
+    volumes:
+      - ${REDIS_VOLUME_NAME:-ldims_redis_data}:/data
+    networks:
+      - ldims_network
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    # Redis密码通过backend/.env.production中的REDIS_PASSWORD变量来配置
+
+  nginx:
+    image: nginx:alpine
+    container_name: ${CONTAINER_PREFIX:-ldims}_nginx
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template
+      - ./ssl_certs:/etc/nginx/ssl:ro
+    environment:
+      NGINX_PORT: 80
+      NGINX_SSL_PORT: 443
+      NGINX_SSL_CERT: ${NGINX_SSL_CERT:-fullchain.pem}
+      NGINX_SSL_KEY: ${NGINX_SSL_KEY:-privkey.pem}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-15M}
+      BACKEND_HOST: backend
+      BACKEND_PORT: 3000
+      HTTPS_ENABLED: ${HTTPS_ENABLED:-false}
+    ports:
+      - "${HOST_PORT:-80}:80"
+      - "${HOST_SSL_PORT:-443}:443"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ldims_network
+
+volumes:
+  ldims_uploads:
+    name: ${UPLOADS_VOLUME_NAME:-ldims_uploads}
+  ldims_exports:
+    name: ${EXPORTS_VOLUME_NAME:-ldims_exports}
+  ldims_documents:
+    name: ${DOCUMENTS_VOLUME_NAME:-ldims_documents}
+  ldims_db_data:
+    name: ${DB_VOLUME_NAME:-ldims_db_data}
+  ldims_redis_data:
+    name: ${REDIS_VOLUME_NAME:-ldims_redis_data}
+
+networks:
+  ldims_network:
+    name: ${NETWORK_NAME:-ldims_network}
+    driver: bridge
+```
+
+### 7.5.4 Nginx 配置模板
+
+创建`nginx/nginx.conf.template`文件：
+
+```nginx
+server {
+    listen ${NGINX_PORT};
+    server_name ${NGINX_SERVER_NAME};
+
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    # 如果启用HTTPS，则重定向HTTP到HTTPS
+    if ($HTTPS_ENABLED = "true") {
+        return 301 https://$host$request_uri;
+    }
+
+    # 如果不启用HTTPS，则直接提供服务
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# HTTPS server
+server {
+    listen ${NGINX_SSL_PORT} ssl;
+    server_name ${NGINX_SERVER_NAME};
+
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    # 仅当HTTPS_ENABLED为true时启用
+    if ($HTTPS_ENABLED != "true") {
+        return 444;
+    }
+
+    ssl_certificate /etc/nginx/ssl/${NGINX_SSL_CERT};
+    ssl_certificate_key /etc/nginx/ssl/${NGINX_SSL_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 7.5.5 一键部署流程
+
+采用以下流程进行一键部署：
+
+1. **配置前后端环境**
+
+   ```bash
+   # 前端配置
+   cd frontend
+   cp .env.production.sample .env.production
+   # 编辑.env.production配置前端参数（API地址等）
+
+   # 后端配置
+   cd ../backend
+   cp .env.production.sample .env.production
+   # 编辑.env.production配置后端参数（数据库凭据、Redis等）
+   ```
+
+2. **配置 Docker 部署参数**
+
+   ```bash
+   # 项目根目录
+   cd ..
+   cp .env.docker.sample .env.docker
+   # 编辑.env.docker配置Docker部署参数（端口映射等）
+   ```
+
+3. **启动服务**
+   ```bash
+   docker-compose --env-file .env.docker up -d
+   ```
+
+这种方式的优势：
+
+1. 配置职责清晰分离 - Docker 编排 vs 应用配置
+2. 尊重现有的前后端配置结构，不强行合并
+3. 更容易管理多环境部署（开发、测试、生产）
+4. 前后端开发人员可以独立管理各自的配置
+
 ## 8. 构建和运行 (生产 - 本地构建)
 
 1.  **准备 SSL 证书**: 将你的 `fullchain.pem` 和 `privkey.pem` 放入 `LDIMS/ssl_certs/` 目录。
@@ -627,3 +1202,404 @@ PYTHON_EXECUTABLE_PATH=python3
 ---
 
 请仔细审查此生产环境部署方案，特别是安全相关的配置 (密码、密钥、SSL 证书、用户权限) 和资源分配。在实际部署前，务必在准生产环境中进行充分测试。
+
+## 7.6 Windows Docker Desktop 环境下的部署指南
+
+在 Windows 环境下使用 Docker Desktop 进行部署有一些特殊考虑，特别是关于路径映射和环境变量管理。
+
+### 7.6.1 Windows 环境下的文件路径映射
+
+Windows 系统的路径格式与 Linux 容器不同，需要特别处理：
+
+1. **路径格式转换**：
+
+   - Windows 路径格式：`F:\data\ldims\uploads`
+   - Docker 容器识别的格式：`/f/data/ldims/uploads`
+   - 需要使用正斜杠(/)替代反斜杠(\\)，并在盘符前加/
+
+2. **环境变量配置示例**：
+
+```env
+# === 数据持久化路径 ===
+# Windows路径映射，使用正斜杠格式
+UPLOADS_PATH=/f/data/ldims/uploads
+EXPORTS_PATH=/f/data/ldims/exports
+DOCUMENTS_PATH=/f/data/ldims/documents
+DB_PATH=/f/data/ldims/mysql
+REDIS_PATH=/f/data/ldims/redis
+```
+
+3. **使用相对路径的替代方案**：
+   如果不想指定绝对路径，可以使用相对路径作为默认值：
+
+```yaml
+volumes:
+  - ${UPLOADS_PATH:-./uploads}:/app/uploads
+  - ${EXPORTS_PATH:-./exports}:/app/exports
+```
+
+### 7.6.2 使用统一的环境变量文件
+
+为简化配置，可以使用单一的 `.env` 文件包含所有配置：
+
+```env
+# =======================================================
+# LDIMS 生产环境配置 (.env)
+# =======================================================
+
+# === 容器配置 ===
+CONTAINER_PREFIX=ldims
+NETWORK_NAME=ldims_network
+NODE_ENV=production
+TZ=Asia/Shanghai
+
+# === 服务端口配置 ===
+PORT=3000                   # 后端API服务端口
+DB_HOST_PORT=3306           # 数据库主机端口
+REDIS_HOST_PORT=6379        # Redis主机端口
+HOST_HTTP_PORT=80           # HTTP主机端口
+HOST_HTTPS_PORT=443         # HTTPS主机端口
+
+# === 数据库配置 ===
+DB_DIALECT=mysql
+DB_HOST=db                  # 容器内服务名称
+DB_PORT=3306                # 容器内端口
+DB_NAME=LDIMS_DB
+DB_USER=ldims_user          # 请修改为您的数据库用户名
+DB_PASSWORD=ldims_password  # 请修改为强密码
+DB_ROOT_PASSWORD=root_password # 请修改为强密码
+
+# === Redis配置 ===
+REDIS_HOST=redis            # 容器内服务名称
+REDIS_PORT=6379             # 容器内端口
+REDIS_PASSWORD=redis_password # 请修改为强密码
+
+# === JWT配置 ===
+JWT_SECRET=your_jwt_secret_key # 请修改为长随机字符串
+JWT_EXPIRES_IN=24h
+
+# === 前端配置 ===
+VITE_API_BASE_URL=/api      # 前端API访问基础路径
+
+# === NGINX配置 ===
+DOMAIN_NAME=localhost       # 您的域名
+HTTPS_ENABLED=false         # 是否启用HTTPS
+NGINX_SSL_CERT=fullchain.pem
+NGINX_SSL_KEY=privkey.pem
+NGINX_CLIENT_MAX_BODY_SIZE=15M
+
+# === Python配置 ===
+PYTHON_EXECUTABLE_PATH=python3
+
+# === 数据持久化路径 ===
+# 请替换为您的实际Windows路径，注意使用正斜杠(/)而非反斜杠(\)
+# 例如: F:\data\ldims\uploads 应写为 /f/data/ldims/uploads
+UPLOADS_PATH=/your/host/path/to/uploads
+EXPORTS_PATH=/your/host/path/to/exports
+DOCUMENTS_PATH=/your/host/path/to/documents
+DB_PATH=/your/host/path/to/mysql/data
+REDIS_PATH=/your/host/path/to/redis/data
+```
+
+### 7.6.3 适用于 Windows 的 Docker Compose 配置
+
+以下是针对 Windows 环境优化的 docker-compose.yaml 示例：
+
+```yaml
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL_BUILD=${VITE_API_BASE_URL}
+    container_name: ${CONTAINER_PREFIX:-ldims}_frontend
+    env_file:
+      - ./frontend/.env.production
+    networks:
+      - ldims_network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-ldims}_backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ:-Asia/Shanghai}
+      PORT: ${PORT:-3000}
+      DB_DIALECT: ${DB_DIALECT:-mysql}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-LDIMS_DB}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      PYTHON_EXECUTABLE_PATH: ${PYTHON_EXECUTABLE_PATH:-python3}
+    volumes:
+      - ${UPLOADS_PATH:-./uploads}:/app/uploads
+      - ${EXPORTS_PATH:-./exports}:/app/exports
+      - ${DOCUMENTS_PATH:-./documents}:/app/document_files
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ldims_network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-ldims}_worker
+    command: npm run start:worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ:-Asia/Shanghai}
+      DB_DIALECT: ${DB_DIALECT:-mysql}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-LDIMS_DB}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      PYTHON_EXECUTABLE_PATH: ${PYTHON_EXECUTABLE_PATH:-python3}
+    volumes:
+      - ${UPLOADS_PATH:-./uploads}:/app/uploads
+      - ${EXPORTS_PATH:-./exports}:/app/exports
+      - ${DOCUMENTS_PATH:-./documents}:/app/document_files
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ldims_network
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: ${CONTAINER_PREFIX:-ldims}_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${DB_PATH:-./docker/mysql}:/var/lib/mysql
+      - ./db_sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ldims_network
+    ports:
+      - "${DB_HOST_PORT:-3306}:3306"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u${DB_USER}",
+          "-p${DB_PASSWORD}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:6-alpine
+    container_name: ${CONTAINER_PREFIX:-ldims}_redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - ${REDIS_PATH:-./docker/redis}:/data
+    networks:
+      - ldims_network
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: ${CONTAINER_PREFIX:-ldims}_nginx
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template
+      - ./ssl_certs:/etc/nginx/ssl:ro
+    environment:
+      NGINX_SERVER_NAME: ${DOMAIN_NAME:-localhost}
+      NGINX_PORT: 80
+      NGINX_SSL_PORT: 443
+      NGINX_SSL_CERT: ${NGINX_SSL_CERT:-fullchain.pem}
+      NGINX_SSL_KEY: ${NGINX_SSL_KEY:-privkey.pem}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-15M}
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${PORT:-3000}
+      FRONTEND_HOST: frontend
+      FRONTEND_PORT: 80
+      HTTPS_ENABLED: ${HTTPS_ENABLED:-false}
+    ports:
+      - "${HOST_HTTP_PORT:-80}:80"
+      - "${HOST_HTTPS_PORT:-443}:443"
+    depends_on:
+      - frontend
+      - backend
+    command: /bin/sh -c "envsubst '$${NGINX_SERVER_NAME} $${NGINX_PORT} $${NGINX_SSL_PORT} $${NGINX_SSL_CERT} $${NGINX_SSL_KEY} $${NGINX_CLIENT_MAX_BODY_SIZE} $${BACKEND_HOST} $${BACKEND_PORT} $${FRONTEND_HOST} $${FRONTEND_PORT} $${HTTPS_ENABLED}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    networks:
+      - ldims_network
+    restart: unless-stopped
+
+networks:
+  ldims_network:
+    name: ${NETWORK_NAME:-ldims_network}
+    driver: bridge
+```
+
+### 7.6.4 Nginx 配置模板
+
+已创建 `nginx/nginx.conf.template` 文件，内容如下：
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+# 重定向HTTP到HTTPS (如果HTTPS_ENABLED=true)
+server {
+    listen ${NGINX_PORT};
+    server_name ${NGINX_SERVER_NAME};
+
+    # 如果启用了HTTPS，则将所有HTTP流量重定向到HTTPS
+    set $should_redirect 0;
+    if ($https_enabled = "true") {
+        set $should_redirect 1;
+    }
+    if ($scheme = "http") {
+        set $should_redirect "${should_redirect}1";
+    }
+    if ($should_redirect = "11") {
+        return 301 https://$host$request_uri;
+    }
+
+    # 如果未启用HTTPS，则直接提供HTTP内容
+    location / {
+        proxy_pass http://${FRONTEND_HOST}:${FRONTEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    }
+
+    # API路由代理到后端服务
+    location /api/ {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket支持
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    }
+}
+
+# HTTPS服务器配置 (仅当HTTPS_ENABLED=true时有效)
+server {
+    listen ${NGINX_SSL_PORT} ssl http2;
+    server_name ${NGINX_SERVER_NAME};
+
+    # SSL配置
+    ssl_certificate /etc/nginx/ssl/${NGINX_SSL_CERT};
+    ssl_certificate_key /etc/nginx/ssl/${NGINX_SSL_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    location / {
+        proxy_pass http://${FRONTEND_HOST}:${FRONTEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    }
+
+    # API路由代理到后端服务
+    location /api/ {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket支持
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    }
+}
+```
+
+### 7.6.5 Windows 环境部署步骤
+
+1. **准备环境文件**：
+
+   - 复制 `env.example` 为 `.env`
+   - 编辑 `.env` 文件，设置必要的配置项
+
+2. **创建数据存储目录**：
+
+   - 在 Windows 上创建数据存储目录，如 `F:\data\ldims`
+   - 在此目录下创建子目录：`uploads`、`exports`、`documents`、`mysql`、`redis`
+   - 确保这些目录有适当的访问权限
+
+3. **修改环境文件中的路径**：
+
+   ```env
+   UPLOADS_PATH=/f/data/ldims/uploads
+   EXPORTS_PATH=/f/data/ldims/exports
+   DOCUMENTS_PATH=/f/data/ldims/documents
+   DB_PATH=/f/data/ldims/mysql
+   REDIS_PATH=/f/data/ldims/redis
+   ```
+
+4. **部署容器**：
+
+   ```bash
+   # 构建镜像
+   docker-compose build
+
+   # 启动服务
+   docker-compose up -d
+   ```
+
+5. **验证部署**：
+   - 访问 http://localhost (或配置的域名)
+   - 检查各服务运行状态：`docker-compose ps`
+   - 查看日志：`docker-compose logs -f [服务名]`

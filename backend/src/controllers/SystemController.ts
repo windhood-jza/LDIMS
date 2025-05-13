@@ -5,7 +5,7 @@ import {
   SystemConfigMap,
 } from "../services/SystemConfigService";
 import { OperationLogService } from "../services/OperationLogService";
-import { OperationLogQuery } from "../types/operationLog";
+import { OperationLogQuery } from "@ldims/types";
 import { success } from "../utils/response"; // 假设有统一的成功响应工具
 import { validateRequest } from "../middleware/validation"; // 假设有请求验证中间件
 import { body, query } from "express-validator"; // 用于请求验证

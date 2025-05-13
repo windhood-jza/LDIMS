@@ -1,0 +1,13 @@
+node_modules
+dist
+venv
+.git
+.gitignore
+.vscode
+npm-debug.log
+uploads/* # Depending on strategy, dev uploads might be ignored
+exports/* # Depending on strategy, dev exports might be ignored
+*.local
+# Test files, coverage reports etc.
+test/
+coverage/ 

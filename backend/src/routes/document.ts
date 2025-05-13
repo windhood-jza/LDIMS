@@ -13,7 +13,7 @@ import {
   DocumentListQuery,
   CreateDocumentRequest,
   UpdateDocumentRequest,
-} from "../types/document.d"; // 导入 DTO
+} from "@ldims/types"; // 导入 DTO
 import { success, fail } from "../utils/response"; // 修正：导入 success 和 fail 函数
 import { validationResult } from "express-validator"; // 只需导入 validationResult
 import { param } from "express-validator"; // 引入 param 用于验证路径参数
@@ -22,103 +22,103 @@ import { param } from "express-validator"; // 引入 param 用于验证路径参
 export const createDocumentRouter = (
   documentService: DocumentService
 ): Router => {
-    const router: Router = express.Router();
+  const router: Router = express.Router();
 
-    // 辅助函数：从请求中获取用户名 (假设存在于 req.user)
-    const getUserName = (req: Request): string | null => {
-        // !! 你需要根据 authenticateToken 的实际实现来调整这里 !!
-        // 可能是 req.user.username, req.user.realName, req.user.name 等
-        return (req as any).user?.realName || (req as any).user?.username || null;
-    };
+  // 辅助函数：从请求中获取用户名 (假设存在于 req.user)
+  const getUserName = (req: Request): string | null => {
+    // !! 你需要根据 authenticateToken 的实际实现来调整这里 !!
+    // 可能是 req.user.username, req.user.realName, req.user.name 等
+    return (req as any).user?.realName || (req as any).user?.username || null;
+  };
 
-    /**
-     * @route   POST /
-     * @desc    创建新文档
-     * @access  Private
-     */
-    router.post(
+  /**
+   * @route   POST /
+   * @desc    创建新文档
+   * @access  Private
+   */
+  router.post(
     "/",
-        authenticateToken,
-        validateCreateDocument, // 应用创建验证规则
-        handleValidationErrors, // 处理验证错误
+    authenticateToken,
+    validateCreateDocument, // 应用创建验证规则
+    handleValidationErrors, // 处理验证错误
     async (req: Request, res: Response, next: NextFunction) => {
-            try {
+      try {
         await documentController.createDocument(req, res, next);
-            } catch (error) {
+      } catch (error) {
         next(error);
-            }
-        }
-    );
+      }
+    }
+  );
 
-    /**
-     * @route   PUT /:id
-     * @desc    更新文档信息
-     * @access  Private
-     */
-    router.put(
+  /**
+   * @route   PUT /:id
+   * @desc    更新文档信息
+   * @access  Private
+   */
+  router.put(
     "/:id",
-        authenticateToken,
-        validateUpdateDocument, // 应用更新验证规则
-        handleValidationErrors, // 处理验证错误
+    authenticateToken,
+    validateUpdateDocument, // 应用更新验证规则
+    handleValidationErrors, // 处理验证错误
     async (req: Request, res: Response, next: NextFunction) => {
-            try {
+      try {
         await documentController.updateDocument(req, res, next);
-            } catch (error) {
-                next(error);
-            }
-        }
-    );
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
-    /**
-     * @route   DELETE /:id
-     * @desc    删除文档 (软删除)
-     * @access  Private
-     */
-    router.delete(
+  /**
+   * @route   DELETE /:id
+   * @desc    删除文档 (软删除)
+   * @access  Private
+   */
+  router.delete(
     "/:id",
-        authenticateToken,
+    authenticateToken,
     async (req: Request, res: Response, next: NextFunction) => {
-            try {
+      try {
         await documentController.deleteDocument(req, res, next);
-            } catch (error) {
-                next(error);
-            }
-        }
-    );
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
-    /**
-     * @route   GET /:id
-     * @desc    获取单个文档详情
-     * @access  Private
-     */
-    router.get(
+  /**
+   * @route   GET /:id
+   * @desc    获取单个文档详情
+   * @access  Private
+   */
+  router.get(
     "/:id",
-        authenticateToken,
+    authenticateToken,
     async (req: Request, res: Response, next: NextFunction) => {
-            try {
+      try {
         await documentController.getDocumentById(req, res, next);
-            } catch (error) {
-                next(error);
-            }
-        }
-    );
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
-    /**
-     * @route   GET /
-     * @desc    获取文档列表 (分页, 搜索, 排序)
-     * @access  Private
-     */
-    router.get(
+  /**
+   * @route   GET /
+   * @desc    获取文档列表 (分页, 搜索, 排序)
+   * @access  Private
+   */
+  router.get(
     "/",
-        authenticateToken,
+    authenticateToken,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await documentController.getDocuments(req, res, next);
-            } catch (error) {
-                next(error);
-            }
-        }
-    );
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   // --- 文件上传路由 (更新) ---
   /**
@@ -184,7 +184,7 @@ export const createDocumentRouter = (
 
   // --- 路由结束 ---
 
-    return router; // 返回配置好的 Router 实例
+  return router; // 返回配置好的 Router 实例
 };
 
 // --- 移除旧的默认导出 ---

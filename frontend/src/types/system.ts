@@ -129,3 +129,12 @@ export const OperationTypeGroups = [
     ],
   },
 ];
+
+/**
+ * 系统配置映射接口
+ * 用于存储系统配置的键值对
+ */
+export interface SystemConfigMap {
+  [key: string]: string | number | boolean | null | undefined;
+  FILE_STORAGE_PATH?: string; // 文件存储路径
+}

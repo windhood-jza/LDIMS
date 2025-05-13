@@ -3,7 +3,7 @@ import authenticateToken from '../middleware/authenticateToken';
 import { ExportService } from '../services/ExportService';
 import { ImportService } from '../services/ImportService'; // 导入 ImportService 类
 import { DocumentService } from '../services/DocumentService'; // 假设仍然需要 DocumentService
-import { DocumentListQuery } from '../types/document.d';
+import { DocumentListQuery } from '@ldims/types';
 import { validationResult, body, query as queryValidator, param as paramValidator } from 'express-validator';
 import * as fs from 'fs'; // 引入 Node.js fs 模块用于检查文件是否存在
 import * as path from 'path'; // 引入 path 模块

@@ -1,8 +1,8 @@
 import { Department, User } from '../models'; // 引入 User 用于检查关联
 import { Op } from 'sequelize';
-import { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '../types/department';
+import { DepartmentInfo, CreateDepartmentRequest, UpdateDepartmentRequest } from '@ldims/types';
 import { OperationLogService } from './OperationLogService'; // 引入日志服务
-import { OperationType } from '../types/operationLog'; // 引入操作类型枚举
+import { OperationType } from '@ldims/types'; // 引入操作类型枚举
 import { Request } from 'express'; // 引入 Request 类型
 
 interface DeptMap { [key: number]: DepartmentInfo & { raw?: Department } } // raw is optional

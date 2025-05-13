@@ -1,11 +1,11 @@
 import { User, Department } from '../models';
 import { Op } from 'sequelize';
 import { PageResult } from '../utils/response';
-import { UserInfo, CreateUserRequest, UpdateUserRequest } from '../types/user'; // 确保引入了类型
+import { UserInfo, CreateUserRequest, UpdateUserRequest } from '@ldims/types'; // 确保引入了类型
 import { Model } from 'sequelize'; // 引入 Model 类型
 import { Request } from 'express'; // 引入 Request 类型
 import { OperationLogService } from './OperationLogService'; // 引入日志服务
-import { OperationType } from '../types/operationLog'; // 引入操作类型枚举
+import { OperationType } from '@ldims/types'; // 引入操作类型枚举
 
 interface UserListQuery {
   page?: number;

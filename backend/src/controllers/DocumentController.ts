@@ -8,7 +8,7 @@ import { getStoragePath } from "../config/storage"; // 引入获取存储路径�
 import path from "path"; // 引入 path 模块
 import fs from "fs/promises"; // 引入 fs.promises 检查文件是否存在
 import { OperationLogService } from "../services/OperationLogService"; // 新增导入
-import { OperationType } from "../types/operationLog"; // 新增导入
+import { OperationType } from "@ldims/types"; // 新增导入
 
 const documentService = new DocumentService(); // Create an instance
 

@@ -251,8 +251,6 @@ import {
   ElDialog,
   ElMessage,
   ElButton,
-  ElTable,
-  ElTableColumn,
   ElTag,
   ElIcon,
   ElDescriptions,
@@ -269,16 +267,13 @@ import {
   downloadFile as apiDownloadFile,
   getFilePreviewBlob,
 } from "@/services/api/document";
-import { downloadBlob } from "@/utils/download";
 import {
   Document,
-  View,
   Download,
   ZoomIn,
   ZoomOut,
   ArrowLeft,
   ArrowRight,
-  Paperclip,
   Loading,
 } from "@element-plus/icons-vue";
 // 移除全局PDF.js导入，改为在需要时动态加载

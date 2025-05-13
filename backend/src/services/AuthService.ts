@@ -1,7 +1,7 @@
-import bcrypt from 'bcryptjs';
-import jwt, { SignOptions } from 'jsonwebtoken';
-import { User } from '../models'; // 从模型入口导入 User
-import { LoginRequest, ChangePasswordRequest } from '../types/auth'; // 引入 ChangePasswordRequest
+import bcrypt from "bcryptjs";
+import jwt, { SignOptions } from "jsonwebtoken";
+import { User } from "../models"; // 从模型入口导入 User
+import { LoginRequest, ChangePasswordRequest } from "@ldims/types"; // 引入 ChangePasswordRequest
 
 class AuthService {
   /**
@@ -37,12 +37,12 @@ class AuthService {
     }
 
     // 4. 生成 JWT
-    const jwtSecret: string = process.env.JWT_SECRET || 'your_default_secret';
-    const expiresInOption = process.env.JWT_EXPIRES_IN || '24h'; // 保持原样
+    const jwtSecret: string = process.env.JWT_SECRET || "your_default_secret";
+    const expiresInOption = process.env.JWT_EXPIRES_IN || "24h"; // 保持原样
 
     if (!jwtSecret) {
-        console.error('JWT_SECRET 未配置!');
-        throw new Error('服务器配置错误');
+      console.error("JWT_SECRET 未配置!");
+      throw new Error("服务器配置错误");
     }
 
     const payload = {
@@ -68,14 +68,17 @@ class AuthService {
    * @returns boolean - 是否成功
    * @throws Error - 如果用户不存在或旧密码错误
    */
-  public async changePassword(userId: number, passwordData: ChangePasswordRequest): Promise<boolean> {
+  public async changePassword(
+    userId: number,
+    passwordData: ChangePasswordRequest
+  ): Promise<boolean> {
     const { oldPassword, newPassword } = passwordData;
 
     // 1. 查找用户
     const user = await User.findByPk(userId);
     if (!user) {
       console.error(`修改密码失败：用户 ID ${userId} 不存在`);
-      throw new Error('用户不存在');
+      throw new Error("用户不存在");
     }
 
     // 2. 验证旧密码
@@ -85,7 +88,7 @@ class AuthService {
 
     if (!isMatch) {
       console.log(`用户 ${user.username} 修改密码失败：旧密码错误`);
-      throw new Error('旧密码错误');
+      throw new Error("旧密码错误");
     }
 
     // 3. 更新密码
@@ -101,4 +104,4 @@ class AuthService {
   }
 }
 
-export default new AuthService(); 
+export default new AuthService();

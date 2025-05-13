@@ -1,5 +1,5 @@
 import Document from '../models/Document';
-import { NameValueData } from '../types/statistics';
+import { NameValueData } from '@ldims/types';
 import sequelize from '../config/database';
 import { literal, fn, col, Op } from 'sequelize';
 

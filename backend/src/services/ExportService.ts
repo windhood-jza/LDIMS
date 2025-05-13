@@ -2,13 +2,13 @@ import { Op, WhereOptions } from 'sequelize';
 import ExportTask from '../models/ExportTask';
 import Document from '../models/Document';
 import { DocumentService } from './DocumentService'; // 引入 DocumentService
-import { DocumentInfo, DocumentListQuery } from '../types/document.d'; // 引入查询类型和信息类型
+import { DocumentInfo, DocumentListQuery } from '@ldims/types'; // 引入查询类型和信息类型
 import { taskQueueService } from './TaskQueueService'; // 引入任务队列服务
 import * as fs from 'fs'; // 修改为导入标准 fs 模块
 import * as path from 'path';
 import * as xlsx from 'xlsx'; // 用于生成 Excel
 import { OperationLogService } from './OperationLogService';
-import { OperationType } from '../types/operationLog';
+import { OperationType } from '@ldims/types';
 import { Request } from 'express';
 
 // 中英文列名映射
