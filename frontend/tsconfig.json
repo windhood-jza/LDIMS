@@ -24,8 +24,7 @@
     /* Path Aliases */
     "baseUrl": ".", // 基准目录
     "paths": {
-      "@/*": ["src/*"], // 配置 @/ 指向 src/
-      "@backend-types/*": ["node_modules/@ldims/types/*"] // 修改：指向 @ldims/types 包
+      "@/*": ["src/*"] // 配置 @/ 指向 src/
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],

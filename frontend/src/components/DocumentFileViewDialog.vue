@@ -747,10 +747,7 @@ onMounted(() => {
   if (!document.getElementById("pdf-worker-loader")) {
     const script = document.createElement("script");
     script.id = "pdf-worker-loader";
-    script.setAttribute("data-pdfjs-src", "/pdf.worker.min.js");
-    script.setAttribute("type", "text/javascript");
-    script.setAttribute("async", "true");
-    script.setAttribute("defer", "true");
+    script.setAttribute("data-pdfjs-src", "/pdf.worker.min.mjs");
     document.head.appendChild(script);
   }
 });

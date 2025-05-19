@@ -12,41 +12,26 @@ ARG NODE_ENV_BUILD=production # Default to production if not set
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL_BUILD}
 ENV NODE_ENV=${NODE_ENV_BUILD}
 
-COPY package*.json ./
+# 调试：打印环境变量
+RUN echo "---> Dockerfile: VITE_API_BASE_URL in Docker build is: $VITE_API_BASE_URL"
+RUN echo "---> Dockerfile: NODE_ENV in Docker build is: $NODE_ENV"
 
-# Install production dependencies and build tools needed for the build
-# Using npm ci for deterministic builds if package-lock.json is present and reliable
-RUN npm ci --include=dev
+# 1. 复制所有 package.json 和 lock 文件到对应目录结构
+# COPY package.json ./ # 根目录没有 package.json，如果项目不是 workspace 则不需要此行
+COPY packages/types/package.json ./packages/types/
+COPY frontend/package.json ./frontend/
+COPY frontend/package-lock.json ./frontend/
 
-# Copy the rest of the application code
-COPY . .
+# 2. 构建 @ldims/types
+COPY packages/types/ ./packages/types/
+RUN cd packages/types && npm ci --include=dev && npm run build
 
-# Build the application for production
-# Ensure your package.json build script creates a production-ready build
-RUN npm run build
+# 3. 安装前端依赖
+COPY frontend/ ./frontend/
+RUN cd frontend && npm ci --include=dev
 
-# Stage 2: Serve the application with Nginx (Production)
-FROM nginx:1.25-alpine AS server
-LABEL stage=frontend-server
+# 4. 构建前端应用
+RUN cd frontend && npm run build
 
-# Remove default Nginx configuration
-RUN rm /etc/nginx/conf.d/default.conf
-
-# Copy custom production Nginx configuration
-COPY nginx.prod.conf /etc/nginx/conf.d/default.conf
-
-WORKDIR /usr/share/nginx/html
-
-# Remove default Nginx static assets
-RUN rm -rf ./*
-
-# Copy built assets from the builder stage's dist directory
-COPY --from=builder /app/dist .
-
-# Nginx will listen on 80 and 443 as per nginx.prod.conf
-# Ports are exposed in docker-compose.yml
-EXPOSE 80
-EXPOSE 443
-
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# 构建完成，静态资源在 /app/frontend/dist
+# 不需要第二阶段 Nginx 镜像 

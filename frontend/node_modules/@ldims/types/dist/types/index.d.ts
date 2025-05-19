@@ -6,3 +6,4 @@ export * from "./doctype";
 export * from "./department";
 export * from "./user";
 export * from "./auth";
+export * from "./response";

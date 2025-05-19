@@ -1,0 +1,45 @@
+# 通用忽略
+node_modules
+.git
+.github
+.vscode
+.idea
+.DS_Store
+*.log
+*.local
+*.lock
+.dockerignore
+docker-compose*.yml
+Dockerfile*
+
+# 前端特定忽略
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/.cache
+
+# 后端特定忽略
+backend/node_modules
+backend/dist
+backend/venv
+backend/coverage
+backend/uploads/*
+backend/exports/*
+backend/document_files/*
+
+# 共享类型包编译产物 (将在构建过程中创建)
+packages/types/node_modules
+packages/types/dist
+
+# 数据卷目录
+docker/
+uploads/
+exports/
+documents/
+db_sql/
+
+# 文档和其他不需要的文件
+docs/
+*.md
+**/*.test.ts
+**/*.spec.ts 

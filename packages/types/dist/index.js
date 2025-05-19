@@ -22,4 +22,5 @@ __exportStar(require("./doctype"), exports);
 __exportStar(require("./department"), exports);
 __exportStar(require("./user"), exports);
 __exportStar(require("./auth"), exports);
+__exportStar(require("./response"), exports);
 // ... 如果还有其他迁移的文件，也在此处导出

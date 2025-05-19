@@ -15,35 +15,58 @@ RUN groupadd --gid 1001 nodejs && \
 
 WORKDIR /app
 
+# 替换为清华大学的 Debian Bullseye 软件源
+RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main non-free contrib" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye-updates main non-free contrib" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye-backports main non-free contrib" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian-security/ bullseye-security main non-free contrib" >> /etc/apt/sources.list
+
 # Install Python, pip, and essential build tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-pip python3-dev build-essential ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Configure pip to use Tsinghua University mirror
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Upgrade pip and setuptools
+RUN pip3 install --upgrade pip setuptools wheel
+
 # Copy Python requirements file
-COPY --chown=nodejs:nodejs requirements.txt ./
+COPY --chown=nodejs:nodejs backend/requirements.txt ./
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy package.json, package-lock.json (or yarn.lock)
-COPY --chown=nodejs:nodejs package*.json ./
+# 1. 复制 package.json 文件
+# COPY --chown=nodejs:nodejs package.json ./: # 项目根目录没有 package.json，如果项目不是 workspace 则不需要此行
+COPY --chown=nodejs:nodejs packages/types/package.json ./packages/types/
+COPY --chown=nodejs:nodejs backend/package*.json ./backend/
 
-# Install production Node.js dependencies and remove devDependencies
-RUN npm ci --omit=dev && npm cache clean --force
+# 2. 构建 @ldims/types
+COPY --chown=nodejs:nodejs packages/types/ ./packages/types/
+RUN cd packages/types && npm ci --include=dev && npm run build
 
-# Copy the rest of the backend source code
-COPY --chown=nodejs:nodejs . .
+# 3. 安装后端依赖并构建
+COPY --chown=nodejs:nodejs backend/ ./backend/
+RUN cd backend && npm ci --include=dev
 
-# Build TypeScript to JavaScript
-RUN npm run build
+# 4. 构建TypeScript
+RUN cd backend && npm run build
+
+# 5. 确保node_modules里能找到@ldims/types
+# RUN mkdir -p ./backend/node_modules/@ldims && \
+#     cp -R ./packages/types ./backend/node_modules/@ldims/
 
 # Change ownership of the entire app directory to the non-root user
 RUN chown -R nodejs:nodejs /app
 
 # Switch to the non-root user
 USER nodejs
+
+# 工作目录改到backend
+WORKDIR /app/backend
 
 # Expose the port the app runs on
 EXPOSE ${PORT}
