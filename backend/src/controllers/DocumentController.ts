@@ -9,6 +9,7 @@ import path from "path"; // 引入 path 模块
 import fs from "fs/promises"; // 引入 fs.promises 检查文件是否存在
 import { OperationLogService } from "../services/OperationLogService"; // 新增导入
 import { OperationType } from "@ldims/types"; // 新增导入
+import { DocumentContentSearchQuery } from "../types/document.d";
 
 const documentService = new DocumentService(); // Create an instance
 
@@ -104,6 +105,33 @@ class DocumentController {
   // 验证文件上传的路径参数 (可以放在路由层，或者在这里再次检查)
   public uploadFilesValidation = [
     param("id").isInt({ gt: 0 }).withMessage("无效的文档 ID").toInt(),
+  ];
+
+  // Validation rules for the new content search endpoint
+  public searchDocumentsValidation = [
+    query("searchText")
+      .notEmpty()
+      .withMessage("搜索文本不能为空")
+      .isString()
+      .trim(),
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("页码必须是正整数")
+      .toInt(),
+    query("pageSize")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("每页数量必须是正整数")
+      .toInt(),
+    // Optional: Add sortField and sortOrder validation if needed in the future
+    query("sortField").optional().isString().trim(),
+    query("sortOrder").optional().isIn(["ASC", "DESC"]),
+  ];
+
+  // --- 新增：获取文档文件内容参数验证规则 (P0-T2 时已添加，此处保留) ---
+  public getDocumentFileContentValidation = [
+    param("file_id").isInt({ gt: 0 }).withMessage("无效的文件 ID").toInt(),
   ];
 
   // 控制器方法 (getDocuments, getDocumentById, createDocument, updateDocument, deleteDocument, uploadDocument)
@@ -532,6 +560,167 @@ class DocumentController {
       if (!res.headersSent) {
         next(error);
       }
+    }
+  }
+
+  // --- 新增：内容搜索控制器方法 ---
+  public async searchDocumentsByContent(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        code: 400,
+        message: "参数验证失败",
+        data: errors.array(),
+      });
+    }
+
+    try {
+      // Extract validated and sanitized query parameters
+      const {
+        searchText,
+        page: currentPage = 1, // Default to page 1 if not provided
+        pageSize: currentPageSize = 10, // Default to 10 per page
+        sortField,
+        sortOrder,
+      } = req.query as unknown as DocumentContentSearchQuery; // Cast after validation
+
+      const queryParams: DocumentContentSearchQuery = {
+        searchText: searchText as string, // searchText is already validated as not empty string
+        page: Number(currentPage),
+        pageSize: Number(currentPageSize),
+      };
+      if (sortField) queryParams.sortField = sortField as string;
+      if (sortOrder) queryParams.sortOrder = sortOrder as "ASC" | "DESC";
+
+      const result = await documentService.searchDocumentsByContent(
+        queryParams
+      );
+
+      const response = page(
+        result.list,
+        result.total,
+        queryParams.page || 1,
+        queryParams.pageSize || 10
+      );
+      return res.json(response);
+    } catch (error: any) {
+      console.error(
+        `[DocumentController] Error in searchDocumentsByContent:`,
+        error
+      );
+      next(error); // Pass error to global handler
+    }
+  }
+
+  // --- 新增：文档文件内容获取控制器方法 ---
+  public async getDocumentFileContent(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        code: 400,
+        message: "参数验证失败",
+        data: errors.array(),
+      });
+    }
+
+    try {
+      // 1. 获取并验证路径参数
+      const fileId = parseInt(req.params.file_id);
+      if (isNaN(fileId) || fileId <= 0) {
+        console.warn(
+          `[getDocumentFileContent] Invalid file ID received: ${req.params.file_id}`
+        );
+        return res.status(400).json({
+          success: false,
+          code: 400,
+          message: "无效的文件ID",
+        });
+      }
+
+      // 2. 记录操作日志
+      console.info(
+        `[getDocumentFileContent] User requesting content for file ID: ${fileId}. ` +
+          `User: ${(req as any).user?.username || "unknown"}`
+      );
+
+      // 3. 调用Service层获取文件内容
+      const fileContent = await documentService.getDocumentFileWithContent(
+        fileId
+      );
+
+      // 4. 处理文件不存在的情况
+      if (!fileContent) {
+        console.warn(
+          `[getDocumentFileContent] File not found or no access for ID: ${fileId}`
+        );
+        return res.status(404).json({
+          success: false,
+          code: 404,
+          message: "文件不存在或无权访问",
+        });
+      }
+
+      // 5. 记录成功的访问操作（用于审计）
+      if (req) {
+        await OperationLogService.logFromRequest(
+          req,
+          OperationType.DOCUMENT_VIEW,
+          `查看文档文件内容: ${fileContent.fileName} (ID: ${fileId})`
+        );
+      }
+
+      // 6. 返回成功响应
+      console.debug(
+        `[getDocumentFileContent] Successfully retrieved content for file ID: ${fileId}. ` +
+          `Status: ${fileContent.processingStatus}, ` +
+          `Content length: ${
+            fileContent.extractedContent
+              ? fileContent.extractedContent.length
+              : 0
+          } chars`
+      );
+
+      return res.json({
+        success: true,
+        code: 200,
+        message: "获取文件内容成功",
+        data: fileContent,
+      });
+    } catch (error: any) {
+      // 7. 错误处理和日志记录
+      console.error(
+        `[getDocumentFileContent] Error retrieving content for file ID ${req.params.file_id}:`,
+        error
+      );
+
+      // 记录错误操作日志
+      if (req) {
+        try {
+          await OperationLogService.logFromRequest(
+            req,
+            OperationType.DOCUMENT_VIEW,
+            `查看文档文件内容失败: 文件ID ${req.params.file_id} - ${error.message}`
+          );
+        } catch (logError) {
+          console.error(
+            `[getDocumentFileContent] Failed to log error operation:`,
+            logError
+          );
+        }
+      }
+
+      // 传递错误给全局错误处理中间件
+      next(error);
     }
   }
 }

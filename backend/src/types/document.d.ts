@@ -118,6 +118,23 @@ export interface DocumentListQuery {
 }
 
 /**
+ * @interface DocumentContentSearchQuery
+ * @description Content search query parameters
+ * @property {string} searchText - The text to search for in document metadata and file content.
+ * @property {number} [page] - Page number (starts from 1).
+ * @property {number} [pageSize] - Number of items per page.
+ * @property {string} [sortField] - Sort field (e.g., 'relevance', 'createdAt').
+ * @property {'ASC' | 'DESC'} [sortOrder] - Sort order.
+ */
+export interface DocumentContentSearchQuery {
+  searchText: string;
+  page?: number;
+  pageSize?: number;
+  sortField?: string; // Optional: for now, we might just sort by relevance or default to createdAt
+  sortOrder?: "ASC" | "DESC";
+}
+
+/**
  * @interface SimplifiedDocumentFile
  * @description 用于在文档信息中展示的简化文件信息类型
  * @property {number} id - 文件 ID
@@ -143,4 +160,47 @@ export interface SimplifiedDocumentFile {
     | "ocr_fallback";
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+/**
+ * @interface DocumentFileContentResponse
+ * @description 文档文件内容提取API的响应接口
+ * @property {number} fileId - 文件ID
+ * @property {string} fileName - 原始文件名
+ * @property {string} filePath - 文件存储路径
+ * @property {string | null} extractedContent - 提取的文本内容
+ * @property {string} processingStatus - 处理状态
+ * @property {Date | null} extractedAt - 内容提取时间
+ * @property {number} fileSize - 文件大小（字节）
+ * @property {string} mimeType - MIME类型
+ * @property {number} documentId - 所属文档ID
+ * @property {Date} uploadedAt - 文件上传时间
+ */
+export interface DocumentFileContentResponse {
+  fileId: number;
+  fileName: string;
+  filePath: string;
+  extractedContent: string | null;
+  processingStatus:
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "ocr_fallback";
+  extractedAt: Date | null;
+  fileSize: number;
+  mimeType: string;
+  documentId: number;
+  uploadedAt: Date;
+}
+
+/**
+ * @interface DocumentFileContentQuery
+ * @description 文档文件内容查询参数接口
+ * @property {boolean} [includeMetadata] - 是否包含文件元数据
+ * @property {'text' | 'json'} [format] - 返回格式类型
+ */
+export interface DocumentFileContentQuery {
+  includeMetadata?: boolean;
+  format?: "text" | "json";
 }

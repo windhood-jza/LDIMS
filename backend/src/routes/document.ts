@@ -182,6 +182,48 @@ export const createDocumentRouter = (
     }
   );
 
+  // --- 新增：内容搜索路由 ---
+  /**
+   * @route   GET /search/content
+   * @desc    根据文本内容搜索文档 (元数据和文件内容)
+   * @access  Private
+   */
+  router.get(
+    "/search/content", // 新的独立路由路径
+    authenticateToken, // 1. 认证
+    documentController.searchDocumentsValidation, // 2. 应用新的验证规则
+    handleValidationErrors, // 3. 处理验证错误
+    // 4. 调用新的控制器方法
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await documentController.searchDocumentsByContent(req, res, next);
+      } catch (error) {
+        next(error); // 确保错误被传递到全局错误处理器
+      }
+    }
+  );
+
+  // --- 新增：文档文件内容提取路由 ---
+  /**
+   * @route   GET /files/:file_id/content
+   * @desc    获取单个文档文件的提取内容和元数据
+   * @access  Private
+   */
+  router.get(
+    "/files/:file_id/content",
+    authenticateToken, // 1. 认证
+    documentController.getDocumentFileContentValidation, // 2. 应用验证规则
+    handleValidationErrors, // 3. 处理验证错误
+    // 4. 调用控制器方法
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await documentController.getDocumentFileContent(req, res, next);
+      } catch (error) {
+        next(error); // 确保错误被传递到全局错误处理器
+      }
+    }
+  );
+
   // --- 路由结束 ---
 
   return router; // 返回配置好的 Router 实例

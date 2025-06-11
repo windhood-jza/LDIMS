@@ -142,11 +142,43 @@
   }
   ```
 - **Implementation Logic**:
+
   1. Receives tool invocation with search parameters
   2. Translates the query and filters into LDIMS backend search API parameters
   3. Executes search using MySQL FULLTEXT search capabilities
   4. Formats and returns results with relevance scores and metadata
   5. Optionally extracts and includes matching context snippets
+
+- **Error Handling**:
+  - If the search operation encounters an error (other than "no results found", which is a successful empty result: `{"isError": false, "results": [], "totalMatches": 0, ...}`), the `content` field of the ToolResponse will be a JSON string containing an error object.
+  - **Error Response Format** (within the `content` JSON string):
+    ```json
+    {
+      "isError": true,
+      "errorCode": "ERROR_CODE_HERE",
+      "errorMessage": "A descriptive message about what went wrong.",
+      "errorDetails": {
+        // Optional: Provides more specific details about the error.
+        // For INVALID_INPUT, this might specify which parameter was invalid.
+        // For BACKEND_API_ERROR, this might include a sanitized error from the backend.
+      }
+      // The 'results', 'totalMatches', and 'searchMetadata' fields might be omitted
+      // or contain minimal information in case of an error.
+    }
+    ```
+  - **Common Error Codes and Messages**:
+    - `INVALID_INPUT`:
+      - `errorMessage`: "Invalid input parameters provided. Please check your query, filters, and other parameters."
+      - `errorDetails`: (Optional) e.g., `{"field": "query", "issue": "Query cannot be empty"}`
+    - `BACKEND_API_ERROR`:
+      - `errorMessage`: "The document search service encountered an internal error."
+      - `errorDetails`: (Optional) e.g., `{"backend_status": 500, "message": "Database connection failed"}` (internal details should be sanitized if exposed)
+    - `SEARCH_TIMEOUT`:
+      - `errorMessage`: "The search operation timed out before results could be retrieved."
+    - `QUERY_UNPROCESSABLE`:
+      - `errorMessage`: "The search query is too broad, too complex, or could not be processed by the search engine."
+    - `FORBIDDEN`:
+      - `errorMessage`: "You do not have permission to perform this search or access the requested search scope."
 
 ## 5. 用户场景实现方案
 
@@ -200,3 +232,42 @@
 - **数据库配置现状与建议 (基于 `ldims_db_new.sql`)**:
 
   - **数据库类型**: 系统后端使用 MySQL 数据库。
+
+## 7. 配置与部署
+
+### 7.1. 配置 (Configuration)
+
+MCP 服务的配置项将主要通过 `.env` 文件进行管理。
+
+- **LDIMS 后端集成**:
+
+  - `LDIMS_API_BASE_URL`: (必需) LDIMS 后端 API 的基础 URL。MCP 服务将通过此 URL 调用后端接口。
+    - 示例: `LDIMS_API_BASE_URL=http://<ldims_backend_ip>:<port>/api`
+  - 认证: MCP 服务调用 LDIMS 后端 API 时**不需要**认证凭据。
+
+- **MCP 服务行为**:
+
+  - `MCP_REQUEST_TIMEOUT_SECONDS`: (可选, 有默认值) MCP 服务处理外部请求（如来自 LLM 的 Tool 调用或 Resource 请求）的默认超时时间，单位为秒。
+    - 示例: `MCP_REQUEST_TIMEOUT_SECONDS=30`
+  - `LOG_LEVEL`: (可选, 默认 `INFO`) MCP 服务的日志级别。支持的级别包括 `DEBUG`, `INFO`, `WARN`, `ERROR`。
+    - 示例: `LOG_LEVEL=INFO`
+  - 日志输出: 日志将输出到控制台。
+  - `SEARCH_MAX_RESULTS_HARD_LIMIT`: (可选, 有默认值) `searchDocuments` Tool 返回结果的硬性最大数量上限，以防止滥用或性能问题。
+    - 示例: `SEARCH_MAX_RESULTS_HARD_LIMIT=50`
+
+- **安全考虑**:
+  - MCP 服务本身**不需要**接入认证。来自 LLM 或其他客户端的调用可以直接进行，无需 API 密钥或类似凭证。
+
+### 7.2. 部署 (Deployment)
+
+- **部署方式**: MCP 服务将通过 **Docker** 进行容器化部署。
+- **服务角色**: MCP 服务将作为**独立的微服务**运行，与 LDIMS 后端服务分开部署。
+- **网络通信**:
+  - MCP 服务将通过配置的 **IP 地址和端口** (定义在 `LDIMS_API_BASE_URL` 中) 来访问 LDIMS 后端 API。
+  - MCP 服务与 LDIMS 后端 API 之间的通信**不需要** HTTPS。
+  - LDIMS 后端 API 需要确保已暴露并允许 MCP 服务进行网络访问。
+- **扩展性与高可用性**:
+  - 预期负载: 中等并发。
+  - 初期**暂不考虑**水平扩展和高可用性方案。
+- **监控与维护**:
+  - 初期**暂不作详细规划**。
