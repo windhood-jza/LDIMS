@@ -143,6 +143,7 @@ export interface DocumentContentSearchQuery {
  * @property {number} fileSize - 文件大小
  * @property {number} sequence - 序列号
  * @property {string} processingStatus - 处理状态
+ * @property {string | null} extractedContent - 提取的文本内容
  * @property {Date | undefined} createdAt - 创建时间
  * @property {Date | undefined} updatedAt - 更新时间
  */
@@ -158,6 +159,7 @@ export interface SimplifiedDocumentFile {
     | "completed"
     | "failed"
     | "ocr_fallback";
+  extractedContent?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

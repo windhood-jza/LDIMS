@@ -26,6 +26,7 @@ var OperationType;
     OperationType["DOCUMENT_CREATE"] = "DOCUMENT_CREATE";
     OperationType["DOCUMENT_UPDATE"] = "DOCUMENT_UPDATE";
     OperationType["DOCUMENT_DELETE"] = "DOCUMENT_DELETE";
+    OperationType["DOCUMENT_VIEW"] = "DOCUMENT_VIEW";
     OperationType["ATTACHMENT_UPLOAD"] = "ATTACHMENT_UPLOAD";
     OperationType["ATTACHMENT_CLEAR"] = "ATTACHMENT_CLEAR";
     // 导入导出
@@ -59,6 +60,7 @@ exports.OperationTypeNames = {
     [OperationType.DOCUMENT_CREATE]: "创建文档",
     [OperationType.DOCUMENT_UPDATE]: "更新文档",
     [OperationType.DOCUMENT_DELETE]: "删除文档",
+    [OperationType.DOCUMENT_VIEW]: "查看文档",
     [OperationType.ATTACHMENT_UPLOAD]: "上传附件",
     [OperationType.ATTACHMENT_CLEAR]: "清空附件",
     // 导入导出
@@ -106,6 +108,7 @@ exports.OperationTypeGroups = [
             OperationType.DOCUMENT_CREATE,
             OperationType.DOCUMENT_UPDATE,
             OperationType.DOCUMENT_DELETE,
+            OperationType.DOCUMENT_VIEW,
             OperationType.ATTACHMENT_UPLOAD,
             OperationType.ATTACHMENT_CLEAR,
             OperationType.DOCUMENT_EXPORT,
