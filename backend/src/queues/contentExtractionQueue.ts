@@ -1,14 +1,14 @@
-import { Queue, QueueOptions } from 'bullmq';
-import redisConfig from '../config/redis'; // 导入我们之前创建的 Redis 配置
+import { Queue, QueueOptions } from "bullmq";
+import redisConfig from "../config/redis"; // 导入我们之前创建的 Redis 配置
 
 // 队列名称，最好使用常量或枚举管理
-export const CONTENT_EXTRACTION_QUEUE_NAME = 'content-extraction';
+export const CONTENT_EXTRACTION_QUEUE_NAME = "content-extraction";
 
 // 默认的作业选项
-const defaultJobOptions: QueueOptions['defaultJobOptions'] = {
+const defaultJobOptions: QueueOptions["defaultJobOptions"] = {
   attempts: 3, // 如果任务失败，最多尝试 3 次
   backoff: {
-    type: 'exponential', // 重试间隔时间指数增长
+    type: "exponential", // 重试间隔时间指数增长
     delay: 5000, // 第一次重试延迟 5 秒
   },
   removeOnComplete: {
@@ -31,6 +31,9 @@ export const contentExtractionQueue = new Queue(CONTENT_EXTRACTION_QUEUE_NAME, {
 console.log(`BullMQ queue '${CONTENT_EXTRACTION_QUEUE_NAME}' initialized.`);
 
 // 可选：添加事件监听器用于调试或监控
-contentExtractionQueue.on('error', (error) => {
-  console.error(`BullMQ queue '${CONTENT_EXTRACTION_QUEUE_NAME}' error:`, error);
-}); 
+contentExtractionQueue.on("error", (error) => {
+  console.error(
+    `BullMQ queue '${CONTENT_EXTRACTION_QUEUE_NAME}' error:`,
+    error
+  );
+});

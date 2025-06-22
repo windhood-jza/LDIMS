@@ -36,10 +36,12 @@ except ImportError:
 
 try:
     from paddleocr import PaddleOCR
+    import fitz  # PyMuPDF
+    import numpy as np
 except ImportError:
-    print("Error: Failed to import the 'paddleocr' library.", file=sys.stderr)
+    print("Error: Failed to import 'paddleocr', 'PyMuPDF' or 'numpy'.", file=sys.stderr)
     print(
-        "Please ensure 'paddleocr' and 'paddlepaddle' are installed in the correct environment.",
+        "Please ensure these libraries are installed in the correct environment.",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -108,36 +110,101 @@ def process_with_markitdown(file_path: Path) -> str:
 
 
 def process_with_paddleocr(file_path: Path) -> str:
-    """使用 PaddleOCR 处理图像文件"""
-    print(f"Processing image with PaddleOCR: {file_path}", file=sys.stderr)
+    """
+    使用 PaddleOCR 处理文件。
+    - 对于图片，直接识别。
+    - 对于PDF，逐页转换为图片后进行识别。
+    """
+    print(f"Processing '{file_path}' with PaddleOCR...", file=sys.stderr)
     engine = initialize_ocr()
     if not engine:
-        print("OCR engine failed to initialize. Cannot process image.", file=sys.stderr)
+        print("OCR engine failed to initialize. Cannot process file.", file=sys.stderr)
         sys.exit(4)  # 特定退出码表示 OCR 引擎错误
 
-    try:
-        # PaddleOCR 处理本地文件路径
-        result = engine.ocr(str(file_path), cls=True)  # cls=True 启用角度分类
-        extracted_texts = []
-        if result and result[0]:  # PaddleOCR 返回列表的列表，第一层通常只有一个元素
-            for line in result[0]:
-                if line and len(line) >= 2:
-                    text_info = line[1]  # 第二个元素是 (文本, 置信度) 元组
-                    if isinstance(text_info, (list, tuple)) and len(text_info) > 0:
-                        extracted_texts.append(
-                            str(text_info[0])
-                        )  # 取元组的第一个元素（文本）
+    file_extension = file_path.suffix.lower()
+    all_texts = []
 
+    try:
+        if file_extension == ".pdf":
+            # --- PDF 处理逻辑 ---
+            print("PDF detected. Processing page by page.", file=sys.stderr)
+            doc = fitz.open(str(file_path))
+            total_pages = len(doc)
+            print(f"Total pages: {total_pages}", file=sys.stderr)
+
+            for page_num in range(total_pages):
+                print(
+                    f"  - Processing page {page_num + 1}/{total_pages}...",
+                    file=sys.stderr,
+                )
+                page = doc.load_page(page_num)
+                pix = page.get_pixmap(dpi=300)  # 使用 300 DPI 获取更好质量
+
+                # 转换图片数据为 numpy 数组
+                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
+                    pix.height, pix.width, pix.n
+                )
+
+                # PaddleOCR 需要 BGR 格式
+                if pix.n == 4:  # RGBA -> BGR
+                    img_bgr = img_data[:, :, [2, 1, 0]]
+                elif pix.n == 3:  # RGB -> BGR
+                    img_bgr = img_data[:, :, ::-1]
+                else:
+                    print(
+                        f"    Skipping page {page_num + 1} due to unsupported image format.",
+                        file=sys.stderr,
+                    )
+                    continue
+
+                # 执行 OCR
+                result = engine.ocr(img_bgr, cls=True)
+
+                # 从结果中提取文本
+                page_texts = []
+                if result and result[0]:
+                    for line in result[0]:
+                        # 确保 line 结构正确
+                        if line and len(line) >= 2:
+                            text_info = line[1]
+                            if (
+                                isinstance(text_info, (list, tuple))
+                                and len(text_info) > 0
+                            ):
+                                page_texts.append(str(text_info[0]))
+
+                # 将单页结果存入列表
+                all_texts.append("\n".join(page_texts))
+
+            doc.close()
+            # 将所有页的结果用换行符合并
+            return "\n\n".join(all_texts)
+
+        elif file_extension in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
+            # --- 图片处理逻辑 ---
+            print("Image file detected. Processing directly.", file=sys.stderr)
+            result = engine.ocr(str(file_path), cls=True)
+            if result and result[0]:
+                for line in result[0]:
+                    if line and len(line) >= 2:
+                        text_info = line[1]
+                        if isinstance(text_info, (list, tuple)) and len(text_info) > 0:
+                            all_texts.append(str(text_info[0]))
+            return "\n".join(all_texts)
+        else:
+            print(
+                f"Unsupported file type for PaddleOCR: {file_extension}",
+                file=sys.stderr,
+            )
+            return ""
+
+    except Exception as e:
         print(
-            f"PaddleOCR processing completed. Extracted {len(extracted_texts)} lines.",
+            f"Error during PaddleOCR processing for '{file_path}': {e}",
             file=sys.stderr,
         )
-        # 将所有识别的文本行连接成一个 Markdown 字符串
-        return "\n".join(extracted_texts)
-    except Exception as e:
-        print(f"Error processing file '{file_path}' with PaddleOCR:", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        sys.exit(2)  # 通用处理错误
+        sys.exit(2)
 
 
 def main():
@@ -160,18 +227,9 @@ def main():
     # 文件类型判断与分发
     if file_extension == ".pdf":
         print(f"Processing PDF file: {file_path}", file=sys.stderr)
-        # 1. 先尝试 MarkItDown
-        markdown_content = process_with_markitdown(file_path)
-
-        # 2. 如果 MarkItDown 结果为空或过短，尝试 OCR
-        if not markdown_content or len(markdown_content) < MIN_TEXT_LENGTH_THRESHOLD:
-            print(
-                f"Warning: MarkItDown result for PDF is empty or too short (length: {len(markdown_content)}). Attempting OCR fallback.",
-                file=sys.stderr,
-            )
-            markdown_content = process_with_paddleocr(file_path)
-        else:
-            print("Using MarkItDown result for PDF.", file=sys.stderr)
+        # 方案1：不再尝试 MarkItDown，总是强制使用 PaddleOCR 以保证最高质量
+        print("Forcing high-quality OCR processing for all PDF files.", file=sys.stderr)
+        markdown_content = process_with_paddleocr(file_path)
 
     elif file_extension == ".docx":
         # 对于 docx，通常 MarkItDown 效果较好，直接使用
