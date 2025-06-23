@@ -554,7 +554,6 @@ const handleSubmit = async () => {
     }
 
     let savedDocumentId: number | null = null;
-    let isNewDocument = false;
 
     console.log("[Dialog] Submitting data:", payload);
 
@@ -565,7 +564,6 @@ const handleSubmit = async () => {
       if (newDocument && newDocument.id) {
         savedDocumentId = newDocument.id;
         currentId.value = savedDocumentId;
-        isNewDocument = true;
         ElMessage.success("文档新增成功");
       } else {
         throw new Error("创建文档后未能获取到有效的文档 ID");
@@ -576,39 +574,45 @@ const handleSubmit = async () => {
       ElMessage.success("文档更新成功");
     }
 
-    if (savedDocumentId && filesToUpload.value.length > 0) {
-      console.log(
-        `[handleSubmit] Document ${mode.value} successful (ID: ${savedDocumentId}). Uploading ${filesToUpload.value.length} selected files.`
-      );
-      try {
-        await handleUploadFiles(savedDocumentId);
-      } catch (uploadError) {
-        console.error(
-          "[handleSubmit] Uploading files after save failed:",
-          uploadError
+    if (savedDocumentId) {
+      if (filesToUpload.value.length > 0) {
+        console.log(
+          `[handleSubmit] Document save successful (ID: ${savedDocumentId}). Uploading ${filesToUpload.value.length} files.`
         );
-        ElMessage.error("文档信息已保存，但文件上传失败。");
+        try {
+          await handleUploadFiles(savedDocumentId);
+        } catch (uploadError) {
+          console.error(
+            "[handleSubmit] Uploading files after save failed:",
+            uploadError
+          );
+          ElMessage.error(
+            "文档信息已保存，但文件上传失败，请稍后在编辑模式下重试。"
+          );
+        }
       }
-    } else if (savedDocumentId && isNewDocument && canStartProcessing.value) {
-      console.log(
-        `[handleSubmit] Document ${savedDocumentId} saved. Checking for pending files...`
-      );
-      console.log(
-        `[handleSubmit] Pending files detected (canStartProcessing=${canStartProcessing.value}). Attempting to automatically start processing.`
-      );
-      try {
-        await handleStartProcessing();
-      } catch (processingError) {
-        console.error(
-          "[handleSubmit] Auto-triggering processing failed:",
-          processingError
+
+      const updatedInfo = await getDocumentInfo(savedDocumentId);
+      associatedFiles.value = updatedInfo.files || [];
+
+      if (canStartProcessing.value) {
+        console.log(
+          `[handleSubmit] Document ${savedDocumentId} ready. Triggering processing for pending files.`
         );
-        ElMessage.error("文档已保存，但自动触发文件处理失败。");
+        try {
+          await handleStartProcessing();
+        } catch (processingError) {
+          console.error(
+            "[handleSubmit] Triggering processing failed:",
+            processingError
+          );
+          ElMessage.error("文档已保存，但触发文件处理失败。");
+        }
+      } else {
+        console.log(
+          `[handleSubmit] Document ${savedDocumentId} ready. No pending files to process.`
+        );
       }
-    } else if (savedDocumentId) {
-      console.log(
-        `[handleSubmit] Document ${savedDocumentId} ${mode.value} successful. No files selected for upload or no pending processing needed.`
-      );
     }
 
     dialogVisible.value = false;
@@ -688,12 +692,6 @@ const handleUploadFiles = async (docIdParam?: number) => {
     );
     filesToUpload.value = [];
     uploadRef.value?.clearFiles();
-    if (!docIdParam && canStartProcessing.value) {
-      console.log(
-        "[handleUploadFiles] Standalone upload successful. Triggering processing."
-      );
-      await handleStartProcessing();
-    }
   } catch (error: any) {
     console.error("Upload files error:", error);
     ElMessage.error(error.message || "文件上传失败");

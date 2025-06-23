@@ -22,55 +22,45 @@ export class ContentProcessingService {
   /**
    * @method processContentExtractionTask
    * @description 处理单个文件内容提取任务的核心逻辑
-   * @param {number} fileId - document_files 表中的文件 ID
+   * @param {object} jobData - 包含任务数据的对象
+   * @param {number} jobData.fileId - document_files 表中的文件 ID
+   * @param {string} jobData.filePath - 文件的相对存储路径
    * @throws {ContentProcessingError} 如果文件记录未找到或处理中发生无法恢复的错误
    */
-  async processContentExtractionTask(fileId: number): Promise<void> {
+  async processContentExtractionTask(jobData: {
+    fileId: number;
+    filePath: string;
+  }): Promise<void> {
+    const { fileId, filePath } = jobData; // 解构参数
+
     console.log(
-      `[ContentProcessingService] Starting task for file ID: ${fileId}`
+      `[ContentProcessingService] Starting task for file ID: ${fileId} with path: ${filePath}`
     );
 
     let documentFile: DocumentFile | null = null;
 
     try {
-      // 1. 获取文件记录
-      documentFile = await DocumentFile.findByPk(fileId);
-      if (!documentFile) {
-        throw new ContentProcessingError(
-          `DocumentFile record not found for ID: ${fileId}`
-        );
-      }
-
-      // 检查状态，避免重复处理 (可选但推荐)
-      if (
-        documentFile.processingStatus !== "pending" &&
-        documentFile.processingStatus !== "failed"
-      ) {
-        // 如果允许重试 'failed' 状态，可以调整此逻辑
-        console.log(
-          `[ContentProcessingService] File ID: ${fileId} status is '${documentFile.processingStatus}', skipping processing.`
-        );
-        return;
-      }
-
-      // 更新状态为 'processing'
-      documentFile.processingStatus = "processing";
-      await documentFile.save();
-      console.log(
-        `[ContentProcessingService] File ID: ${fileId} status updated to 'processing'.`
-      );
-
-      // 2. 构建文件物理路径
-      const storageRoot = await getStoragePath(); // 获取配置的文件存储根目录
-      if (!documentFile.filePath) {
-        throw new ContentProcessingError(
-          `File path is missing for DocumentFile ID: ${fileId}`
-        );
-      }
+      // 1. 验证文件路径并构建完整路径
       // 注意：filePath 设计为相对路径，包含子目录和结构化文件名
-      const fullFilePath = path.resolve(storageRoot, documentFile.filePath);
+      if (!filePath) {
+        throw new ContentProcessingError(
+          `File path is missing in job data for file ID: ${fileId}`
+        );
+      }
+      const storageRoot = await getStoragePath(); // 获取配置的文件存储根目录
+      const fullFilePath = path.resolve(storageRoot, filePath);
       console.log(
         `[ContentProcessingService] Full file path for ID ${fileId}: ${fullFilePath}`
+      );
+
+      // 2. 更新状态为 'processing'
+      // 这一步仍然需要查询数据库，但它现在可以与文件处理并行或稍后进行
+      await DocumentFile.update(
+        { processingStatus: "processing" },
+        { where: { id: fileId } }
+      );
+      console.log(
+        `[ContentProcessingService] File ID: ${fileId} status updated to 'processing'.`
       );
 
       // 3. 准备 Python 脚本参数
@@ -115,8 +105,13 @@ export class ContentProcessingService {
           }`
         );
         // -----------------
-        documentFile.extractedContent = result.output; // 允许保存 null 或空字符串
-        documentFile.processingStatus = "completed";
+        await DocumentFile.update(
+          {
+            extractedContent: result.output,
+            processingStatus: "completed",
+          },
+          { where: { id: fileId } }
+        );
       } else {
         // 失败 (包括脚本内部错误 exitCode != 0 或执行超时/错误)
         console.error(
@@ -126,40 +121,40 @@ export class ContentProcessingService {
             !result.exitCode && result.error?.includes("timed out")
           }. Error: ${result.error}`
         );
-        documentFile.processingStatus = "failed";
-        // 可以考虑将 result.error 存入数据库的错误信息字段 (如果添加了该字段)
-        // documentFile.processingError = result.error;
+        await DocumentFile.update(
+          {
+            processingStatus: "failed",
+            // processingError: result.error // 如果有错误字段
+          },
+          { where: { id: fileId } }
+        );
       }
 
-      // 6. 保存最终状态
-      await documentFile.save();
       console.log(
-        `[ContentProcessingService] File ID: ${fileId} final status saved as '${documentFile.processingStatus}'.`
+        `[ContentProcessingService] File ID: ${fileId} final status saved.`
       );
     } catch (error: any) {
       console.error(
         `[ContentProcessingService] Unhandled error processing file ID: ${fileId}:`,
         error
       );
-      // 如果在更新状态前发生错误，尝试将状态标记为失败
-      if (
-        documentFile &&
-        documentFile.processingStatus !== "completed" &&
-        documentFile.processingStatus !== "failed"
-      ) {
-        try {
-          documentFile.processingStatus = "failed";
-          // documentFile.processingError = error.message; // 记录错误
-          await documentFile.save();
-          console.error(
-            `[ContentProcessingService] Marked file ID: ${fileId} as failed due to unhandled error.`
-          );
-        } catch (saveError) {
-          console.error(
-            `[ContentProcessingService] Failed to save error status for file ID: ${fileId}:`,
-            saveError
-          );
-        }
+      // 发生未知错误时，也尝试将状态标记为失败
+      try {
+        await DocumentFile.update(
+          {
+            processingStatus: "failed",
+            // processingError: error.message // 记录错误
+          },
+          { where: { id: fileId } }
+        );
+        console.error(
+          `[ContentProcessingService] Marked file ID: ${fileId} as failed due to unhandled error.`
+        );
+      } catch (saveError) {
+        console.error(
+          `[ContentProcessingService] Failed to save error status for file ID: ${fileId}:`,
+          saveError
+        );
       }
       // 重新抛出错误，让 BullMQ Worker 知道任务失败
       throw new ContentProcessingError(

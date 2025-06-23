@@ -31,20 +31,30 @@ const worker = new Worker(
   async (job: Job) => {
     // 这是处理器函数 (processor function)
     console.log(`[Worker] Processing job #${job.id} with data:`, job.data);
-    if (!job.data || typeof job.data.fileId !== "number") {
-      throw new Error("Job data is missing or fileId is not a number.");
+    // 修改：验证 job.data 的结构
+    if (
+      !job.data ||
+      typeof job.data.fileId !== "number" ||
+      typeof job.data.filePath !== "string"
+    ) {
+      throw new Error(
+        "Job data is missing or invalid (requires fileId and filePath)."
+      );
     }
     // 调用实际的处理逻辑
-    // 使用导入的 service instance
-    await contentProcessingService.processContentExtractionTask(
-      job.data.fileId
-    ); // <--- 调用实际服务
+    // 使用导入的 service instance，并传递整个 job.data 对象
+    await contentProcessingService.processContentExtractionTask(job.data); // <--- 修改：传递整个 job.data
   },
   {
     connection: redisConfig, // Redis 连接配置
     concurrency: concurrency, // 并发设置
-    // 可以添加更多 Worker 配置项，例如锁的持续时间等
-    // lockDuration: 60000, // 锁的最长持续时间 (毫秒)
+    // 增加锁的持续时间，给耗时的OCR任务足够的时间
+    // 这是解决 "stalled" 问题的关键
+    lockDuration: 10 * 60 * 1000, // 10 分钟
+    // 通过官方选项，向底层的 fork 函数传递参数，以隐藏 Windows 上的弹窗
+    workerForkOptions: {
+      detached: true,
+    },
   }
 );
 
