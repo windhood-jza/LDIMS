@@ -213,7 +213,6 @@
           :limit="10"
           :on-exceed="handleUploadExceed"
           :headers="uploadHeaders"
-          :http-request="() => undefined"
           :before-upload="() => !loading"
           :disabled="loading"
         >
@@ -246,7 +245,7 @@
         <el-button
           type="success"
           @click="() => handleUploadFiles()"
-          :disabled="filesToUpload.length === 0 || loading || mode === 'add'"
+          :disabled="filesToUpload.length === 0 || loading"
           :loading="loading"
         >
           上传选中文件
@@ -307,6 +306,7 @@ import {
   startProcessing as apiStartProcessing,
   downloadFile as apiDownloadFileInEdit,
   getDocumentInfo,
+  deleteDocument,
 } from "@/services/api/document";
 
 interface Props {
@@ -322,6 +322,8 @@ const loading = ref(false);
 const formRef = ref<FormInstance>();
 const mode = ref<"add" | "edit" | "view">("add");
 const currentId = ref<number | null>(null);
+// 若在上传附件时临时创建了文档，则记录其 ID，便于在取消时自动清理
+const tempCreatedDocumentId = ref<number | null>(null);
 
 const isEditingDocType = ref(false);
 const isEditingDepartment = ref(false);
@@ -429,16 +431,21 @@ const open = (type: "add" | "edit" | "view", data?: DocumentInfo) => {
           formData.storageLocation = fullData.storageLocation ?? null;
           formData.handoverDate = fullData.handoverDate ?? undefined;
           formData.remarks = fullData.remarks ?? "";
-          formData.sourceDepartmentId = parseId(fullData.sourceDepartmentId);
-          formData.sourceDepartmentName = fullData.sourceDepartmentName ?? null;
-          const docTypeIdFromData = parseId(fullData.docTypeId);
-          const typeNodeExists = props.docTypeTreeData?.some((node) =>
-            checkNodeExists(node, docTypeIdFromData)
+          // --- 来源部门 ---
+          // 兼容后端字段 departmentId / departmentName
+          formData.sourceDepartmentId = parseId(
+            fullData.sourceDepartmentId ?? (fullData as any).departmentId
           );
-          formData.docTypeId = typeNodeExists ? docTypeIdFromData : null;
-          formData.docTypeName = typeNodeExists
-            ? fullData.docTypeName ?? null
-            : null;
+          formData.sourceDepartmentName =
+            fullData.sourceDepartmentName ??
+            (fullData as any).departmentName ??
+            null;
+
+          // --- 文档类型 ---
+          const docTypeIdFromData = parseId(fullData.docTypeId);
+          formData.docTypeId = docTypeIdFromData ?? null;
+          // 即便没有 ID，也保留名称供展示
+          formData.docTypeName = fullData.docTypeName ?? null;
 
           if (type === "edit") {
             associatedFiles.value = fullData.files || [];
@@ -473,7 +480,8 @@ const checkNodeExists = (
   targetId: number | null | undefined
 ): boolean => {
   if (!node || targetId === null || targetId === undefined) return false;
-  if (node.id === targetId) return true;
+  // 使用数值比较，兼容 id 字符串/数字
+  if (Number(node.id) === Number(targetId)) return true;
   if (node.children && node.children.length > 0) {
     return node.children.some((child: any) => checkNodeExists(child, targetId));
   }
@@ -558,15 +566,23 @@ const handleSubmit = async () => {
     console.log("[Dialog] Submitting data:", payload);
 
     if (mode.value === "add") {
-      const newDocument = await createDocument(
-        payload as CreateDocumentRequest
-      );
-      if (newDocument && newDocument.id) {
-        savedDocumentId = newDocument.id;
-        currentId.value = savedDocumentId;
-        ElMessage.success("文档新增成功");
+      if (currentId.value) {
+        // 已在上传阶段创建过文档，改为更新
+        await updateDocument(currentId.value, payload as UpdateDocumentRequest);
+        savedDocumentId = currentId.value;
+        ElMessage.success("文档保存成功");
       } else {
-        throw new Error("创建文档后未能获取到有效的文档 ID");
+        // 还未创建，正常新增
+        const newDocument = await createDocument(
+          payload as CreateDocumentRequest
+        );
+        if (newDocument && newDocument.id) {
+          savedDocumentId = newDocument.id;
+          currentId.value = savedDocumentId;
+          ElMessage.success("文档新增成功");
+        } else {
+          throw new Error("创建文档后未能获取到有效的文档 ID");
+        }
       }
     } else if (mode.value === "edit" && currentId.value) {
       await updateDocument(currentId.value, payload as UpdateDocumentRequest);
@@ -615,6 +631,9 @@ const handleSubmit = async () => {
       }
     }
 
+    // 文档已正式保存，清除临时标记
+    tempCreatedDocumentId.value = null;
+
     dialogVisible.value = false;
     emit("success");
   } catch (error) {
@@ -627,8 +646,26 @@ const handleSubmit = async () => {
   }
 };
 
-const handleClose = () => {
+const handleClose = async () => {
   if (loading.value) return;
+
+  // 若是在新增模式且存在临时创建的文档，则删除之
+  if (mode.value === "add" && tempCreatedDocumentId.value) {
+    try {
+      loading.value = true;
+      await deleteDocument(tempCreatedDocumentId.value);
+      console.log(
+        `[Dialog] Temporary document ${tempCreatedDocumentId.value} deleted due to cancel.`
+      );
+    } catch (err) {
+      console.error("删除临时文档失败:", err);
+      // 即便删除失败，也继续关闭对话框，不阻塞 UI
+    } finally {
+      loading.value = false;
+      tempCreatedDocumentId.value = null;
+    }
+  }
+
   dialogVisible.value = false;
 };
 
@@ -671,8 +708,60 @@ const handleClearAllFiles = async () => {
 };
 
 const handleUploadFiles = async (docIdParam?: number) => {
-  const targetDocId = docIdParam ?? currentId.value;
-  if (!targetDocId || filesToUpload.value.length === 0) return;
+  // 开始上传或创建操作，先进入加载状态
+  loading.value = true;
+  // 如果还没有文档 ID，则先创建文档
+  let targetDocId = docIdParam ?? currentId.value;
+
+  if (!targetDocId) {
+    // 先校验表单，确保必填项已填写
+    if (formRef.value) {
+      try {
+        await formRef.value.validate();
+      } catch (validErr) {
+        // 表单校验失败，直接返回
+        return;
+      }
+    }
+
+    loading.value = true;
+    try {
+      const payload: CreateDocumentRequest = {
+        docName: formData.doc_name,
+        submitter: formData.submitter,
+        receiver: formData.receiver,
+        signer: formData.signer ?? undefined,
+        storageLocation: formData.storageLocation ?? undefined,
+        handoverDate: formData.handoverDate,
+        remarks: formData.remarks,
+        docTypeId: formData.docTypeId ?? undefined,
+        sourceDepartmentId: formData.sourceDepartmentId ?? undefined,
+      } as CreateDocumentRequest;
+
+      const newDoc = await createDocument(payload);
+      if (!newDoc || !newDoc.id) {
+        throw new Error("创建文档失败，无法上传附件");
+      }
+
+      targetDocId = newDoc.id;
+      currentId.value = targetDocId;
+      tempCreatedDocumentId.value = targetDocId; // 标记为临时文档
+      isMetadataSaved.value = true;
+      ElMessage.success("已创建文档，开始上传附件");
+    } catch (createErr: any) {
+      console.error("创建文档失败:", createErr);
+      ElMessage.error(createErr.message || "创建文档失败，无法上传附件");
+      loading.value = false;
+      return;
+    } finally {
+      // 若后面还有上传流程，loading 状态继续保持
+    }
+  }
+
+  if (!targetDocId || filesToUpload.value.length === 0) {
+    loading.value = false;
+    return;
+  }
 
   const formDataInstance = new FormData();
   filesToUpload.value.forEach((file) => {
@@ -681,15 +770,12 @@ const handleUploadFiles = async (docIdParam?: number) => {
     }
   });
 
-  loading.value = true;
   try {
     const res = await apiUploadFiles(targetDocId, formDataInstance);
     ElMessage.success("文件上传成功");
     associatedFiles.value = res.files || [];
-    console.log(
-      "[Upload Success] Associated files updated:",
-      JSON.parse(JSON.stringify(associatedFiles.value))
-    );
+    // 处理任务应在用户点击“确定”保存后统一触发，故此处不再立刻触发
+
     filesToUpload.value = [];
     uploadRef.value?.clearFiles();
   } catch (error: any) {

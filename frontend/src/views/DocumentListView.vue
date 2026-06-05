@@ -190,7 +190,7 @@
             {{ formatDate(row.handoverDate) }}
           </template>
         </el-table-column>
-        <el-table-column prop="createdBy" label="创建人" width="90" />
+        <el-table-column prop="createdByName" label="创建人" width="90" />
         <el-table-column
           prop="createdAt"
           label="创建时间"
@@ -274,8 +274,8 @@
 </template>
 
 <script setup lang="ts">
-// Removed nextTick from import
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   ElTable,
   ElPagination,
@@ -617,6 +617,25 @@ const formatDateTime = (date: Date | string | null): string => {
 };
 
 // --- 生命周期钩子 ---
+const route = useRoute();
+const router = useRouter();
+
+// 当 url 带有 ?docName=xxx 时自动搜索
+watch(
+  () => route.query.docName,
+  (val) => {
+    if (val && typeof val === "string") {
+      searchForm.docName = val;
+      // 可选：重置其他搜索字段
+      // resetSearch();
+      handleSearch();
+      // 清空查询参数，避免刷新重复触发
+      router.replace({ query: {} });
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   console.log("[DocumentListView] onMounted STARTING...");
   fetchDocTypeTree();

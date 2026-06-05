@@ -4,10 +4,11 @@
       <div class="login-banner">
         <div class="banner-content">
           <h1 class="main-title">
-            <span class="org-name">技术中心融合业务部</span>
-            <span class="system-name">文档管理系统</span>
+            <span class="system-name emphasized">综合文档管理系统</span>
           </h1>
-          <p>高效的文档管理平台，助力台信息化建设。提供文档录入、存储、查询和统计分析等全方位功能，让文档管理更简单。</p>
+          <p>
+            高效的文档管理平台，助力台信息化建设。提供文档录入、存储、查询和统计分析等全方位功能，让文档管理更简单。
+          </p>
         </div>
       </div>
       <div class="login-form-container">
@@ -20,21 +21,37 @@
           @submit.prevent="handleLogin"
         >
           <div class="login-header">
-             <!-- 暂时移除 SVG Logo 以简化 -->
+            <!-- 暂时移除 SVG Logo 以简化 -->
             <h2>欢迎使用</h2>
             <p>请登录您的账号</p>
           </div>
           <el-form-item label="用户名" prop="username">
-            <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large"></el-input>
+            <el-input
+              v-model="loginForm.username"
+              placeholder="请输入用户名"
+              size="large"
+            ></el-input>
           </el-form-item>
           <el-form-item label="密码" prop="password">
-            <el-input type="password" v-model="loginForm.password" placeholder="请输入密码" show-password size="large"></el-input>
+            <el-input
+              type="password"
+              v-model="loginForm.password"
+              placeholder="请输入密码"
+              show-password
+              size="large"
+            ></el-input>
           </el-form-item>
           <el-form-item>
-             <el-checkbox v-model="rememberMe">记住密码</el-checkbox>
+            <el-checkbox v-model="rememberMe">记住密码</el-checkbox>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" native-type="submit" :loading="loading" class="login-btn" size="large">
+            <el-button
+              type="primary"
+              native-type="submit"
+              :loading="loading"
+              class="login-btn"
+              size="large"
+            >
               登 录
             </el-button>
           </el-form-item>
@@ -45,10 +62,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
-import { ElMessage, FormInstance, FormRules } from 'element-plus';
-import { useRouter } from 'vue-router';
-import { loginUser } from '@/services/api/auth'; // 引入真实的登录 API
+import { ref, reactive } from "vue";
+import { ElMessage, FormInstance, FormRules } from "element-plus";
+import { useRouter } from "vue-router";
+import { loginUser } from "@/services/api/auth"; // 引入真实的登录 API
 
 const router = useRouter();
 const loginFormRef = ref<FormInstance>();
@@ -56,13 +73,13 @@ const loading = ref(false);
 const rememberMe = ref(false);
 
 const loginForm = reactive({
-  username: '',
-  password: ''
+  username: "",
+  password: "",
 });
 
 const loginRules = reactive<FormRules>({
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+  password: [{ required: true, message: "请输入密码", trigger: "blur" }],
 });
 
 const handleLogin = async () => {
@@ -74,42 +91,40 @@ const handleLogin = async () => {
     loading.value = true;
     try {
       const response = await loginUser(loginForm);
-      
+
       // Check if response and response.data exist before destructuring
       if (response && response.data) {
         const { token, user } = response.data;
 
         // Ensure token and user are not null/undefined if needed
         if (token && user) {
-          localStorage.setItem('authToken', token);
-          localStorage.setItem('userInfo', JSON.stringify(user));
-          console.log('登录成功，Token:', token);
-          console.log('用户信息:', user);
+          localStorage.setItem("authToken", token);
+          localStorage.setItem("userInfo", JSON.stringify(user));
+          console.log("登录成功，Token:", token);
+          console.log("用户信息:", user);
 
-          ElMessage.success(response.message || '登录成功');
-          router.push('/dashboard');
+          ElMessage.success(response.message || "登录成功");
+          router.push("/dashboard");
         } else {
-           console.error('登录响应格式错误: token 或 user 不存在');
-           ElMessage.error('登录响应格式错误');
+          console.error("登录响应格式错误: token 或 user 不存在");
+          ElMessage.error("登录响应格式错误");
         }
       } else {
-        console.error('登录响应格式错误: response 或 response.data 不存在');
-        ElMessage.error('登录响应格式错误');
+        console.error("登录响应格式错误: response 或 response.data 不存在");
+        ElMessage.error("登录响应格式错误");
       }
-
     } catch (error: any) {
-      console.error('登录失败:', error);
-      ElMessage.error(error.message || '登录失败，请稍后重试');
+      console.error("登录失败:", error);
+      ElMessage.error(error.message || "登录失败，请稍后重试");
     } finally {
       loading.value = false;
     }
   } catch (validationError) {
     // If validate() rejects, it means validation failed
-    console.log('表单验证失败:', validationError);
+    console.log("表单验证失败:", validationError);
     // No need to return false here, validate() rejection handles it
   }
 };
-
 </script>
 
 <style scoped>
@@ -139,14 +154,14 @@ const handleLogin = async () => {
   margin-bottom: 25px; /* 增加标题和描述间距 */
 }
 .main-title {
-  font-size: 36px; /* 调整基础字体大小 */
+  font-size: 48px; /* 调整基础字体大小，增大 */
   font-weight: 300; /* 默认较细的字重 */
   color: #ffffff;
-  letter-spacing: 1.5px; /* 增加字间距 */
+  letter-spacing: 2px; /* 增加字间距 */
   position: relative;
   padding-bottom: 15px; /* 为下划线留出空间 */
   display: inline-block; /* 使下划线宽度自适应内容 */
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* 微调阴影 */
+  text-shadow: 0 0 12px rgba(255, 255, 255, 1); /* 微调阴影 */
 }
 .main-title .org-name {
   font-weight: 500; /* 组织名称稍粗 */
@@ -157,8 +172,14 @@ const handleLogin = async () => {
   font-weight: 300; /* 系统名称使用默认细字重 */
   opacity: 0.9; /* 系统名称稍透明 */
 }
+/* 让系统名称突出显示（沿用原 org-name 样式） */
+.main-title .emphasized {
+  font-weight: 500;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
 .main-title::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -166,7 +187,12 @@ const handleLogin = async () => {
   width: 100%; /* 下划线宽度与标题一致 */
   max-width: 300px; /* 最大宽度限制 */
   height: 3px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1)); /* 渐变下划线 */
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0.1)
+  ); /* 渐变下划线 */
   border-radius: 1.5px;
 }
 .banner-content p {
@@ -214,4 +240,4 @@ const handleLogin = async () => {
     margin: auto; /* 居中 */
   }
 }
-</style> 
+</style>

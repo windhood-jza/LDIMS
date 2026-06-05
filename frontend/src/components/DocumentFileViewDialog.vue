@@ -10,7 +10,11 @@
   >
     <div v-loading="loading">
       <!-- File list (horizontal scroll) -->
-      <div v-if="associatedFiles.length > 0" class="file-list-container">
+      <div
+        v-if="associatedFiles.length > 0"
+        class="file-list-container"
+        ref="fileListRef"
+      >
         <div
           v-for="(file, index) in associatedFiles"
           :key="file.id"
@@ -22,7 +26,13 @@
           <span class="file-item-label">文件 {{ index + 1 }}</span>
         </div>
       </div>
-      <el-empty v-else description="该文档没有关联附件" />
+      <div v-if="associatedFiles.length > 5" class="scroll-hint">
+        <span>← 可左右滑动查看更多文件 →</span>
+      </div>
+      <el-empty
+        v-if="associatedFiles.length === 0"
+        description="该文档没有关联附件"
+      />
 
       <!-- Divider -->
       <el-divider v-if="associatedFiles.length > 0"></el-divider>
@@ -58,7 +68,17 @@
               @click="handleDownloadFile(selectedFile)"
               :loading="downloadingFiles[selectedFile.id]"
             >
-              下载文件
+              下载所选文件
+            </el-button>
+            <el-button
+              type="primary"
+              link
+              size="small"
+              @click="handleBulkDownload"
+              :loading="bulkDownloading"
+              :disabled="associatedFiles.length === 0"
+            >
+              打包下载
             </el-button>
           </el-descriptions-item>
         </el-descriptions>
@@ -76,7 +96,7 @@
           >
             <div
               class="gallery-arrow gallery-arrow-left"
-              v-if="hasScrollableGallery"
+              v-if="imageFiles.length > 3"
               @click="scrollGallery('left')"
               :class="{ disabled: isAtLeftEdge }"
             >
@@ -86,6 +106,7 @@
               <div
                 v-for="file in imageFiles"
                 :key="file.id"
+                :data-file-id="file.id"
                 class="image-thumbnail-card"
                 :class="{ selected: selectedFile?.id === file.id }"
                 @click="selectFileForView(file)"
@@ -96,11 +117,12 @@
                     :src="fileImageUrls[file.id]"
                     alt="图片预览"
                     class="thumbnail-image"
+                    @load="checkGalleryScrollable"
                   />
                   <div v-else class="thumbnail-placeholder">加载中...</div>
                   <div
                     class="thumbnail-overlay"
-                    @click.stop="openImageViewer(file.id)"
+                    @click.stop="handleThumbnailClick(file)"
                   >
                     <span
                       ><el-icon><ZoomIn /></el-icon> 点击查看大图</span
@@ -119,7 +141,7 @@
             </div>
             <div
               class="gallery-arrow gallery-arrow-right"
-              v-if="hasScrollableGallery"
+              v-if="imageFiles.length > 3"
               @click="scrollGallery('right')"
               :class="{ disabled: isAtRightEdge }"
             >
@@ -266,6 +288,7 @@ import {
   getDocumentInfo,
   downloadFile as apiDownloadFile,
   getFilePreviewBlob,
+  downloadAllFiles as apiDownloadAll,
 } from "@/services/api/document";
 import {
   Document,
@@ -288,6 +311,8 @@ const currentDocId = ref<number | null>(null);
 const associatedFiles = ref<DocumentFile[]>([]);
 const selectedFile = ref<DocumentFile | null>(null);
 const downloadingFiles = ref<Record<number, boolean>>({});
+const bulkDownloading = ref(false);
+const currentDocName = ref("");
 
 // Image preview related state
 const imageLoading = ref(false); // Might need refinement based on which image is loading
@@ -315,6 +340,7 @@ const pdfJsLoaded = ref(false);
 
 // Gallery scroll related state
 const galleryRef = ref<HTMLElement | null>(null);
+const fileListRef = ref<HTMLElement | null>(null);
 const hasScrollableGallery = ref(false);
 const isAtLeftEdge = ref(true);
 const isAtRightEdge = ref(false);
@@ -336,6 +362,7 @@ const open = async (documentId: number) => {
   try {
     const fullData = await getDocumentInfo(documentId);
     if (fullData && fullData.files) {
+      currentDocName.value = fullData.docName || "";
       associatedFiles.value = fullData.files;
       if (associatedFiles.value.length > 0) {
         // Select the first file by default
@@ -389,6 +416,22 @@ const handleDownloadFile = async (file: DocumentFile) => {
     ElMessage.error("下载文件失败");
   } finally {
     downloadingFiles.value[file.id] = false;
+  }
+};
+
+const handleBulkDownload = async () => {
+  if (!currentDocId.value) return;
+  const zipName = `${currentDocName.value || "document"}_${new Date()
+    .toISOString()
+    .replace(/[-:T.Z]/g, "")}.zip`;
+  bulkDownloading.value = true;
+  try {
+    await apiDownloadAll(currentDocId.value, zipName);
+  } catch (error) {
+    console.error("Bulk download error:", error);
+    ElMessage.error("批量下载失败");
+  } finally {
+    bulkDownloading.value = false;
   }
 };
 
@@ -473,6 +516,16 @@ const selectFileForView = (file: DocumentFile) => {
       pdfDocument.value = null;
     }
   }
+
+  // 如果是图片文件，自动滚动到选中的缩略图
+  if (isImageType(file.fileType)) {
+    nextTick(() => {
+      scrollToSelectedThumbnail(file.id);
+      scrollToSelectedFileItem(file.id);
+    });
+  } else {
+    nextTick(() => scrollToSelectedFileItem(file.id));
+  }
 };
 
 const preloadImagePreviews = (files: DocumentFile[]) => {
@@ -490,12 +543,23 @@ const loadImagePreview = async (fileId: number) => {
     const blob = await getFilePreviewBlob(fileId);
     const objectUrl = URL.createObjectURL(blob);
     fileImageUrls.value[fileId] = objectUrl;
+
+    // 图片加载完成后检查滚动状态
+    nextTick(() => {
+      checkGalleryScrollable();
+    });
   } catch (error) {
     console.error(`Failed to load image preview for file ${fileId}:`, error);
     // Optionally set a placeholder or error state for this specific image
   } finally {
     imageLoading.value = false; // Hide loading indicator
   }
+};
+
+// 当点击缩略图上的“查看大图”覆盖层时，也同步选中文件
+const handleThumbnailClick = (file: DocumentFile) => {
+  selectFileForView(file);
+  openImageViewer(file.id);
 };
 
 // 动态加载PDF.js库并初始化
@@ -689,6 +753,53 @@ const scrollGallery = (direction: "left" | "right") => {
   setTimeout(() => checkGalleryScrollable(), 300);
 };
 
+// 滚动到选中的缩略图
+const scrollToSelectedThumbnail = (fileId: number) => {
+  if (!galleryRef.value) return;
+
+  const gallery = galleryRef.value;
+  const selectedCard = gallery.querySelector(
+    `[data-file-id="${fileId}"]`
+  ) as HTMLElement;
+
+  if (selectedCard) {
+    // 计算需要滚动的距离，使选中的卡片居中显示
+    const scrollLeft =
+      selectedCard.offsetLeft -
+      (gallery.clientWidth - selectedCard.clientWidth) / 2;
+
+    gallery.scrollTo({
+      left: Math.max(0, scrollLeft),
+      behavior: "smooth",
+    });
+
+    setTimeout(() => checkGalleryScrollable(), 300);
+  }
+};
+
+const scrollToSelectedFileItem = (arg?: any) => {
+  if (!fileListRef.value) return;
+  const fileId = typeof arg === "number" ? arg : selectedFile.value?.id;
+  if (!fileId) return;
+
+  const target = fileListRef.value.querySelector(
+    `[data-file-id='${fileId}']`
+  ) as HTMLElement | null;
+  if (target) {
+    const container = fileListRef.value;
+    const targetLeft = target.offsetLeft;
+    const targetRight = targetLeft + target.offsetWidth;
+    const scrollLeft = container.scrollLeft;
+    const containerWidth = container.clientWidth;
+
+    if (targetLeft < scrollLeft) {
+      container.scrollLeft = targetLeft - 10; // small padding
+    } else if (targetRight > scrollLeft + containerWidth) {
+      container.scrollLeft = targetRight - containerWidth + 10;
+    }
+  }
+};
+
 // 监听PDF相关状态变化 (currentPage, scale)
 watch([currentPage, scale], () => {
   // --- 在 watch 回调开始时取消任务 ---
@@ -740,6 +851,10 @@ onMounted(() => {
       galleryRef.value.addEventListener("scroll", checkGalleryScrollable);
       window.addEventListener("resize", checkGalleryScrollable);
     }
+    if (fileListRef.value) {
+      fileListRef.value.addEventListener("scroll", scrollToSelectedFileItem);
+      window.addEventListener("resize", scrollToSelectedFileItem);
+    }
   });
 
   // 创建隐藏的<script>标签并加载worker文件到public目录
@@ -757,6 +872,10 @@ onBeforeUnmount(() => {
     galleryRef.value.removeEventListener("scroll", checkGalleryScrollable);
   }
   window.removeEventListener("resize", checkGalleryScrollable);
+  if (fileListRef.value) {
+    fileListRef.value.removeEventListener("scroll", scrollToSelectedFileItem);
+  }
+  window.removeEventListener("resize", scrollToSelectedFileItem);
   // Clean up object URLs
   Object.values(fileImageUrls.value).forEach((url) => {
     if (url) URL.revokeObjectURL(url);
@@ -794,6 +913,26 @@ defineExpose({ open });
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 15px; /* Add margin below list */
+  scroll-behavior: smooth;
+}
+
+/* 添加滚动条样式 */
+.file-list-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.file-list-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.file-list-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.file-list-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .file-item {
@@ -1087,5 +1226,12 @@ defineExpose({ open });
 
 .dialog-footer {
   text-align: right;
+}
+
+.scroll-hint {
+  text-align: center;
+  margin-top: 10px;
+  color: #909399;
+  font-size: 14px;
 }
 </style>

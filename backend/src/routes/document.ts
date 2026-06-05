@@ -165,6 +165,20 @@ export const createDocumentRouter = (
     }
   );
 
+  // --- 新增：批量下载所有附件路由 ---
+  /**
+   * @route   GET /:id/files/download-all
+   * @desc    批量打包下载指定文档的所有附件
+   * @access  Private
+   */
+  router.get(
+    "/:id/files/download-all",
+    authenticateToken,
+    (req: Request, res: Response, next: NextFunction) => {
+      documentController.downloadAllDocumentFiles(req, res, next);
+    }
+  );
+
   /**
    * @route   GET /files/:file_id/download
    * @desc    下载单个关联文件

@@ -1,0 +1,102 @@
+# ===================
+# 基础忽略规则
+# ===================
+
+# Node.js 依赖（所有目录）
+node_modules/
+.pnp
+.pnp.js
+
+# Python 虚拟环境（所有目录）
+venv/
+ENV/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 构建产物
+dist/
+build/
+*.tsbuildinfo
+.next/
+.nuxt/
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# ===================
+# 项目特定忽略
+# ===================
+
+# 环境变量（所有位置的 .env）
+.env
+.env.local
+.env.*.local
+
+# 大二进制文件
+*.rar
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# 前端
+frontend/dist/
+frontend/node_modules/
+
+# 后端
+backend/dist/
+backend/node_modules/
+backend/uploads/
+backend/exports/
+
+# MCP 服务
+backend_mcp/dist/
+backend_mcp/node_modules/
+
+# 备份
+*.bak
+*.backup
+*_backup.*
+
+# 临时文件
+.worktrees/
+worktrees/
+*.tmp
+*.temp
+tmp/
+temp/
+
+# PM2
+.pm2/
+pm2.log
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# ===================
+# 证书和密钥
+# ===================
+*.pem
+*.key
+*.crt
+*.cer
+credentials.json
+service-account.json

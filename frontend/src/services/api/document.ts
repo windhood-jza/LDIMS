@@ -203,3 +203,19 @@ export const getFilePreviewBlob = async (fileId: number): Promise<Blob> => {
     throw new Error("获取文件预览失败");
   }
 };
+
+export const downloadAllFiles = async (
+  documentId: number,
+  zipName: string
+): Promise<void> => {
+  try {
+    const response = await wrappedRequest.get<Blob>(
+      `/documents/${documentId}/files/download-all`,
+      { responseType: "blob" }
+    );
+    downloadBlob(response, zipName);
+  } catch (error) {
+    console.error(`[api/document.ts] Error downloading all files for document ${documentId}:`, error);
+    throw error;
+  }
+};

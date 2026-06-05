@@ -99,6 +99,10 @@ export const executePythonScript = (
         // 成功条件：进程启动没问题 (processError=null)，执行未超时 (timedOut=false)，退出码为 0 (code=0)
         const isSuccess = !processError && !timedOut && code === 0;
 
+        // 先打印完整 stdout / stderr，方便排查
+        console.log(`[PythonExecutor] STDOUT >>>\n${stdoutData}`);
+        console.log(`[PythonExecutor] STDERR >>>\n${stderrData}`);
+
         // 准备最终的错误信息字符串
         let finalError = stderrData.trim() || null;
         if (processError) {

@@ -11,7 +11,7 @@
  Target Server Version : 80041 (8.0.41)
  File Encoding         : 65001
 
- Date: 12/05/2025 16:21:41
+ Date: 10/07/2025 10:35:36
 */
 
 SET NAMES utf8mb4;
@@ -55,7 +55,7 @@ CREATE TABLE `doc_types`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_parent`(`parent_id` ASC) USING BTREE,
   INDEX `idx_level`(`level` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 29 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '文档类型表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 30 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '文档类型表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for document_files
@@ -78,7 +78,7 @@ CREATE TABLE `document_files`  (
   INDEX `idx_document_id_sequence`(`document_id` ASC, `sequence` ASC) USING BTREE,
   FULLTEXT INDEX `idx_ft_extracted_content`(`extracted_content`),
   CONSTRAINT `fk_document_id` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE = InnoDB AUTO_INCREMENT = 79 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文档关联文件表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 107 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文档关联文件表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for documents
@@ -139,7 +139,7 @@ CREATE TABLE `export_tasks`  (
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_task_type`(`task_type` ASC) USING BTREE,
   INDEX `idx_related_file`(`related_file_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 56 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '导出与导入任务表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 57 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '导出与导入任务表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for operation_logs
@@ -155,7 +155,7 @@ CREATE TABLE `operation_logs`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user`(`user_id` ASC) USING BTREE,
   INDEX `idx_created_at`(`created_at` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 154 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '操作日志表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 241 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '操作日志表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for search_conditions

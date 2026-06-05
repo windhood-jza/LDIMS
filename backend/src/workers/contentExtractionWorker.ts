@@ -3,6 +3,8 @@ import os from "os";
 import redisConfig from "../config/redis"; // Redis 配置
 import { CONTENT_EXTRACTION_QUEUE_NAME } from "../queues/contentExtractionQueue"; // 队列名称
 import { contentProcessingService } from "../services/ContentProcessingService"; // <--- 导入实际的处理服务
+import DocumentFile from "../models/DocumentFile"; // 导入模型
+import { contentExtractionQueue } from "../queues/contentExtractionQueue"; // 队列实例
 
 // Placeholder for the actual processing function
 // We will implement this service/function later
@@ -57,6 +59,47 @@ const worker = new Worker(
     },
   }
 );
+
+// --- 在 Worker 启动时，自动检查并重新入队所有 pending 文件 ---
+(async () => {
+  try {
+    console.log("[Worker Bootstrap] Scanning for pending files to enqueue...");
+    const pendingFiles = await DocumentFile.findAll({
+      where: { processingStatus: "pending" },
+      attributes: ["id", "filePath"],
+    });
+
+    if (pendingFiles.length === 0) {
+      console.log("[Worker Bootstrap] No pending files found.");
+      return;
+    }
+
+    let enqueuedCount = 0;
+    for (const file of pendingFiles) {
+      if (!file.filePath) continue;
+      try {
+        await contentExtractionQueue.add("process-file", {
+          fileId: file.id,
+          filePath: file.filePath,
+        });
+        enqueuedCount++;
+      } catch (e) {
+        console.error(
+          `[Worker Bootstrap] Failed to enqueue file ID ${file.id}:`,
+          e
+        );
+      }
+    }
+    console.log(
+      `[Worker Bootstrap] Enqueued ${enqueuedCount}/${pendingFiles.length} pending files.`
+    );
+  } catch (bootstrapErr) {
+    console.error(
+      "[Worker Bootstrap] Error scanning/enqueuing pending files:",
+      bootstrapErr
+    );
+  }
+})();
 
 // --- Event Listeners for Monitoring/Logging ---
 

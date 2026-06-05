@@ -85,9 +85,9 @@ export class ContentProcessingService {
       //   - 调用新的统一处理脚本
       const result: PythonExecutionResult = await executePythonScript(
         "process_document.py", // <--- 使用新的脚本名
-        args
-        // 可以根据需要调整超时时间
-        // 600000 // 例如：10 分钟
+        args,
+        // 超时时间：20 分钟
+        1_200_000
       );
 
       // 5. 处理结果

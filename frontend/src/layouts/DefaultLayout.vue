@@ -3,7 +3,7 @@
     <el-container class="layout-container">
       <!-- Sidebar -->
       <el-aside width="200px" class="sidebar">
-        <div class="logo">融合业务部文档管理</div>
+        <div class="logo">综合文档管理系统</div>
         <el-menu
           :default-active="activeMenu"
           class="el-menu-vertical-demo"

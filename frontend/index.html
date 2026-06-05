@@ -1,13 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LDIMS</title>
+    <!-- Dify Chatbot start -->
+    <script>
+      window.difyChatbotConfig = {
+        token: "nDEZuCaa88MbtZzp",
+        baseUrl: "http://localhost",
+      };
+    </script>
+    <script
+      src="http://localhost/embed.min.js"
+      id="nDEZuCaa88MbtZzp"
+      defer
+    ></script>
+    <style>
+      #dify-chatbot-bubble-window {
+        width: 37.5rem !important;
+        height: 45rem !important;
+      }
+      #dify-chatbot-bubble-button {
+        background: #ff3b30 !important;
+      }
+
+      /*（已撤销海豚头像覆盖）*/
+    </style>
+    <!-- Dify Chatbot end -->
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <!-- 监听来自 Chatbot 的文档搜索消息 -->
+    <script>
+      // 添加调试标志
+      window.LDIMS_DEBUG = true;
+
+      function handleDocSearch(docName) {
+        if (window.LDIMS_DEBUG) {
+          console.log("[LDIMS] 处理文档搜索:", docName);
+          console.log("[LDIMS] 当前路由器状态:", !!window.__LDIMS_ROUTER__);
+        }
+
+        const router = window.__LDIMS_ROUTER__;
+        if (router) {
+          // Vue Router 方式
+          try {
+            router.push({
+              name: "DocumentList",
+              query: { docName: docName },
+            });
+            if (window.LDIMS_DEBUG) {
+              console.log("[LDIMS] 路由跳转成功");
+            }
+          } catch (error) {
+            console.error("[LDIMS] 路由跳转失败:", error);
+            // 降级到 URL 方式
+            fallbackNavigation(docName);
+          }
+        } else {
+          // 兜底方案：等待路由器初始化或使用 URL 导航
+          setTimeout(() => {
+            if (window.__LDIMS_ROUTER__) {
+              handleDocSearch(docName);
+            } else {
+              fallbackNavigation(docName);
+            }
+          }, 100);
+        }
+      }
+
+      function fallbackNavigation(docName) {
+        if (window.LDIMS_DEBUG) {
+          console.log("[LDIMS] 使用兜底导航方案");
+        }
+        // 检查当前是否为 hash 路由模式
+        if (window.location.hash) {
+          window.location.hash = `#/documents?docName=${encodeURIComponent(
+            docName
+          )}`;
+        } else {
+          window.location.href = `/documents?docName=${encodeURIComponent(
+            docName
+          )}`;
+        }
+      }
+
+      window.addEventListener("message", function (event) {
+        if (window.LDIMS_DEBUG) {
+          console.log("[LDIMS] 收到消息:", {
+            type: event.data?.type,
+            name: event.data?.name,
+            origin: event.origin,
+            source: event.source,
+          });
+        }
+
+        // 验证消息格式
+        if (!event.data || typeof event.data !== "object") {
+          return;
+        }
+
+        // 验证事件源（基本安全检查）
+        if (
+          event.origin !== window.location.origin &&
+          event.origin !== "http://localhost" &&
+          event.origin !== "http://localhost:3000"
+        ) {
+          if (window.LDIMS_DEBUG) {
+            console.warn("[LDIMS] 忽略来自未知源的消息:", event.origin);
+          }
+          return;
+        }
+
+        // 处理文档搜索请求
+        if (event.data.type === "doc-search" && event.data.name) {
+          console.log("[LDIMS] 收到文档搜索请求:", event.data.name);
+          handleDocSearch(event.data.name);
+        }
+      });
+
+      // 页面加载完成后的初始化检查
+      window.addEventListener("load", function () {
+        setTimeout(() => {
+          if (window.LDIMS_DEBUG) {
+            console.log(
+              "[LDIMS] 页面加载完成，路由器状态:",
+              !!window.__LDIMS_ROUTER__
+            );
+          }
+        }, 1000);
+      });
+    </script>
   </body>
-</html> 
+</html>

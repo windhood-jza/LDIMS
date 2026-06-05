@@ -10,6 +10,8 @@ import fs from "fs/promises"; // 引入 fs.promises 检查文件是否存在
 import { OperationLogService } from "../services/OperationLogService"; // 新增导入
 import { OperationType } from "@ldims/types"; // 新增导入
 import { DocumentContentSearchQuery } from "../types/document.d";
+import Document from "../models/Document"; // 新增 导入 Document 模型
+import archiver from "archiver"; // 新增 用于打包 ZIP
 
 const documentService = new DocumentService(); // Create an instance
 
@@ -563,6 +565,70 @@ class DocumentController {
     }
   }
 
+  // --- 新增：批量打包下载所有附件 ---
+  public async downloadAllDocumentFiles(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const documentId = parseInt(req.params.id);
+      if (isNaN(documentId) || documentId <= 0) {
+        return res.status(400).json(fail("无效的文档 ID"));
+      }
+
+      const document = await Document.findByPk(documentId, {
+        attributes: ["docName"],
+      });
+      if (!document) {
+        return res.status(404).json(fail("文档不存在"));
+      }
+
+      const files = await DocumentFile.findAll({
+        where: { documentId },
+        attributes: ["filePath", "fileName"],
+      });
+      if (files.length === 0) {
+        return res.status(404).json(fail("该文档没有关联附件"));
+      }
+
+      const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, "");
+      const safeDocName = (document.docName || "document").replace(
+        /[^a-zA-Z0-9\u4e00-\u9fa5-_]/g,
+        "_"
+      );
+      const zipName = `${safeDocName}_${timestamp}.zip`;
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename*=UTF-8''${encodeURIComponent(zipName)}`
+      );
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.on("error", (err: any) => {
+        console.error("[downloadAllDocumentFiles] Archiver error:", err);
+        if (!res.headersSent) {
+          res.status(500).json(fail("生成压缩包时出错"));
+        }
+      });
+      archive.pipe(res);
+
+      const storageRoot = await getStoragePath();
+      for (const f of files) {
+        const fullPath = path.join(storageRoot, f.filePath);
+        archive.file(fullPath, { name: f.fileName });
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error("[downloadAllDocumentFiles] Error:", error);
+      if (!res.headersSent) {
+        next(error);
+      }
+    }
+  }
+
   // --- 新增：内容搜索控制器方法 ---
   public async searchDocumentsByContent(
     req: Request,
@@ -703,7 +769,6 @@ class DocumentController {
         error
       );
 
-      // 记录错误操作日志
       if (req) {
         try {
           await OperationLogService.logFromRequest(
@@ -719,7 +784,6 @@ class DocumentController {
         }
       }
 
-      // 传递错误给全局错误处理中间件
       next(error);
     }
   }
