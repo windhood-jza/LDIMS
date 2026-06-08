@@ -140,106 +140,114 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table
-        ref="tableRef"
-        :data="tableData"
-        v-loading="loading"
-        style="width: 100%"
-        stripe
-        border
-        @sort-change="handleSortChange"
-        :default-sort="{ prop: 'createdAt', order: 'descending' }"
-        @selection-change="handleSelectionChange"
-        row-key="id"
-      >
-        <el-table-column
-          type="selection"
-          width="45"
-          :reserve-selection="true"
-        />
-        <el-table-column prop="id" label="ID" width="70" sortable />
-        <el-table-column
-          prop="docName"
-          label="文档名称"
-          width="355"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="docTypeName"
-          label="文档类型"
-          width="120"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="departmentName"
-          label="来源部门"
-          width="120"
-          show-overflow-tooltip
-        />
-        <el-table-column prop="submitter" label="提交人" width="90" />
-        <el-table-column prop="receiver" label="接收人" width="90" />
-        <el-table-column prop="signer" label="签章人" width="90" />
-        <el-table-column
-          prop="handoverDate"
-          label="交接日期"
-          width="110"
-          align="center"
-          sortable="custom"
+      <div class="table-wrapper">
+        <el-table
+          ref="tableRef"
+          class="document-table"
+          :data="tableData"
+          v-loading="loading"
+          stripe
+          border
+          @sort-change="handleSortChange"
+          :default-sort="{ prop: 'createdAt', order: 'descending' }"
+          @selection-change="handleSelectionChange"
+          row-key="id"
         >
-          <template #default="{ row }">
-            {{ formatDate(row.handoverDate) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdByName" label="创建人" width="90" />
-        <el-table-column
-          prop="createdAt"
-          label="创建时间"
-          width="200"
-          align="center"
-          sortable="custom"
-        >
-          <template #default="{ row }">
-            {{ formatDateTime(row.createdAt) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="260" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              :icon="View"
-              @click="handleViewDocumentInfo(row)"
-              >查看</el-button
-            >
-            <el-button
-              type="primary"
-              link
-              size="small"
-              :icon="Edit"
-              @click="handleEdit(row)"
-              >编辑</el-button
-            >
-            <el-button
-              type="success"
-              link
-              size="small"
-              :icon="FolderOpened"
-              @click="handlePreviewFiles(row)"
-              :disabled="!row.fileCount || row.fileCount === 0"
-              >预览文件</el-button
-            >
-            <el-button
-              type="danger"
-              link
-              size="small"
-              :icon="Delete"
-              @click="handleDelete(row)"
-              >删除</el-button
-            >
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            type="selection"
+            width="45"
+            :reserve-selection="true"
+          />
+          <el-table-column prop="id" label="ID" width="70" sortable />
+          <el-table-column
+            prop="docName"
+            label="文档名称"
+            min-width="280"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="docTypeName"
+            label="文档类型"
+            min-width="120"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="departmentName"
+            label="来源部门"
+            min-width="120"
+            show-overflow-tooltip
+          />
+          <el-table-column prop="submitter" label="提交人" min-width="90" />
+          <el-table-column prop="receiver" label="接收人" min-width="90" />
+          <el-table-column prop="signer" label="签章人" min-width="90" />
+          <el-table-column
+            prop="handoverDate"
+            label="交接日期"
+            width="110"
+            align="center"
+            sortable="custom"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.handoverDate) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="createdByName"
+            label="创建人"
+            min-width="90"
+          />
+          <el-table-column
+            prop="createdAt"
+            label="创建时间"
+            width="180"
+            align="center"
+            sortable="custom"
+          >
+            <template #default="{ row }">
+              {{ formatDateTime(row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="300" align="center" fixed="right">
+            <template #default="{ row }">
+              <div class="table-actions">
+                <el-button
+                  type="primary"
+                  link
+                  size="small"
+                  :icon="View"
+                  @click="handleViewDocumentInfo(row)"
+                  >查看</el-button
+                >
+                <el-button
+                  type="primary"
+                  link
+                  size="small"
+                  :icon="Edit"
+                  @click="handleEdit(row)"
+                  >编辑</el-button
+                >
+                <el-button
+                  type="success"
+                  link
+                  size="small"
+                  :icon="FolderOpened"
+                  @click="handlePreviewFiles(row)"
+                  :disabled="!row.fileCount || row.fileCount === 0"
+                  >预览文件</el-button
+                >
+                <el-button
+                  type="danger"
+                  link
+                  size="small"
+                  :icon="Delete"
+                  @click="handleDelete(row)"
+                  >删除</el-button
+                >
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <!-- 分页 -->
       <el-pagination
@@ -713,6 +721,16 @@ const handlePreviewFiles = (row: DocumentInfo) => {
   }
 }
 
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.document-table {
+  width: 100%;
+  min-width: 1545px;
+}
+
 .toolbar {
   display: flex;
   justify-content: flex-end;
@@ -734,6 +752,18 @@ const handlePreviewFiles = (row: DocumentInfo) => {
   margin-left: 8px;
 }
 
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.table-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
 :deep(.el-tree-select__popper) {
   min-width: fit-content;
 }
@@ -742,6 +772,7 @@ const handlePreviewFiles = (row: DocumentInfo) => {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: wrap;
 }
 
 /* 移除之前可能干扰布局的 el-form-item__content 样式 */
