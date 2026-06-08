@@ -1,10 +1,11 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ElMessage } from 'element-plus'; // 引入 Element Plus 消息提示
+import { logger } from '@/utils/logger';
 
 // 读取环境变量，如果未定义则回退到默认值
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const timeout = parseInt(import.meta.env.VITE_API_TIMEOUT || '5000', 10);
-console.log(`[request.ts] API baseURL: ${baseURL}, Timeout: ${timeout}`);
+logger.debug(`[request.ts] API baseURL: ${baseURL}, Timeout: ${timeout}`);
 
 // 创建 axios 实例
 const instance = axios.create({
@@ -15,24 +16,15 @@ const instance = axios.create({
 // 请求拦截器 (可选, 用于添加 token 等)
 instance.interceptors.request.use(
   (config) => {
-    console.log('[request.ts:interceptor] Request interceptor START.');
-    console.log('[request.ts:interceptor] Original config.params:', JSON.stringify(config.params, null, 2)); // Log initial params
-
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[request.ts:interceptor] Token added to headers.');
-    } else {
-       console.log('[request.ts:interceptor] No token found.');
     }
 
-    // --- Log params just before returning ---
-    console.log('[request.ts:interceptor] config.params BEFORE returning config:', JSON.stringify(config.params, null, 2));
-    console.log('[request.ts:interceptor] Request interceptor END.');
     return config; // Return config unchanged regarding params
   },
   (error) => {
-    console.error('Request error:', error); // for debug
+    logger.error('Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -73,7 +65,7 @@ instance.interceptors.response.use(
     }
   },
   (error) => {
-    console.error('Response error:', error); // for debug
+    logger.error('Response error:', error);
 
     // 检查是否存在 error.response (网络错误或 CORS 等问题可能没有 response)
     if (error.response) {

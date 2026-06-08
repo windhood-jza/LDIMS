@@ -66,6 +66,7 @@ import { ref, reactive } from "vue";
 import { ElMessage, FormInstance, FormRules } from "element-plus";
 import { useRouter } from "vue-router";
 import { loginUser } from "@/services/api/auth"; // 引入真实的登录 API
+import { logger } from "@/utils/logger";
 
 const router = useRouter();
 const loginFormRef = ref<FormInstance>();
@@ -100,28 +101,27 @@ const handleLogin = async () => {
         if (token && user) {
           localStorage.setItem("authToken", token);
           localStorage.setItem("userInfo", JSON.stringify(user));
-          console.log("登录成功，Token:", token);
-          console.log("用户信息:", user);
+          logger.info("登录成功");
 
           ElMessage.success(response.message || "登录成功");
           router.push("/dashboard");
         } else {
-          console.error("登录响应格式错误: token 或 user 不存在");
+          logger.error("登录响应格式错误: token 或 user 不存在");
           ElMessage.error("登录响应格式错误");
         }
       } else {
-        console.error("登录响应格式错误: response 或 response.data 不存在");
+        logger.error("登录响应格式错误: response 或 response.data 不存在");
         ElMessage.error("登录响应格式错误");
       }
     } catch (error: any) {
-      console.error("登录失败:", error);
+      logger.error("登录失败:", error);
       ElMessage.error(error.message || "登录失败，请稍后重试");
     } finally {
       loading.value = false;
     }
   } catch (validationError) {
     // If validate() rejects, it means validation failed
-    console.log("表单验证失败:", validationError);
+    logger.debug("表单验证失败:", validationError);
     // No need to return false here, validate() rejection handles it
   }
 };

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { fail } from "../utils/response";
 import { JwtPayload } from "@ldims/types";
+import { logger } from "../utils/logger";
 
 // 扩展 Express 的 Request 接口以包含 user 属性
 declare global {
@@ -34,14 +35,14 @@ const authenticateToken = (
 
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
-    console.error("JWT_SECRET 未配置!");
+    logger.error("JWT_SECRET 未配置!");
     res.status(500).json(fail("服务器配置错误", 500));
     return;
   }
 
   jwt.verify(token, jwtSecret, (err, decoded) => {
     if (err) {
-      console.error("JWT 验证失败:", err.message);
+      logger.warn("JWT 验证失败:", err.message);
       // 可以根据错误类型返回不同消息，如 TokenExpiredError
       if (err.name === "TokenExpiredError") {
         return res.status(401).json(fail("访问令牌已过期", 401));
@@ -51,7 +52,7 @@ const authenticateToken = (
 
     // 验证通过，将解码后的 payload 附加到请求对象上
     req.user = decoded as JwtPayload;
-    console.log("JWT 验证通过, 用户:", req.user?.username);
+    logger.debug("JWT 验证通过");
     next(); // 将控制权传递给下一个中间件或路由处理程序
   });
 };

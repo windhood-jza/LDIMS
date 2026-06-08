@@ -6,6 +6,7 @@ import { testConnection, isConnected } from './config/database';
 import { success } from './utils/response';
 import multer from 'multer';
 import morgan from 'morgan';
+import { logger } from './utils/logger';
 
 // --- 导入服务类 ---
 import { DocumentService } from './services/DocumentService';
@@ -27,7 +28,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(morgan('dev'));
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
 
 // --- 服务实例化与依赖注入 ---
 const documentService = new DocumentService();
@@ -38,9 +41,9 @@ const docTypeService = new DocTypeService();
 // 手动注入 ImportService 到 TaskQueueService
 if (taskQueueService) {
     taskQueueService.setImportService(importService);
-    console.log("[App] ImportService injected into TaskQueueService.");
+    logger.info("[App] ImportService injected into TaskQueueService.");
 } else {
-    console.error("[App Critical Error] TaskQueueService instance not found. Import processing will fail.");
+    logger.error("[App Critical Error] TaskQueueService instance not found. Import processing will fail.");
 }
 
 // 组合所有服务实例到一个对象中
@@ -106,19 +109,19 @@ app.use((err: any, req: Request, res: Response, next: NextFunction): void => {
 // 启动服务器
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`服务器运行在端口 ${PORT}`);
+  logger.info(`服务器运行在端口 ${PORT}`);
   
   // 测试数据库连接
   testConnection()
     .then(connected => {
       if (connected) {
-        console.log('初始化数据库连接成功');
+        logger.info('初始化数据库连接成功');
       } else {
-        console.log('初始化数据库连接失败，服务仍将继续运行');
+        logger.warn('初始化数据库连接失败，服务仍将继续运行');
       }
     })
     .catch(err => {
-      console.error('测试数据库连接时出错:', err);
+      logger.error('测试数据库连接时出错:', err);
     });
 });
 
