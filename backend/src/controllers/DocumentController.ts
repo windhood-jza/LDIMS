@@ -5,13 +5,14 @@ import { Request, Response, NextFunction } from "express"; // Import NextFunctio
 import { validationResult } from "express-validator";
 import DocumentFile from "../models/DocumentFile"; // 引入 DocumentFile 模型
 import { getStoragePath } from "../config/storage"; // 引入获取存储路径的函数
-import path from "path"; // 引入 path 模块
 import fs from "fs/promises"; // 引入 fs.promises 检查文件是否存在
 import { OperationLogService } from "../services/OperationLogService"; // 新增导入
 import { OperationType } from "@ldims/types"; // 新增导入
 import { DocumentContentSearchQuery } from "../types/document.d";
 import Document from "../models/Document"; // 新增 导入 Document 模型
 import archiver from "archiver"; // 新增 用于打包 ZIP
+import { resolveStorageFilePath } from "../utils/storagePath";
+import { logger } from "../utils/logger";
 
 const documentService = new DocumentService(); // Create an instance
 
@@ -276,7 +277,7 @@ class DocumentController {
       // 1. 验证路径参数 ID
       const documentId = parseInt(req.params.id);
       if (isNaN(documentId) || documentId <= 0) {
-        console.warn(
+        logger.warn(
           "[uploadDocumentFiles] Invalid document ID received:",
           req.params.id
         );
@@ -295,36 +296,22 @@ class DocumentController {
           .json(fail("文件上传失败：未检测到上传的文件数组。"));
       }
 
-      // !!! 关键的检查点：记录接收到的原始文件名 !!!
-      if (files && files.length > 0) {
-        files.forEach((file, index) => {
-          console.log(
-            `[uploadDocumentFiles] Received file ${
-              index + 1
-            } for document ID ${documentId}: originalname = '${
-              file.originalname
-            }', mimetype = '${file.mimetype}', size = ${file.size}`
-          );
-        });
-      }
-      // !!! 日志添加结束 !!!
-
       if (files.length === 0) {
-        console.log(
+        logger.info(
           `[uploadDocumentFiles] No files were uploaded for document ID ${documentId}.`
         );
         return res.status(400).json(fail("必须上传至少一个文件进行替换。"));
       }
 
       // 3. 调用服务层方法
-      console.log(
+      logger.info(
         `[uploadDocumentFiles] Calling DocumentService.uploadAndReplaceFiles for document ID ${documentId} with ${files.length} files.`
       );
       const uploadedFileRecords = await documentService.uploadAndReplaceFiles(
         documentId,
         files
       );
-      console.log(
+      logger.info(
         `[uploadDocumentFiles] Successfully uploaded ${uploadedFileRecords.length} files for document ID ${documentId}.`
       );
 
@@ -343,11 +330,11 @@ class DocumentController {
           OperationType.ATTACHMENT_UPLOAD,
           operationContent
         );
-        console.log(
+        logger.info(
           `[uploadDocumentFiles] Operation log created for document ID ${documentId} attachment upload.`
         );
       } catch (logError) {
-        console.error(
+        logger.error(
           `[uploadDocumentFiles] Failed to create operation log for document ID ${documentId} attachment upload:`,
           logError
         );
@@ -362,7 +349,7 @@ class DocumentController {
     } catch (error: any) {
       // 捕获来自 Service 层的错误 (包括文件系统、数据库错误等)
       // Multer 自身的错误 (如文件过大) 通常由 Multer 或全局错误处理中间件处理
-      console.error(
+      logger.error(
         `[uploadDocumentFiles] Error uploading files for document ID ${req.params.id}:`,
         error
       );
@@ -381,7 +368,7 @@ class DocumentController {
       // 1. 验证路径参数 ID
       const documentId = parseInt(req.params.id);
       if (isNaN(documentId) || documentId <= 0) {
-        console.warn(
+        logger.warn(
           "[deleteAllDocumentFiles] Invalid document ID received:",
           req.params.id
         );
@@ -389,12 +376,12 @@ class DocumentController {
       }
 
       // 2. 调用服务层方法
-      console.log(
+      logger.info(
         `[deleteAllDocumentFiles] Calling DocumentService.deleteAllFilesForDocument for document ID ${documentId}.`
       );
       // DocumentService.deleteAllFilesForDocument 不返回任何内容，如果出错会抛出异常
       await documentService.deleteAllFilesForDocument(documentId);
-      console.log(
+      logger.info(
         `[deleteAllDocumentFiles] Successfully deleted all files for document ID ${documentId}.`
       );
 
@@ -406,11 +393,11 @@ class DocumentController {
           OperationType.ATTACHMENT_CLEAR,
           operationContent
         );
-        console.log(
+        logger.info(
           `[deleteAllDocumentFiles] Operation log created for document ID ${documentId} attachment clear.`
         );
       } catch (logError) {
-        console.error(
+        logger.error(
           `[deleteAllDocumentFiles] Failed to create operation log for document ID ${documentId} attachment clear:`,
           logError
         );
@@ -426,7 +413,7 @@ class DocumentController {
       return res.json(success(null, "关联文件已成功清空"));
     } catch (error: any) {
       // 捕获来自 Service 层的错误 (如文档未找到、文件删除失败等)
-      console.error(
+      logger.error(
         `[deleteAllDocumentFiles] Error deleting files for document ID ${req.params.id}:`,
         error
       );
@@ -445,7 +432,7 @@ class DocumentController {
       // 1. 验证路径参数 ID
       const documentId = parseInt(req.params.id);
       if (isNaN(documentId) || documentId <= 0) {
-        console.warn(
+        logger.warn(
           "[startFileProcessing] Invalid document ID received:",
           req.params.id
         );
@@ -453,7 +440,7 @@ class DocumentController {
       }
 
       // 2. 调用服务层方法 (待实现)
-      console.log(
+      logger.info(
         `[startFileProcessing] Calling DocumentService.triggerFileProcessing for document ID ${documentId}.`
       );
       // 这个服务方法目前可能只是占位符或只更新状态，实际任务入队在阶段二实现
@@ -461,7 +448,7 @@ class DocumentController {
       const processingResult = await documentService.triggerFileProcessing(
         documentId
       );
-      console.log(
+      logger.info(
         `[startFileProcessing] File processing triggered for document ID ${documentId}. Result:`,
         processingResult
       );
@@ -472,7 +459,7 @@ class DocumentController {
       return res.status(202).json(success(processingResult, "文件处理已开始"));
     } catch (error: any) {
       // 捕获来自 Service 层的错误 (如文档未找到、任务入队失败等)
-      console.error(
+      logger.error(
         `[startFileProcessing] Error triggering file processing for document ID ${req.params.id}:`,
         error
       );
@@ -491,7 +478,7 @@ class DocumentController {
       // 1. 验证路径参数 file_id
       const fileId = parseInt(req.params.file_id);
       if (isNaN(fileId) || fileId <= 0) {
-        console.warn(
+        logger.warn(
           "[downloadDocumentFile] Invalid file ID received:",
           req.params.file_id
         );
@@ -499,7 +486,7 @@ class DocumentController {
       }
 
       // 2. 从数据库查找文件记录
-      console.debug(
+      logger.debug(
         `[downloadDocumentFile] Looking for file record with ID: ${fileId}`
       );
       const fileRecord = await DocumentFile.findByPk(fileId, {
@@ -507,7 +494,7 @@ class DocumentController {
       });
 
       if (!fileRecord || !fileRecord.filePath || !fileRecord.fileName) {
-        console.warn(
+        logger.warn(
           `[downloadDocumentFile] File record not found or missing path/name for ID: ${fileId}`
         );
         return res.status(404).json(fail("文件记录不存在或信息不完整"));
@@ -515,19 +502,23 @@ class DocumentController {
 
       // 3. 构建完整物理路径
       const storageRoot = await getStoragePath();
-      const fullPath = path.join(storageRoot, fileRecord.filePath);
-      console.debug(
-        `[downloadDocumentFile] Attempting to download file from path: ${fullPath}`
-      );
+      let fullPath: string;
+      try {
+        fullPath = resolveStorageFilePath(storageRoot, fileRecord.filePath);
+      } catch (pathError) {
+        logger.error(
+          `[downloadDocumentFile] Unsafe file path for file ID ${fileId}:`,
+          pathError
+        );
+        return res.status(400).json(fail("文件路径无效或不安全"));
+      }
+      logger.debug(`[downloadDocumentFile] Attempting to download file ID: ${fileId}`);
 
       // 4. (可选但推荐) 检查物理文件是否存在
       try {
         await fs.access(fullPath, fs.constants.R_OK); // 检查文件是否存在且可读
       } catch (accessError) {
-        console.error(
-          `[downloadDocumentFile] File not accessible at path ${fullPath}:`,
-          accessError
-        );
+        logger.error(`[downloadDocumentFile] File not accessible for ID ${fileId}:`, accessError);
         return res.status(404).json(fail("物理文件不存在或无法访问"));
       }
 
@@ -536,10 +527,7 @@ class DocumentController {
       res.download(fullPath, fileRecord.fileName, (err) => {
         if (err) {
           // 如果在发送过程中发生错误 (例如连接中断)，需要处理
-          console.error(
-            `[downloadDocumentFile] Error sending file ${fullPath} to client:`,
-            err
-          );
+          logger.error(`[downloadDocumentFile] Error sending file ID ${fileId} to client:`, err);
           // 避免再次发送响应头，检查是否已发送
           if (!res.headersSent) {
             // 可以选择将错误传递给下一个错误处理器，或者发送一个通用错误
@@ -548,13 +536,11 @@ class DocumentController {
           }
         }
         // 如果没有错误，res.download 会自动结束响应
-        console.log(
-          `[downloadDocumentFile] Successfully started download for file: ${fileRecord.fileName} (ID: ${fileId})`
-        );
+        logger.info(`[downloadDocumentFile] Successfully started download for file ID: ${fileId}`);
       });
     } catch (error: any) {
       // 捕获数据库查询、路径获取等其他可能的错误
-      console.error(
+      logger.error(
         `[downloadDocumentFile] General error processing download for file ID ${req.params.file_id}:`,
         error
       );
@@ -607,7 +593,7 @@ class DocumentController {
 
       const archive = archiver("zip", { zlib: { level: 9 } });
       archive.on("error", (err: any) => {
-        console.error("[downloadAllDocumentFiles] Archiver error:", err);
+        logger.error("[downloadAllDocumentFiles] Archiver error:", err);
         if (!res.headersSent) {
           res.status(500).json(fail("生成压缩包时出错"));
         }
@@ -616,13 +602,13 @@ class DocumentController {
 
       const storageRoot = await getStoragePath();
       for (const f of files) {
-        const fullPath = path.join(storageRoot, f.filePath);
+        const fullPath = resolveStorageFilePath(storageRoot, f.filePath);
         archive.file(fullPath, { name: f.fileName });
       }
 
       await archive.finalize();
     } catch (error) {
-      console.error("[downloadAllDocumentFiles] Error:", error);
+      logger.error("[downloadAllDocumentFiles] Error:", error);
       if (!res.headersSent) {
         next(error);
       }
