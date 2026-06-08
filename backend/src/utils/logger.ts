@@ -8,24 +8,33 @@ const levelPriority: Record<LogLevel, number> = {
 };
 
 const normalizeLevel = (level: string | undefined): LogLevel => {
-  if (level === "debug" || level === "info" || level === "warn" || level === "error") {
-    return level;
+  const normalizedLevel = level?.trim().toLowerCase();
+  if (
+    normalizedLevel === "debug" ||
+    normalizedLevel === "info" ||
+    normalizedLevel === "warn" ||
+    normalizedLevel === "error"
+  ) {
+    return normalizedLevel;
   }
   return process.env.NODE_ENV === "production" ? "warn" : "debug";
 };
 
-const configuredLevel = normalizeLevel(process.env.LOG_LEVEL);
+export const getConfiguredLogLevel = (): LogLevel => {
+  return normalizeLevel(process.env.LOG_LEVEL);
+};
 
 const shouldLog = (level: LogLevel): boolean => {
+  const configuredLevel = getConfiguredLogLevel();
   return levelPriority[level] >= levelPriority[configuredLevel];
 };
 
 export const logger = {
   debug: (...args: unknown[]) => {
-    if (shouldLog("debug")) console.debug(...args);
+    if (shouldLog("debug")) console.log(...args);
   },
   info: (...args: unknown[]) => {
-    if (shouldLog("info")) console.info(...args);
+    if (shouldLog("info")) console.log(...args);
   },
   warn: (...args: unknown[]) => {
     if (shouldLog("warn")) console.warn(...args);

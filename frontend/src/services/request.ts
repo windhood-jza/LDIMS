@@ -148,11 +148,11 @@ const wrappedRequest: RequestFunction = {
    * Performs a PATCH request.
    * The type parameter T represents the expected type *after* the response interceptor.
    */
-  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
+  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) =>
     instance.patch<any, T>(url, data, config),
 };
 
 // Export the wrapped object instead of the raw instance
 export default wrappedRequest;
 
-// --- End: Wrapper Implementation --- 
+// --- End: Wrapper Implementation ---

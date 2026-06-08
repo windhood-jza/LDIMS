@@ -1,12 +1,12 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { testConnection, isConnected } from './config/database';
 import { success } from './utils/response';
 import multer from 'multer';
 import morgan from 'morgan';
-import { logger } from './utils/logger';
+import { getConfiguredLogLevel, logger } from './utils/logger';
 
 // --- 导入服务类 ---
 import { DocumentService } from './services/DocumentService';
@@ -18,9 +18,6 @@ import { taskQueueService } from './services/TaskQueueService';
 // --- 导入主路由创建函数 ---
 import { createApiRouter } from './routes/index';
 
-// 加载环境变量
-dotenv.config();
-
 // 创建Express应用
 const app = express();
 
@@ -28,7 +25,11 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-if (process.env.NODE_ENV !== 'production') {
+if (
+  process.env.NODE_ENV !== 'production' ||
+  getConfiguredLogLevel() === 'debug' ||
+  getConfiguredLogLevel() === 'info'
+) {
   app.use(morgan('dev'));
 }
 
@@ -109,11 +110,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction): void => {
 // 启动服务器
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  logger.info(`服务器运行在端口 ${PORT}`);
-  logger.info(
-    `日志配置: LOG_LEVEL=${process.env.LOG_LEVEL || "default"}, NODE_ENV=${
+  console.log(`服务器运行在端口 ${PORT}`);
+  console.log(
+    `日志配置: LOG_LEVEL=${getConfiguredLogLevel()}, NODE_ENV=${
       process.env.NODE_ENV || "development"
-    }`
+    }, raw_LOG_LEVEL=${process.env.LOG_LEVEL || "unset"}`
   );
   
   // 测试数据库连接
@@ -130,4 +131,4 @@ app.listen(PORT, () => {
     });
 });
 
-export default app; 
+export default app;
