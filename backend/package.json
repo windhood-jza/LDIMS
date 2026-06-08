@@ -7,7 +7,7 @@
     "start": "node dist/app.js",
     "dev": "nodemon --watch src -e ts --exec ts-node src/app.ts",
     "build": "tsc && copyfiles -u 1 \"src/python-scripts/**/*\" dist",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test -r ts-node/register \"tests/**/*.test.ts\"",
     "start:worker:dev": "node -r tsconfig-paths/register -r ts-node/register src/workers/contentExtractionWorker.ts",
     "start:worker": "node dist/workers/contentExtractionWorker.js"
   },
