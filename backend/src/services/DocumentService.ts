@@ -23,6 +23,7 @@ import { OperationType } from "@ldims/types";
 import { Request } from "express";
 import { getStoragePath } from "../config/storage";
 import { contentExtractionQueue } from "../queues/contentExtractionQueue"; // <--- 导入 BullMQ 队列
+import { logger } from "../utils/logger";
 // 假设有一个任务队列服务接口或类
 // import { TaskQueueService } from './TaskQueueService';
 
@@ -907,7 +908,7 @@ export class DocumentService {
 
       // 2. 确保新的文档子文件夹存在
       await fs.mkdir(documentFolderPath, { recursive: true });
-      console.debug(
+      logger.debug(
         `[DocumentService] Ensured document folder exists for document ID ${documentId}.`
       );
 
@@ -936,18 +937,18 @@ export class DocumentService {
         const finalRelativePath = path.join(sanitizedDocName, finalFilename);
         const finalFullPath = path.join(storageRoot, finalRelativePath);
 
-        console.debug(
+        logger.info(
           `[DocumentService] Processing uploaded file #${sequence} for document ID ${documentId}: mimetype=${file.mimetype}, size=${file.size}`
         );
 
         // 将 Multer 保存的临时文件重命名/移动到最终位置
         try {
           await fs.rename(file.path, finalFullPath);
-          console.debug(
+          logger.info(
             `[DocumentService] Uploaded file #${sequence} moved to managed storage for document ID ${documentId}.`
           );
         } catch (renameError) {
-          console.error(
+          logger.error(
             `[DocumentService] Failed to move uploaded file #${sequence} for document ID ${documentId}:`,
             renameError
           );
@@ -968,7 +969,7 @@ export class DocumentService {
           sequence: sequence,
           processingStatus: "pending" as const,
         };
-        console.debug(
+        logger.debug(
           `[DocumentService] Creating DocumentFile record for document ID ${documentId}, file #${sequence}.`
         );
         const newFileRecord = await DocumentFile.create(fileData, {
@@ -977,13 +978,13 @@ export class DocumentService {
         createdFileRecords.push(newFileRecord);
       }
 
-      console.debug(
+      logger.info(
         `[DocumentService] ${createdFileRecords.length} new file records created and files moved for document ID ${documentId}.`
       );
 
       // 4. 提交事务
       await t.commit();
-      console.debug(
+      logger.debug(
         `[DocumentService] uploadAndReplaceFiles transaction committed for document ID ${documentId}.`
       );
 

@@ -110,6 +110,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction): void => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   logger.info(`服务器运行在端口 ${PORT}`);
+  logger.info(
+    `日志配置: LOG_LEVEL=${process.env.LOG_LEVEL || "default"}, NODE_ENV=${
+      process.env.NODE_ENV || "development"
+    }`
+  );
   
   // 测试数据库连接
   testConnection()
