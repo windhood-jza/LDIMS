@@ -1,5 +1,6 @@
 import { SandboxedJob } from "bullmq";
 import { contentProcessingService } from "../services/ContentProcessingService";
+import { logger } from "../utils/logger";
 
 /**
  * 这是沙盒化的处理器文件。
@@ -9,30 +10,31 @@ import { contentProcessingService } from "../services/ContentProcessingService";
  * @param job SandboxedJob 对象，包含了任务的数据
  */
 module.exports = async (job: SandboxedJob) => {
-  console.log(
-    `[Processor] Starting sandboxed processing for job #${job.id} with data:`,
-    job.data
-  );
+  logger.info(`[Processor] Starting sandboxed processing for job #${job.id}.`);
 
-  if (!job.data || typeof job.data.fileId !== "number") {
-    console.error('[Processor] Job data is invalid.', job.data);
-    throw new Error("Job data is missing or fileId is not a number.");
+  if (
+    !job.data ||
+    typeof job.data.fileId !== "number" ||
+    typeof job.data.filePath !== "string"
+  ) {
+    logger.error(`[Processor] Job data is invalid for job #${job.id}.`);
+    throw new Error("Job data is missing or invalid.");
   }
 
   try {
     // 调用我们现有的、包含了所有实际处理逻辑的服务
     const result = await contentProcessingService.processContentExtractionTask(
-      job.data.fileId
+      job.data
     );
-    console.log(`[Processor] Job #${job.id} completed successfully.`);
+    logger.info(`[Processor] Job #${job.id} completed successfully.`);
     // 沙盒处理器可以返回一个结果，这个结果会被保存在 Job 的 returnvalue 中
     return result;
   } catch (error: any) {
-    console.error(
+    logger.error(
       `[Processor] Error processing job #${job.id}: ${error.message}`,
       error.stack
     );
     // 在沙盒处理器中抛出异常，会导致 BullMQ 将任务标记为 "failed"
     throw error;
   }
-}; 
+};

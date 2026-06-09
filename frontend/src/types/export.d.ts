@@ -22,7 +22,7 @@ export interface Task {
   originalFileName: string | null; // 导入任务的原始文件名
   fileName: string | null; // 导出任务的文件名
   fileType: string | null; // 文件类型 (xlsx, csv)
-  filePath: string | null; // 确保 filePath 存在且类型正确
+  canDownload?: boolean;
   errorMessage: string | null; // 任务失败时的总体错误消息
   errorDetails: string | null; // JSON 格式的详细错误信息
   totalRows: number | null; // 导入任务的总行数
@@ -88,4 +88,4 @@ export interface UploadResponse {
 export interface ImportRequestParams {
   fileName: string; // 服务器保存的文件名 (来自 UploadResponse)
   originalName: string; // 原始文件名 (来自 UploadResponse)
-} 
+}

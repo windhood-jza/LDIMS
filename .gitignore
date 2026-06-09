@@ -49,8 +49,10 @@ docs/
 
 # 环境变量（所有位置的 .env）
 .env
+.env.docker
 .env.local
 .env.*.local
+backend/.env.docker
 
 # 大二进制文件
 *.rar

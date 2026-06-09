@@ -9,6 +9,8 @@ import * as fs from 'fs'; // 引入 Node.js fs 模块用于检查文件是否存
 import * as path from 'path'; // 引入 path 模块
 import ExportTask from '../models/ExportTask'; // 修改为默认导入
 import upload from '../middleware/multerConfig'; // 导入 Multer 配置
+import { logger } from '../utils/logger';
+import { resolveExportFilePath } from '../utils/exportPath';
 
 // --- 将路由设置封装在函数中，接收服务实例作为参数 ---
 export const createExportRouter = (exportService: ExportService, importService: ImportService): Router => {
@@ -72,11 +74,9 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 const exportOptions = { fields, fileType };
 
                 // --- 添加日志，检查接收到的 currentPageIds --- 
-                console.log(`[Debug] Received export request. Scope: ${exportScope}`);
+                logger.debug(`[Export API] Received export request. Scope: ${exportScope}`);
                 if (exportScope === 'currentPage') {
-                    console.log(`[Debug] Received currentPageIds (raw):`, currentPageIds);
-                    console.log(`[Debug] Type of currentPageIds:`, typeof currentPageIds);
-                    console.log(`[Debug] Is currentPageIds an array?`, Array.isArray(currentPageIds));
+                    logger.debug(`[Export API] currentPageIds is array: ${Array.isArray(currentPageIds)}`);
                 }
                 // ---------------------------------------------
 
@@ -97,7 +97,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 
                 // 直接传递原始数组或 null (Sequelize 会处理 JSON 列)
                 const currentPageIdsValue = (exportScope === 'currentPage') ? (currentPageIds || null) : null;
-                console.log(`[Debug] Passing currentPageIdsValue to service:`, currentPageIdsValue);
+                logger.debug(`[Export API] Passing currentPageIdsValue to service.`);
                 // -----------------------------------------------------
 
                 const newTask = await exportService.createExportTask(
@@ -112,7 +112,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 res.status(201).json({ code: 201, message: '导出任务已创建', data: { taskId: newTask.id } });
                 return;
             } catch (error) {
-                 console.error('[API Error] /documents/export:', error);
+                 logger.error('[API Error] /documents/export:', error);
                  const message = error instanceof Error ? error.message : '创建导出任务时出错';
                  res.status(500).json({ code: 500, message: message });
                  return;
@@ -165,7 +165,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                         fileName: task.fileName,
                         originalFileName: task.originalFileName,
                         fileType: task.fileType,
-                        filePath: task.filePath,
+                        canDownload: task.taskType === 'document_export' && task.status === 2 && !!task.filePath,
                         totalRows: task.totalRows,
                         successCount: task.successCount,
                         failureCount: task.failureCount,
@@ -184,7 +184,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 return;
 
             } catch (error) {
-                console.error('[API Error] /export-tasks:', error);
+                logger.error('[API Error] /export-tasks:', error);
                 const message = error instanceof Error ? error.message : '获取任务列表时出错';
                 res.status(500).json({ code: 500, message: message });
                 return;
@@ -237,7 +237,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                     queryCriteria: task.queryCriteria, // 考虑是否返回查询条件
                     progress: task.progress,
                     selectedFields: task.selectedFields, // 考虑是否返回选择的字段
-                    filePath: task.filePath,
+                    canDownload: task.taskType === 'document_export' && task.status === 2 && !!task.filePath,
                     errorMessage: task.errorMessage,
                     createdAt: task.createdAt,
                     updatedAt: task.updatedAt,
@@ -247,7 +247,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 return;
 
             } catch (error) {
-                console.error(`[API Error] /export-tasks/${req.params.taskId}:`, error);
+                logger.error(`[API Error] /export-tasks/${req.params.taskId}:`, error);
                 const message = error instanceof Error ? error.message : '获取任务详情时出错';
                 res.status(500).json({ code: 500, message: message });
                 return;
@@ -280,36 +280,48 @@ export const createExportRouter = (exportService: ExportService, importService: 
                     return;
                 }
 
-                console.log(`[API Download] User ${userId} requesting download for task ${taskId}`);
+                logger.info(`[API Download] User ${userId} requesting download for task ${taskId}`);
 
                 const task = await exportService.getTaskById(taskId, userId);
 
                 if (!task) {
-                    console.log(`[API Download] Task ${taskId} not found or user ${userId} not authorized.`);
+                    logger.warn(`[API Download] Task ${taskId} not found or user ${userId} not authorized.`);
                     res.status(404).json({ code: 404, message: '导出任务未找到' });
                     return;
                 }
 
                 // 检查任务状态是否为"完成" (status code 2)
                 if (task.status !== 2) {
-                     console.log(`[API Download] Task ${taskId} is not completed (status: ${task.status}).`);
+                     logger.info(`[API Download] Task ${taskId} is not completed (status: ${task.status}).`);
                     res.status(400).json({ code: 400, message: '任务尚未完成，无法下载' });
                     return;
                 }
 
                 // 检查文件路径是否存在
                 if (!task.filePath) {
-                    console.error(`[API Download] Task ${taskId} completed but filePath is missing.`);
+                    logger.error(`[API Download] Task ${taskId} completed but filePath is missing.`);
                     res.status(500).json({ code: 500, message: '任务文件路径丢失' });
+                    return;
+                }
+
+                let fullPath: string;
+                try {
+                    fullPath = resolveExportFilePath(
+                        path.resolve(__dirname, '../../exports'),
+                        task.filePath
+                    );
+                } catch (pathError) {
+                    logger.error(`[API Download] Unsafe export file path for task ${taskId}:`, pathError);
+                    res.status(400).json({ code: 400, message: '导出文件路径无效或不安全' });
                     return;
                 }
 
                 // 检查物理文件是否存在
                 try {
-                    await fs.promises.access(task.filePath, fs.constants.R_OK); // 检查文件是否存在且可读
-                    console.log(`[API Download] File found at ${task.filePath}. Starting download...`);
+                    await fs.promises.access(fullPath, fs.constants.R_OK); // 检查文件是否存在且可读
+                    logger.info(`[API Download] Export file is ready for task ${taskId}.`);
                 } catch (fileError) {
-                    console.error(`[API Download] File not accessible at path ${task.filePath}:`, fileError);
+                    logger.error(`[API Download] Export file is not accessible for task ${taskId}:`, fileError);
                     res.status(404).json({ code: 404, message: '导出文件不存在或无法访问' });
                     return;
                 }
@@ -317,26 +329,26 @@ export const createExportRouter = (exportService: ExportService, importService: 
                 // 使用 res.download 发送文件
                 // 第一个参数是文件在服务器上的绝对路径
                 // 第二个参数是可选的，指定下载时显示给用户的文件名，如果省略则使用原始文件名
-                const downloadFileName = task.fileName || path.basename(task.filePath);
-                res.download(task.filePath, downloadFileName, (err) => {
+                const downloadFileName = task.fileName || path.basename(fullPath);
+                res.download(fullPath, downloadFileName, (err) => {
                     if (err) {
                         // 需要在这里处理下载过程中可能发生的错误，例如连接中断
                         // res.headersSent 检查是否已开始发送响应头，如果已发送则无法再发送错误 JSON
                         if (!res.headersSent) {
-                             console.error(`[API Download] Error sending file ${task.filePath}:`, err);
+                             logger.error(`[API Download] Error sending export file for task ${taskId}:`, err);
                              res.status(500).json({ code: 500, message: '下载文件时发生错误' });
                         } else {
-                             console.error(`[API Download] Error after headers sent for file ${task.filePath}:`, err);
+                             logger.error(`[API Download] Error after headers sent for export task ${taskId}:`, err);
                              // 可能需要记录日志，但无法再向客户端发送消息
                         }
                     } else {
-                        console.log(`[API Download] File ${downloadFileName} sent successfully.`);
+                        logger.info(`[API Download] Export task ${taskId} sent successfully.`);
                         // 下载成功完成
                     }
                 });
 
             } catch (error) {
-                console.error(`[API Error] /export-tasks/${req.params.taskId}/download:`, error);
+                logger.error(`[API Error] /export-tasks/${req.params.taskId}/download:`, error);
                 if (!res.headersSent) {
                     const message = error instanceof Error ? error.message : '处理下载请求时出错';
                     res.status(500).json({ code: 500, message: message });
@@ -387,7 +399,7 @@ export const createExportRouter = (exportService: ExportService, importService: 
                  res.status(200).json({ code: 200, message: '导入请求已收到，任务将在后台处理' });
 
             } catch (error) {
-                console.error('[API Error] /documents/import:', error);
+                logger.error('[API Error] /documents/import:', error);
                 const message = error instanceof Error ? error.message : '触发导入任务时出错';
                 res.status(500).json({ code: 500, message: message });
             }
@@ -430,15 +442,15 @@ export const createExportRouter = (exportService: ExportService, importService: 
                     }
                 });
             } catch (error) {
-                console.error('[API Error] /upload/excel:', error);
+                logger.error('[API Error] /upload/excel:', error);
                 const filePath = path.join(__dirname, '..', '..', 'uploads', uploadedFileName);
                 try {
                     if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
-                        console.log(`[API Cleanup] Deleted uploaded file due to task creation failure: ${filePath}`);
+                        logger.info(`[API Cleanup] Deleted uploaded file after import task creation failure.`);
                     }
                 } catch (unlinkError) {
-                    console.error(`[API Cleanup] Error deleting uploaded file ${filePath}:`, unlinkError);
+                    logger.error(`[API Cleanup] Error deleting uploaded file after import task creation failure:`, unlinkError);
                 }
 
                 const message = error instanceof Error ? error.message : '文件上传成功但创建导入任务失败';
@@ -451,4 +463,4 @@ export const createExportRouter = (exportService: ExportService, importService: 
 };
 
 // 移除旧的默认导出
-// export default router; 
+// export default router;

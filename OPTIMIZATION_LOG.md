@@ -102,3 +102,25 @@
 - 修复后端 `logger` 在模块加载时提前缓存 `LOG_LEVEL` 的问题。由于 `app.ts` 中 `dotenv.config()` 可能晚于静态导入执行，旧实现会导致 `.env` 中的日志级别没有生效；现已改为每次输出日志时读取当前环境变量。
 - 新增 `backend/tests/utils/logger.test.ts`，覆盖“先导入 logger、后设置 `LOG_LEVEL`”时日志级别仍能生效的场景。
 - 进一步加固本地开发日志可见性：将 `.env` 加载提前到业务模块导入前；后端启动时的端口和日志级别改为直接 `console.log` 输出，不再受 `LOG_LEVEL` 过滤；`debug/info` 级别统一走 `console.log`，避免不同终端对 `console.debug/info` 展示不一致；`LOG_LEVEL` 支持大小写和前后空格容错。
+
+## 2026-06-09 安全与日志收口优化
+
+### 背景
+
+在基础加固完成后继续检查发现，导出任务下载链路仍会向前端暴露 `filePath`，下载时直接使用任务中的文件路径；内容提取服务和 worker 仍存在完整路径、任务数据或提取内容片段输出；Docker Compose 未显式传递 `LOG_LEVEL`；本地真实 Docker 环境文件也需要明确避免误提交。
+
+### 调整内容
+
+- 新建优化分支：`codex/security-log-hardening`。
+- 导出任务下载增加导出目录边界校验，新增 `backend/src/utils/exportPath.ts` 和 `backend/tests/utils/exportPath.test.ts`。
+- 导出任务列表和详情不再向前端返回 `filePath`，改为返回 `canDownload`，前端下载按钮改用该字段判断。
+- 内容提取服务改用 `resolveStorageFilePath` 解析文件路径，不再输出完整物理路径和提取内容片段。
+- content extraction worker / processor 接入后端 logger，不再打印完整 `job.data`；同时修复 sandbox processor 向内容处理服务传参不一致的问题。
+- `docker-compose.yaml` 的 backend 和 worker 环境变量显式传入 `LOG_LEVEL`。
+- `.gitignore` 明确忽略 `.env.docker` 和 `backend/.env.docker`，避免真实环境配置误提交。
+
+### 验证情况
+
+- 已运行 `backend` 下的 `npm test`，10 个测试全部通过。
+- 已运行 `backend` 下的 `npm run build`，构建通过。
+- 已运行 `frontend` 下的 `npm run build`，构建通过；仍保留 Vite 大 chunk 警告。

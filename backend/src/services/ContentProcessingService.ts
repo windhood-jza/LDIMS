@@ -4,7 +4,8 @@ import {
   PythonExecutionResult,
 } from "../utils/pythonExecutor";
 import { getStoragePath } from "../config/storage"; // 假设我们用这个函数获取存储根路径
-import * as path from "path";
+import { logger } from "../utils/logger";
+import { resolveStorageFilePath } from "../utils/storagePath";
 
 // 可以在这里定义更具体的错误类型
 class ContentProcessingError extends Error {
@@ -33,9 +34,7 @@ export class ContentProcessingService {
   }): Promise<void> {
     const { fileId, filePath } = jobData; // 解构参数
 
-    console.log(
-      `[ContentProcessingService] Starting task for file ID: ${fileId} with path: ${filePath}`
-    );
+    logger.info(`[ContentProcessingService] Starting task for file ID: ${fileId}`);
 
     let documentFile: DocumentFile | null = null;
 
@@ -48,10 +47,8 @@ export class ContentProcessingService {
         );
       }
       const storageRoot = await getStoragePath(); // 获取配置的文件存储根目录
-      const fullFilePath = path.resolve(storageRoot, filePath);
-      console.log(
-        `[ContentProcessingService] Full file path for ID ${fileId}: ${fullFilePath}`
-      );
+      const fullFilePath = resolveStorageFilePath(storageRoot, filePath);
+      logger.debug(`[ContentProcessingService] Resolved managed file path for ID ${fileId}.`);
 
       // 2. 更新状态为 'processing'
       // 这一步仍然需要查询数据库，但它现在可以与文件处理并行或稍后进行
@@ -59,7 +56,7 @@ export class ContentProcessingService {
         { processingStatus: "processing" },
         { where: { id: fileId } }
       );
-      console.log(
+      logger.info(
         `[ContentProcessingService] File ID: ${fileId} status updated to 'processing'.`
       );
 
@@ -71,7 +68,7 @@ export class ContentProcessingService {
       const azureKey = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY; // Key 由脚本内部检查环境变量
 
       if (azureEndpoint) {
-        console.log(
+        logger.info(
           `[ContentProcessingService] Azure DI Endpoint found, adding to args for file ID: ${fileId}`
         );
         args.push("--azure-endpoint", azureEndpoint);
@@ -79,7 +76,7 @@ export class ContentProcessingService {
       }
 
       // 4. 调用 executePythonScript 执行 Python 脚本
-      console.log(
+      logger.info(
         `[ContentProcessingService] Executing python script for file ID: ${fileId}...`
       );
       //   - 调用新的统一处理脚本
@@ -93,18 +90,11 @@ export class ContentProcessingService {
       // 5. 处理结果
       if (result.success) {
         // 成功
-        console.log(
+        logger.info(
           `[ContentProcessingService] Python script successful for file ID: ${fileId}. Output length: ${
             result.output?.length ?? 0
           }`
         );
-        // ---- 添加日志 ----
-        console.log(
-          `[ContentProcessingService] Extracted content before DB save (first 100 chars): ${
-            result.output?.substring(0, 100) ?? "null"
-          }`
-        );
-        // -----------------
         await DocumentFile.update(
           {
             extractedContent: result.output,
@@ -114,7 +104,7 @@ export class ContentProcessingService {
         );
       } else {
         // 失败 (包括脚本内部错误 exitCode != 0 或执行超时/错误)
-        console.error(
+        logger.error(
           `[ContentProcessingService] Python script failed for file ID: ${fileId}. Exit code: ${
             result.exitCode
           }. Timed out: ${
@@ -130,11 +120,11 @@ export class ContentProcessingService {
         );
       }
 
-      console.log(
+      logger.info(
         `[ContentProcessingService] File ID: ${fileId} final status saved.`
       );
     } catch (error: any) {
-      console.error(
+      logger.error(
         `[ContentProcessingService] Unhandled error processing file ID: ${fileId}:`,
         error
       );
@@ -147,11 +137,11 @@ export class ContentProcessingService {
           },
           { where: { id: fileId } }
         );
-        console.error(
+        logger.error(
           `[ContentProcessingService] Marked file ID: ${fileId} as failed due to unhandled error.`
         );
       } catch (saveError) {
-        console.error(
+        logger.error(
           `[ContentProcessingService] Failed to save error status for file ID: ${fileId}:`,
           saveError
         );

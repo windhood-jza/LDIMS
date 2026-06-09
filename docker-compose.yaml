@@ -21,6 +21,7 @@ services:
     container_name: ${CONTAINER_PREFIX:-ldims}_backend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
       TZ: ${TZ:-Asia/Shanghai}
       PORT: ${PORT:-3000}
       DB_DIALECT: ${DB_DIALECT:-mysql}
@@ -56,6 +57,7 @@ services:
     command: npm run start:worker
     environment:
       NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
       TZ: ${TZ:-Asia/Shanghai}
       DB_DIALECT: ${DB_DIALECT:-mysql}
       DB_HOST: db

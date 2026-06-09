@@ -5,6 +5,7 @@ import { CONTENT_EXTRACTION_QUEUE_NAME } from "../queues/contentExtractionQueue"
 import { contentProcessingService } from "../services/ContentProcessingService"; // <--- 导入实际的处理服务
 import DocumentFile from "../models/DocumentFile"; // 导入模型
 import { contentExtractionQueue } from "../queues/contentExtractionQueue"; // 队列实例
+import { logger } from "../utils/logger";
 
 // Placeholder for the actual processing function
 // We will implement this service/function later
@@ -23,7 +24,7 @@ import { contentExtractionQueue } from "../queues/contentExtractionQueue"; // �
 // 确定并发数：使用 CPU 核心数减 1 (至少为 1)，可以根据服务器负载调整
 const concurrency = Math.max(1, os.cpus().length - 1);
 
-console.log(
+logger.info(
   `[Worker] Setting up content extraction worker with concurrency: ${concurrency}`
 );
 
@@ -32,7 +33,7 @@ const worker = new Worker(
   CONTENT_EXTRACTION_QUEUE_NAME, // 监听的队列名称
   async (job: Job) => {
     // 这是处理器函数 (processor function)
-    console.log(`[Worker] Processing job #${job.id} with data:`, job.data);
+    logger.info(`[Worker] Processing job #${job.id}.`);
     // 修改：验证 job.data 的结构
     if (
       !job.data ||
@@ -63,14 +64,14 @@ const worker = new Worker(
 // --- 在 Worker 启动时，自动检查并重新入队所有 pending 文件 ---
 (async () => {
   try {
-    console.log("[Worker Bootstrap] Scanning for pending files to enqueue...");
+    logger.info("[Worker Bootstrap] Scanning for pending files to enqueue...");
     const pendingFiles = await DocumentFile.findAll({
       where: { processingStatus: "pending" },
       attributes: ["id", "filePath"],
     });
 
     if (pendingFiles.length === 0) {
-      console.log("[Worker Bootstrap] No pending files found.");
+      logger.info("[Worker Bootstrap] No pending files found.");
       return;
     }
 
@@ -84,17 +85,17 @@ const worker = new Worker(
         });
         enqueuedCount++;
       } catch (e) {
-        console.error(
+        logger.error(
           `[Worker Bootstrap] Failed to enqueue file ID ${file.id}:`,
           e
         );
       }
     }
-    console.log(
+    logger.info(
       `[Worker Bootstrap] Enqueued ${enqueuedCount}/${pendingFiles.length} pending files.`
     );
   } catch (bootstrapErr) {
-    console.error(
+    logger.error(
       "[Worker Bootstrap] Error scanning/enqueuing pending files:",
       bootstrapErr
     );
@@ -104,17 +105,17 @@ const worker = new Worker(
 // --- Event Listeners for Monitoring/Logging ---
 
 worker.on("completed", (job: Job, returnValue: any) => {
-  console.log(`[Worker] Job #${job.id} completed successfully.`);
+  logger.info(`[Worker] Job #${job.id} completed successfully.`);
 });
 
 worker.on("failed", (job: Job | undefined, error: Error) => {
   if (job) {
-    console.error(
+    logger.error(
       `[Worker] Job #${job.id} failed after ${job.attemptsMade} attempts with error: ${error.message}`,
       error.stack
     );
   } else {
-    console.error(
+    logger.error(
       `[Worker] A job failed with error: ${error.message}`,
       error.stack
     );
@@ -123,18 +124,18 @@ worker.on("failed", (job: Job | undefined, error: Error) => {
 
 worker.on("error", (error) => {
   // 通常是连接 Redis 等非任务本身的问题
-  console.error("[Worker] Worker encountered an error:", error);
+  logger.error("[Worker] Worker encountered an error:", error);
 });
 
 worker.on("active", (job: Job) => {
-  console.log(`[Worker] Job #${job.id} is now active.`);
+  logger.debug(`[Worker] Job #${job.id} is now active.`);
 });
 
 worker.on("stalled", (jobId: string) => {
-  console.warn(`[Worker] Job #${jobId} has stalled.`);
+  logger.warn(`[Worker] Job #${jobId} has stalled.`);
 });
 
-console.log(
+logger.info(
   `[Worker] Content extraction worker listening to queue '${CONTENT_EXTRACTION_QUEUE_NAME}'...`
 );
 

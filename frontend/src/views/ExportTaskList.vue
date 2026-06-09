@@ -78,7 +78,7 @@
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.taskType === 'document_export' && row.status === 2 && row.filePath"
+              v-if="row.taskType === 'document_export' && row.status === 2 && row.canDownload"
               type="primary"
               size="small"
               link
@@ -375,4 +375,4 @@ pre {
   border-radius: 4px;
   font-family: monospace;
 }
-</style> 
+</style>
